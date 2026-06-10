@@ -1,0 +1,21 @@
+name: Design sync
+description: Track public design synchronization work
+title: "[design-sync]: "
+labels: ["design-sync"]
+body:
+  - type: input
+    id: source
+    attributes:
+      label: Source reference
+      placeholder: UbU-project/ubu-design
+  - type: textarea
+    id: scope
+    attributes:
+      label: Sync scope
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: Public-safe references only
+        - label: No private fixtures added

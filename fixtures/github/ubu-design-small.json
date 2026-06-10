@@ -1,0 +1,13 @@
+{
+  "fixture": "ubu-design-small",
+  "public_safe": true,
+  "repositories": [
+    {
+      "name": "ubu-design",
+      "owner": "UbU-project",
+      "visibility": "public",
+      "fake_issue_count": 2
+    }
+  ],
+  "notes": "Fake public fixture for harness testing only."
+}

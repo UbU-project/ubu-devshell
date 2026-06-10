@@ -1,0 +1,10 @@
+{
+  "fixture": "multi-repo-small",
+  "public_safe": true,
+  "repositories": [
+    { "name": "ubu-core", "owner": "UbU-project", "fake_issue_count": 1 },
+    { "name": "ubu-store", "owner": "UbU-project", "fake_issue_count": 1 },
+    { "name": "ubu-ui", "owner": "UbU-project", "fake_issue_count": 1 }
+  ],
+  "notes": "Fake public fixture for cross-repo harness testing only."
+}

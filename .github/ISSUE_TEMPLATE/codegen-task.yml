@@ -1,0 +1,23 @@
+name: Codegen task
+description: Track public code generation work
+title: "[codegen]: "
+labels: ["codegen"]
+body:
+  - type: textarea
+    id: source
+    attributes:
+      label: Source
+      description: Pinned local source repository and path.
+  - type: textarea
+    id: target
+    attributes:
+      label: Target
+      description: Generated output repository and path.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: No network fetch required
+        - label: No private data included
+        - label: Generated output verified locally

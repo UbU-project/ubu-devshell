@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bash syntax
+        run: bash -n scripts/*.sh
+
+      - name: Shellcheck if available
+        run: |
+          if command -v shellcheck >/dev/null 2>&1; then
+            shellcheck scripts/*.sh
+          else
+            echo "shellcheck not available; skipping"
+          fi
+
+      - name: Validate repos.toml
+        run: |
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          data = tomllib.loads(Path("repos.toml").read_text())
+          repos = data.get("repos", {})
+          if not repos:
+              raise SystemExit("repos.toml has no [repos] entries")
+          for name, url in repos.items():
+              if not isinstance(name, str) or not isinstance(url, str):
+                  raise SystemExit("repo names and urls must be strings")
+              if not url.startswith("https://github.com/UbU-project/"):
+                  raise SystemExit(f"unexpected repo url: {name}={url}")
+          print(f"validated {len(repos)} repos")
+          PY

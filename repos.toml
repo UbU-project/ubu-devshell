@@ -1,0 +1,10 @@
+[repos]
+ubu_design = "https://github.com/UbU-project/ubu-design"
+ubu_schemas = "https://github.com/UbU-project/ubu-schemas"
+ubu_core = "https://github.com/UbU-project/ubu-core"
+ubu_store = "https://github.com/UbU-project/ubu-store"
+ubu_github_adapter = "https://github.com/UbU-project/ubu-github-adapter"
+ubu_planning_kernel = "https://github.com/UbU-project/ubu-planning-kernel"
+ubu_orchestrator = "https://github.com/UbU-project/ubu-orchestrator"
+ubu_ui = "https://github.com/UbU-project/ubu-ui"
+ubu_brand = "https://github.com/UbU-project/ubu-brand"

@@ -1,0 +1,7 @@
+{
+  "package": "ubu-phase1-public-demo",
+  "fixture": true,
+  "public_safe": true,
+  "generated_by": "ubu-devshell",
+  "notes": "Placeholder package shape for public demo workflows."
+}

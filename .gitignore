@@ -1,0 +1,18 @@
+# OS and editor noise
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# Local logs and temp output
+*.log
+tmp/
+
+# Shell/editor environment files
+.env
+.env.*
+
+# Do not ignore devshell source files or artifacts by default.
+# Generated .cargo/config.toml files are written into sibling repos, not here.

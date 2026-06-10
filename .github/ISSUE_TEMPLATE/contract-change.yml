@@ -1,0 +1,22 @@
+name: Contract change
+description: Track a contract change owned by another Phase 1 repo
+title: "[contract]: "
+labels: ["contract"]
+body:
+  - type: input
+    id: owner
+    attributes:
+      label: Owning repository
+      placeholder: UbU-project/ubu-schemas
+  - type: textarea
+    id: change
+    attributes:
+      label: Change
+      description: Describe the contract change and why devshell is tracking it.
+  - type: checkboxes
+    id: boundaries
+    attributes:
+      label: Boundary checks
+      options:
+        - label: Source of truth remains outside ubu-devshell
+        - label: No canonical schema added to ubu-devshell
