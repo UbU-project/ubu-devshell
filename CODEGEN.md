@@ -10,13 +10,33 @@ the network.
 Primary commands:
 
 ```sh
-./scripts/generate-ui-api-client.sh
-./scripts/generate-ui-schema-types.sh
-./scripts/generate-codegen-issues.sh
-./scripts/generate-public-artifacts.sh
+./scripts/generate-ui-api-client.sh          # copy pinned OpenAPI file into ubu-ui
+./scripts/generate-ui-api-client.sh --from-server  # fetch from running orchestrator
+./scripts/generate-ui-schema-types.sh        # copy pinned TS types into ubu-ui
+./scripts/generate-codegen-issues.sh         # write issue drafts under artifacts/
+./scripts/generate-public-artifacts.sh       # write public-safe artifact package
 ```
 
-See [docs/codegen-workflow.md](docs/codegen-workflow.md).
+## Prerequisites
+
+Both generation scripts require local checkouts of their source repos:
+
+| Script | Needs |
+|---|---|
+| `generate-ui-api-client.sh` | `ubu-orchestrator` with `openapi/openapi.generated.json` present, and `ubu-ui` |
+| `generate-ui-schema-types.sh` | `ubu-schemas` with TypeScript output generated, and `ubu-ui` |
+
+Clone all repos first if needed:
+
+```sh
+./scripts/clone-all.sh
+```
+
+Scripts fail clearly when prerequisites are missing. No private credentials
+are required.
+
+See [docs/codegen-workflow.md](docs/codegen-workflow.md) for full details
+including environment variable overrides.
 
 ## Governing Decisions
 
