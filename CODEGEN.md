@@ -48,3 +48,9 @@ vocabulary. The current governing decisions for Phase 1 vocabulary are:
 Any PR that adds, renames, or removes fields in the generated API client or
 schema types must reference the relevant decision ID from this range in the
 PR description and in the generated issue draft.
+
+The fixture smoke test (`scripts/run-fixture-demo.sh`) exercises the
+store-backed orchestrator path. The removal of the in-memory MemoryState
+path and the addition of `UBU_DB_PATH` config are governed by orchestrator
+ticket **O4** (`O4: Replace MemoryState with ubu_store admission and query
+boundary`). See `docs/fixture-demo.md` for the full demo description.
