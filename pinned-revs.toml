@@ -1,0 +1,23 @@
+# Pinned revs for Phase 1 upstream repos.
+#
+# Record the expected HEAD SHA here each time an upstream repo lands.
+# D1 ticket R_* notation → key mapping:
+#   R_schemas      → ubu_schemas
+#   R_core         → ubu_core
+#   R_store        → ubu_store
+#   R_planning     → ubu_planning_kernel
+#   R_adapter      → ubu_github_adapter
+#   R_orchestrator → ubu_orchestrator
+#   R_ui           → ubu_ui
+#
+# Leave a value as "" when a repo has not yet landed.
+# show-revs.sh compares these against local checkout HEADs.
+
+[pinned]
+ubu_schemas         = "1755b9348d510cbb32314405ece4631813f8e222"  # R_schemas
+ubu_core            = "139ce98a2dce40f8e73f472344d5cc4a8eb59db1"  # R_core
+ubu_store           = "4204a0e6e5c0bb1882b7672e022e3458789c1061"  # R_store
+ubu_planning_kernel = "4786682fdd00e10b316db3b76f3fc83d9ca629d8"  # R_planning
+ubu_github_adapter  = "d99f28feeec82d4a7e06f5b1889cbdef586b8afd"  # R_adapter
+ubu_orchestrator    = "1d839defb2c8752ab339d586e7ea29a3af2cab1c"  # R_orchestrator
+ubu_ui              = "0ccd1f6e38e381f94ad2248e5c42e6c8a3142fb6"  # R_ui

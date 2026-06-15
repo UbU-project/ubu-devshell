@@ -17,3 +17,14 @@ Primary commands:
 ```
 
 See [docs/codegen-workflow.md](docs/codegen-workflow.md).
+
+## Governing Decisions
+
+Generated issue text must cite governing decision IDs when touching
+vocabulary. The current governing decisions for Phase 1 vocabulary are:
+
+- **UBU-D0226** through **UBU-D0230**
+
+Any PR that adds, renames, or removes fields in the generated API client or
+schema types must reference the relevant decision ID from this range in the
+PR description and in the generated issue draft.
