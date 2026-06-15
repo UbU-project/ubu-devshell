@@ -47,39 +47,77 @@ pinned_rev() {
   ' "$PINNED_FILE"
 }
 
+# Map git %G? code to a human-readable label.
+# Reports "unverified-locally" when Git cannot check (missing key, no gpg, etc.)
+sig_label() {
+  local dir="$1"
+  local code
+  code="$(git -C "$dir" log -1 --format="%G?" 2>/dev/null)" || { printf 'error'; return; }
+  case "$code" in
+    G) printf 'signed-ok' ;;
+    B) printf 'BAD-SIG' ;;
+    U) printf 'unverified-key' ;;
+    X) printf 'sig-expired' ;;
+    Y) printf 'key-expired' ;;
+    R) printf 'key-revoked' ;;
+    E) printf 'unverified-locally' ;;
+    N) printf 'unsigned' ;;
+    *) printf 'unknown(%s)' "$code" ;;
+  esac
+}
+
+tree_state() {
+  local dir="$1"
+  if [[ -n "$(git -C "$dir" status --short 2>/dev/null)" ]]; then
+    printf 'DIRTY'
+  else
+    printf 'clean'
+  fi
+}
+
 mismatch=0
 
-printf '%-24s %-10s %-10s %s\n' "REPO" "ACTUAL" "PINNED" "STATUS"
-printf '%-24s %-10s %-10s %s\n' "----" "------" "------" "------"
+printf '%-24s %-14s %-9s %-19s %-6s %-9s %s\n' \
+  "REPO" "BRANCH" "HEAD" "SIG" "TREE" "PINNED" "STATUS"
+printf '%-24s %-14s %-9s %-19s %-6s %-9s %s\n' \
+  "----" "------" "----" "---" "----" "------" "------"
 
 while read -r name; do
   dir="$REPOS_DIR/$(repo_dir_name "$name")"
   pinned="$(pinned_rev "$name")"
 
   if [[ ! -d "$dir/.git" ]]; then
-    actual="missing"
     if [[ -n "$pinned" ]]; then
       status="MISSING"
       mismatch=1
     else
       status="unset"
     fi
-  elif actual="$(git -C "$dir" rev-parse --short HEAD 2>/dev/null)"; then
-    if [[ -z "$pinned" ]]; then
-      status="unset"
-    elif [[ "$actual" == "$pinned"* || "$pinned" == "$actual"* ]]; then
-      status="OK"
-    else
-      status="MISMATCH"
-      mismatch=1
-    fi
-  else
-    actual="no-head"
+    printf '%-24s %-14s %-9s %-19s %-6s %-9s %s\n' \
+      "$name" "-" "missing" "-" "-" "${pinned:0:8}" "$status"
+    continue
+  fi
+
+  branch="$(git -C "$dir" rev-parse --abbrev-ref HEAD 2>/dev/null || printf '?')"
+  actual="$(git -C "$dir" rev-parse --short HEAD 2>/dev/null || printf 'no-head')"
+  sig="$(sig_label "$dir")"
+  tree="$(tree_state "$dir")"
+
+  if [[ "$actual" == "no-head" ]]; then
     status="ERROR"
+    mismatch=1
+  elif [[ -z "$pinned" ]]; then
+    status="unset"
+  elif [[ "$actual" == "$pinned"* || "$pinned" == "$actual"* ]]; then
+    status="OK"
+  else
+    status="MISMATCH"
     mismatch=1
   fi
 
-  printf '%-24s %-10s %-10s %s\n' "$name" "$actual" "${pinned:-(unset)}" "$status"
+  pinned_short="${pinned:0:8}"
+  printf '%-24s %-14s %-9s %-19s %-6s %-9s %s\n' \
+    "$name" "$branch" "$actual" "$sig" "$tree" "${pinned_short:-(unset)}" "$status"
 done < <(repo_names)
 
 if [[ "$mismatch" -ne 0 ]]; then
