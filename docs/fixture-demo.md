@@ -10,9 +10,9 @@ Current entry point:
 
 ## What the demo exercises
 
-The demo exercises the **full bootstrap-to-act loop** store-backed against a throwaway
-SQLite store. No in-memory (MemoryState) path is exercised; all state flows through
-`ubu_store`.
+The demo exercises the **full bootstrap-to-act loop** and gated projection loop
+store-backed against a throwaway SQLite store. No in-memory (MemoryState) path
+is exercised; all state flows through `ubu_store`.
 
 | Step | Endpoint | Governing decision |
 |------|----------|--------------------|
@@ -21,6 +21,9 @@ SQLite store. No in-memory (MemoryState) path is exercised; all state flows thro
 | 3. next_action (ready) | `GET /next-action?schema_version=…` | O6 |
 | 4. Action recording | `POST /task/{id}/action` | O6 |
 | 5. next_action (bounded diagnostic) | `GET /next-action?schema_version=…` | O6, UBU-D0210 |
+| 6. Projection preview + approval | `POST /projection/preview`, `POST /projection/approve` | O7, UBU-D0226, UBU-D0230 |
+| 7. Projection reconciliation | `POST /projection/reconcile` | O7 |
+| 8. Projection gate deny path | `POST /projection/preview`, `POST /projection/approve` | O7, UBU-D0230 |
 
 ### Assertions
 
@@ -37,14 +40,24 @@ SQLite store. No in-memory (MemoryState) path is exercised; all state flows thro
    `no_admitted_tasks`, `no_active_tasks`,
    `all_candidates_blocked_on_unmet_dependencies`,
    `all_candidates_blocked_on_preconditions`, or `no_ready_task`.
+6. Projection preview returns a managed-label-only operation with an accepted
+   policy summary; approval returns a `projection_result` with `status=applied`,
+   exactly one mock worker write, and a `compartment_boundary_decided` Log entry.
+7. Reconciliation against a mock observed-label set returns `missing` or `drifted`,
+   surfaces a `projection_conflict`, persists the reconciliation, and performs no
+   silent overwrite.
+8. The deny path sets `no_external_export`; the approved preview returns a failed
+   `projection_result`, records `projection_denied`, writes no mock
+   `github-label-write`, and records a `compartment_boundary_decided` denial Log.
 
 ## Offline operation and import stub
 
 The demo is fully offline. `bootstrap/seed` internally calls `import_live`, which is a
 Phase 1 stub (`source=github_live_stub`) that creates Tasks locally without making any
-outbound HTTP request to GitHub. The fixture/dev token
-(`"fixture-dev-token-ubu-demo"`) satisfies the token-availability check and is never
-sent to the network.
+outbound HTTP request to GitHub. The projection loop uses the orchestrator's mock
+managed-label write table and reconciliation request payloads; it does not call live
+GitHub. The fixture/dev token (`"fixture-dev-token-ubu-demo"`) satisfies the
+token-availability check and is never sent to the network.
 
 The demo fails clearly if a required fixture or prerequisite (orchestrator repo,
 `cargo`, `curl`, `python3`) is missing. It does not fall back to network access.
@@ -85,4 +98,7 @@ admitted via the `import_live` stub, not from the JSON fixture files.
 | **O4** | MemoryState removed; all reads and writes through `ubu_store`; `UBU_DB_PATH` throwaway store |
 | **O5** | Desktop token intake (`/desktop/session/github-token`); `bootstrap/seed` endpoint |
 | **O6** | Readiness `next_action` with explanation; action recording (`/task/{id}/action`); bounded diagnostic |
+| **O7** | Projection preview, approval, gated managed-label mock write, reconciliation, and gate-deny path |
 | **UBU-D0210** | `next_action` must return a bounded diagnostic when no ready Task is available — not an opaque empty result |
+| **UBU-D0226** | `authority_source` records the authority path for projection state; source details remain in provenance |
+| **UBU-D0230** | Policy-summary guardrails (`local_only`, `no_cloud_llm`, `no_external_export`) and `compartment_boundary_decided` Log vocabulary |

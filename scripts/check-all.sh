@@ -95,6 +95,11 @@ while read -r name; do
   printf '\n'
 done < <(repo_names)
 
+echo "=== Pinned revs ==="
+echo ""
+"$SCRIPT_DIR/show-revs.sh"
+echo ""
+
 echo "=== Build checks ==="
 echo ""
 echo "Running checks under $REPOS_DIR"

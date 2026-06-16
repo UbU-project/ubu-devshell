@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Fixture smoke test: exercises the full bootstrap-to-act loop against the
-# store-backed orchestrator (O5: token intake and bootstrap/seed; O6: readiness
-# next_action with explanation, action recording, and bounded diagnostic).
+# Fixture smoke test: exercises the full bootstrap-to-act loop and the gated
+# projection loop against the store-backed orchestrator (O5: token intake and
+# bootstrap/seed; O6: readiness next_action with explanation, action recording,
+# and bounded diagnostic; O7: projection preview, approval, gated mock write,
+# reconciliation, and gate-deny path).
 # Creates a throwaway SQLite store under a temp directory; removed on exit,
 # including on failure. Requires no live GitHub and no network egress.
 #
@@ -9,6 +11,9 @@
 #   O4: MemoryState removed; all state through ubu_store (UBU_DB_PATH throwaway store)
 #   O5: desktop token intake (/desktop/session/github-token) + bootstrap/seed endpoint
 #   O6: readiness next_action with explanation; action recording; bounded diagnostics (UBU-D0210)
+#   O7: gated managed-label projection loop, mock write, reconciliation, deny path
+#   UBU-D0226: authority_source remains the authority-path enum
+#   UBU-D0230: policy-summary guardrails and compartment_boundary_decided log vocabulary
 #
 # import_live is a Phase 1 stub (source=github_live_stub) that admits Tasks locally
 # without any outbound HTTP. The fixture/dev token satisfies the token-availability
@@ -45,6 +50,7 @@ echo "=== Fixture Demo: full bootstrap-to-act loop, store-backed ==="
 echo "  O4: throwaway UBU_DB_PATH store"
 echo "  O5: token intake + bootstrap/seed"
 echo "  O6: readiness next_action, action recording, bounded diagnostic (UBU-D0210)"
+echo "  O7: gated projection preview/approval/write/reconcile loop with deny path"
 echo "orchestrator: $ORCHESTRATOR_DIR"
 echo "manifest:     $MANIFEST"
 echo "port:         $DEMO_PORT"
@@ -272,5 +278,286 @@ print(f"  message: {diags[0].get('message', '')}")
 PYEOF
 
 echo ""
-echo "PASS: full bootstrap-to-act loop verified store-backed on throwaway store"
+echo "Step 6: projection preview + approval (O7) — gated mock managed-label write"
+PREVIEW_SCHEMA="ubu.orchestrator.projection_preview.v1"
+APPROVAL_SCHEMA="ubu.orchestrator.projection_approval.v1"
+RESULT_SCHEMA="ubu.orchestrator.projection_result.v1"
+RECONCILE_SCHEMA="ubu.orchestrator.projection_reconciliation.v1"
+
+PROJECTION_PREVIEW_RESP="$(curl -sf -X POST "$DEMO_BASE/projection/preview" \
+  -H "content-type: application/json" \
+  -d "{
+    \"schema_version\":\"$PREVIEW_SCHEMA\",
+    \"owner\":\"UbU-project\",
+    \"repo\":\"ubu-orchestrator\",
+    \"issue_number\":7,
+    \"observed_labels\":[],
+    \"desired_labels\":[\"ubu-managed\"],
+    \"existing_repository_labels\":[\"ubu\",\"ubu-managed\"],
+    \"reason\":\"fixture smoke test managed-label projection\"
+  }")"
+echo "  preview response: $PROJECTION_PREVIEW_RESP"
+PROJECTION_PREVIEW_ID="$(python3 - "$PROJECTION_PREVIEW_RESP" <<'PYEOF'
+import json, sys
+
+d = json.loads(sys.argv[1])
+assert d.get("schema_version") == "ubu.orchestrator.projection_preview.v1", d
+assert d.get("requires_approval") is True, d
+assert d.get("policy_summary", {}).get("legitimization") == "accepted", d
+assert d.get("policy_summary", {}).get("no_external_export") is False, d
+ops = d.get("operations", [])
+assert ops, f"projection preview: expected at least one managed-label operation, got: {d}"
+for op in ops:
+    assert op.get("kind") == "label", f"projection preview: expected label-only operation, got: {op}"
+    payload = op.get("payload", {})
+    if payload.get("type") == "label":
+        label = payload.get("label")
+        assert label in {"ubu", "ubu-managed"}, f"unexpected label write: {label}"
+print(d["preview_id"])
+PYEOF
+)"
+echo "  projection preview: preview_id=$PROJECTION_PREVIEW_ID"
+
+COUNTS_BEFORE_APPROVE="$(python3 - "$DEMO_DB" <<'PYEOF'
+import sqlite3, sys
+db = sys.argv[1]
+con = sqlite3.connect(db)
+cur = con.cursor()
+for table in ("projection_worker_writes", "projection_approvals", "logs"):
+    cur.execute(f"SELECT COUNT(*) FROM {table}")
+    print(cur.fetchone()[0])
+PYEOF
+)"
+WRITES_BEFORE="$(printf '%s\n' "$COUNTS_BEFORE_APPROVE" | sed -n '1p')"
+APPROVALS_BEFORE="$(printf '%s\n' "$COUNTS_BEFORE_APPROVE" | sed -n '2p')"
+LOGS_BEFORE="$(printf '%s\n' "$COUNTS_BEFORE_APPROVE" | sed -n '3p')"
+
+PROJECTION_RESULT_RESP="$(curl -sf -X POST "$DEMO_BASE/projection/approve" \
+  -H "content-type: application/json" \
+  -d "{
+    \"schema_version\":\"$APPROVAL_SCHEMA\",
+    \"preview_id\":\"$PROJECTION_PREVIEW_ID\",
+    \"approved\":true,
+    \"authority_source\":\"user\"
+  }")"
+echo "  approval/result response: $PROJECTION_RESULT_RESP"
+python3 - "$PROJECTION_RESULT_RESP" "$PROJECTION_PREVIEW_ID" <<'PYEOF'
+import json, sys
+
+d = json.loads(sys.argv[1])
+preview_id = sys.argv[2]
+assert d.get("schema_version") == "ubu.orchestrator.projection_result.v1", d
+assert d.get("preview_id") == preview_id, d
+assert d.get("status") == "applied", f"projection result: expected applied, got: {d}"
+assert not d.get("diagnostics"), f"projection result: expected no diagnostics, got: {d}"
+results = d.get("operation_results", [])
+assert results, f"projection result: expected operation results, got: {d}"
+for result in results:
+    assert result.get("status") == "applied", result
+    assert result.get("authority_source") == "automation_worker", result
+print("  PASS projection result: status=applied  authority_source=automation_worker")
+PYEOF
+
+python3 - "$DEMO_DB" "$WRITES_BEFORE" "$APPROVALS_BEFORE" "$LOGS_BEFORE" <<'PYEOF'
+import json, sqlite3, sys
+
+db, writes_before, approvals_before, logs_before = sys.argv[1:5]
+writes_before = int(writes_before)
+approvals_before = int(approvals_before)
+logs_before = int(logs_before)
+con = sqlite3.connect(db)
+cur = con.cursor()
+
+cur.execute("SELECT COUNT(*) FROM projection_worker_writes")
+writes_after = cur.fetchone()[0]
+assert writes_after == writes_before + 1, (
+    f"mock github-label-write: expected exactly one new worker write, "
+    f"before={writes_before} after={writes_after}"
+)
+
+cur.execute("SELECT COUNT(*) FROM projection_approvals")
+approvals_after = cur.fetchone()[0]
+assert approvals_after == approvals_before + 1, (
+    f"projection approval: expected one new approval, before={approvals_before} "
+    f"after={approvals_after}"
+)
+
+cur.execute(
+    "SELECT payload_json FROM projection_worker_writes ORDER BY created_at DESC LIMIT 1"
+)
+payload = json.loads(cur.fetchone()[0])
+operation = payload.get("operation", {})
+assert payload.get("schema_version") == "ubu.orchestrator.projection_result.v1", payload
+assert payload.get("authority_source") == "automation_worker", payload
+assert operation.get("kind") in {"apply_label", "managed_label_preflight"}, operation
+op_payload = operation.get("payload", {})
+labels = []
+if op_payload.get("type") == "label":
+    labels.append(op_payload.get("label"))
+if op_payload.get("type") == "managed_label_preflight":
+    labels.extend(op_payload.get("missing_labels", []))
+assert labels, f"mock github-label-write: no managed labels found in payload: {payload}"
+assert all(label in {"ubu", "ubu-managed"} for label in labels), (
+    f"mock github-label-write: unmanaged label reached mock: {labels}"
+)
+
+cur.execute(
+    """
+    SELECT payload_json FROM logs
+    WHERE event_type = 'compartment_boundary_decided'
+    ORDER BY created_at DESC
+    LIMIT 1
+    """
+)
+log_payload = json.loads(cur.fetchone()[0])
+cur.execute("SELECT COUNT(*) FROM logs")
+logs_after = cur.fetchone()[0]
+assert logs_after >= logs_before + 1, (
+    f"compartment_boundary_decided: expected a new log entry, "
+    f"before={logs_before} after={logs_after}"
+)
+assert log_payload.get("adjudication_result") == "accepted", log_payload
+assert log_payload.get("member_evaluated") == "no_external_export", log_payload
+assert log_payload.get("authority_source") == "automation_worker", log_payload
+print("  PASS mock write: exactly one managed-label write recorded")
+print("  PASS boundary log: compartment_boundary_decided accepted")
+PYEOF
+
+echo ""
+echo "Step 7: projection reconciliation (O7) — mock reports managed-label drift"
+WRITES_BEFORE_RECONCILE="$(python3 - "$DEMO_DB" <<'PYEOF'
+import sqlite3, sys
+con = sqlite3.connect(sys.argv[1])
+cur = con.cursor()
+cur.execute("SELECT COUNT(*) FROM projection_worker_writes")
+print(cur.fetchone()[0])
+PYEOF
+)"
+RECONCILE_RESP="$(curl -sf -X POST "$DEMO_BASE/projection/reconcile" \
+  -H "content-type: application/json" \
+  -d "{
+    \"schema_version\":\"$RECONCILE_SCHEMA\",
+    \"observed_labels\":[]
+  }")"
+echo "  reconciliation response: $RECONCILE_RESP"
+python3 - "$RECONCILE_RESP" <<'PYEOF'
+import json, sys
+
+d = json.loads(sys.argv[1])
+assert d.get("schema_version") == "ubu.orchestrator.projection_reconciliation.v1", d
+assert d.get("status") in {"drifted", "missing"}, (
+    f"reconciliation: expected drifted or missing, got: {d}"
+)
+assert d.get("conflicts"), f"reconciliation: expected conflicts to surface, got: {d}"
+diagnostics = d.get("diagnostics", [])
+assert diagnostics and diagnostics[0].get("code") == "projection_conflict", d
+print(f"  PASS reconciliation: status={d['status']} conflicts={len(d['conflicts'])}")
+PYEOF
+python3 - "$DEMO_DB" "$WRITES_BEFORE_RECONCILE" <<'PYEOF'
+import sqlite3, sys
+
+db, writes_before = sys.argv[1], int(sys.argv[2])
+con = sqlite3.connect(db)
+cur = con.cursor()
+cur.execute("SELECT COUNT(*) FROM projection_worker_writes")
+writes_after = cur.fetchone()[0]
+assert writes_after == writes_before, (
+    f"reconciliation: expected no silent overwrite, before={writes_before} after={writes_after}"
+)
+cur.execute("SELECT COUNT(*) FROM projection_reconciliations WHERE status IN ('drifted', 'missing')")
+assert cur.fetchone()[0] >= 1, "reconciliation: expected persisted drifted/missing record"
+print("  PASS reconciliation: conflict persisted and no mock write occurred")
+PYEOF
+
+echo ""
+echo "Step 8: projection gate deny path (O7/UBU-D0230) — no external export"
+WRITES_BEFORE_DENY="$(python3 - "$DEMO_DB" <<'PYEOF'
+import sqlite3, sys
+con = sqlite3.connect(sys.argv[1])
+cur = con.cursor()
+cur.execute("SELECT COUNT(*) FROM projection_worker_writes")
+print(cur.fetchone()[0])
+PYEOF
+)"
+DENY_PREVIEW_RESP="$(curl -sf -X POST "$DEMO_BASE/projection/preview" \
+  -H "content-type: application/json" \
+  -d "{
+    \"schema_version\":\"$PREVIEW_SCHEMA\",
+    \"owner\":\"UbU-project\",
+    \"repo\":\"ubu-orchestrator\",
+    \"issue_number\":8,
+    \"observed_labels\":[],
+    \"desired_labels\":[\"ubu-managed\"],
+    \"existing_repository_labels\":[\"ubu\",\"ubu-managed\"],
+    \"no_external_export\":true,
+    \"reason\":\"fixture smoke test deny path\"
+  }")"
+echo "  deny preview response: $DENY_PREVIEW_RESP"
+DENY_PREVIEW_ID="$(python3 - "$DENY_PREVIEW_RESP" <<'PYEOF'
+import json, sys
+
+d = json.loads(sys.argv[1])
+policy = d.get("policy_summary", {})
+assert policy.get("legitimization") == "rejected", d
+assert policy.get("no_external_export") is True, d
+assert d.get("operations"), f"deny preview: expected operation requiring gate decision, got: {d}"
+print(d["preview_id"])
+PYEOF
+)"
+echo "  deny preview: preview_id=$DENY_PREVIEW_ID  legitimization=rejected"
+
+DENY_RESULT_RESP="$(curl -sf -X POST "$DEMO_BASE/projection/approve" \
+  -H "content-type: application/json" \
+  -d "{
+    \"schema_version\":\"$APPROVAL_SCHEMA\",
+    \"preview_id\":\"$DENY_PREVIEW_ID\",
+    \"approved\":true,
+    \"authority_source\":\"user\"
+  }")"
+echo "  deny approval/result response: $DENY_RESULT_RESP"
+python3 - "$DENY_RESULT_RESP" "$DENY_PREVIEW_ID" <<'PYEOF'
+import json, sys
+
+d = json.loads(sys.argv[1])
+preview_id = sys.argv[2]
+assert d.get("schema_version") == "ubu.orchestrator.projection_result.v1", d
+assert d.get("preview_id") == preview_id, d
+assert d.get("status") == "failed", f"deny result: expected failed, got: {d}"
+diagnostics = d.get("diagnostics", [])
+assert diagnostics and diagnostics[0].get("code") == "projection_denied", d
+for result in d.get("operation_results", []):
+    assert result.get("status") == "skipped", result
+    assert result.get("authority_source") is None, result
+print("  PASS deny result: status=failed diagnostics[0].code=projection_denied")
+PYEOF
+
+python3 - "$DEMO_DB" "$WRITES_BEFORE_DENY" <<'PYEOF'
+import json, sqlite3, sys
+
+db, writes_before = sys.argv[1], int(sys.argv[2])
+con = sqlite3.connect(db)
+cur = con.cursor()
+cur.execute("SELECT COUNT(*) FROM projection_worker_writes")
+writes_after = cur.fetchone()[0]
+assert writes_after == writes_before, (
+    f"deny path: github-label-write reached mock unexpectedly, "
+    f"before={writes_before} after={writes_after}"
+)
+cur.execute(
+    """
+    SELECT payload_json FROM logs
+    WHERE event_type = 'compartment_boundary_decided'
+    ORDER BY created_at DESC
+    LIMIT 1
+    """
+)
+log_payload = json.loads(cur.fetchone()[0])
+assert log_payload.get("adjudication_result") == "rejected", log_payload
+assert log_payload.get("member_evaluated") == "no_external_export", log_payload
+assert "rejected" in log_payload.get("reason", ""), log_payload
+print("  PASS deny path: no mock write and compartment_boundary_decided rejected")
+PYEOF
+
+echo ""
+echo "PASS: full bootstrap-to-act and gated projection loops verified store-backed on throwaway store"
 echo "  store=$DEMO_DB (ephemeral — removed on exit)"
