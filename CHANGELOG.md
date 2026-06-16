@@ -7,6 +7,23 @@
   artifact helper scripts.
 - Added local Cargo `[patch]` config generation workflow.
 
+## D5: Extend fixture smoke test to full bootstrap-to-act loop
+
+- Extended `run-fixture-demo.sh` to drive the full bootstrap-to-act loop store-backed
+  against a throwaway store: token intake → bootstrap/seed → next_action (ready) →
+  action recording (complete) → next_action (bounded diagnostic, UBU-D0210).
+- Demo asserts: Objective, Preference, and Task admitted from seed; ready Task returned
+  with non-empty readiness explanation; Task transitions to `completed`; append-only Log
+  event admitted; bounded diagnostic returned on second next_action (UBU-D0210).
+- Demo remains offline: import_live is a Phase 1 stub (source=github_live_stub) that
+  creates Tasks locally without outbound HTTP; fixture/dev token never sent to GitHub.
+- Removed old three-step flow (bootstrap/start, /github/import/fixture, planning/generate).
+- Updated `pinned-revs.toml`: R_orchestrator → post-O6 rev (8d9ad42).
+- Updated `docs/fixture-demo.md` with full bootstrap-to-act loop description citing
+  O4, O5, O6, and UBU-D0210.
+- Updated `CODEGEN.md` with full loop description and UBU-D0210 citation.
+- Confirmed: no `[patch]` residue in committed files.
+
 ## D4: Repoint fixture smoke test at store-backed orchestrator
 
 - Rewrote `run-fixture-demo.sh` to exercise the store-backed orchestrator

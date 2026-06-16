@@ -49,8 +49,21 @@ Any PR that adds, renames, or removes fields in the generated API client or
 schema types must reference the relevant decision ID from this range in the
 PR description and in the generated issue draft.
 
-The fixture smoke test (`scripts/run-fixture-demo.sh`) exercises the
-store-backed orchestrator path. The removal of the in-memory MemoryState
-path and the addition of `UBU_DB_PATH` config are governed by orchestrator
-ticket **O4** (`O4: Replace MemoryState with ubu_store admission and query
-boundary`). See `docs/fixture-demo.md` for the full demo description.
+The fixture smoke test (`scripts/run-fixture-demo.sh`) exercises the full
+**bootstrap-to-act loop** store-backed against a throwaway SQLite store:
+
+1. Token intake — `/desktop/session/github-token` (O5)
+2. Bootstrap/seed — `/bootstrap/seed` admits Objectives, Preferences, and Tasks (O5/O6)
+3. `next_action` — asserts a ready Task with a non-empty readiness explanation (O6)
+4. Action recording — `/task/{id}/action` with `complete`; asserts `task_status=completed`
+   and an append-only Log event admitted (O6)
+5. `next_action` again — asserts the bounded empty/blocked diagnostic (UBU-D0210, O6)
+
+Governing decisions:
+- **O4**: MemoryState removed; `UBU_DB_PATH` throwaway store
+- **O5**: desktop token intake and `bootstrap/seed` endpoint
+- **O6**: readiness `next_action` with explanation; action recording; bounded diagnostics
+- **UBU-D0210**: selection rule that `next_action` must always return a bounded diagnostic
+  (not an opaque empty result) when no ready Task is available
+
+See `docs/fixture-demo.md` for the full demo description.

@@ -1,7 +1,18 @@
 #!/usr/bin/env bash
-# Fixture smoke test: exercises the store-backed orchestrator path (O4).
-# Creates a throwaway SQLite store under a temp directory; removes it on exit,
+# Fixture smoke test: exercises the full bootstrap-to-act loop against the
+# store-backed orchestrator (O5: token intake and bootstrap/seed; O6: readiness
+# next_action with explanation, action recording, and bounded diagnostic).
+# Creates a throwaway SQLite store under a temp directory; removed on exit,
 # including on failure. Requires no live GitHub and no network egress.
+#
+# Governing decisions:
+#   O4: MemoryState removed; all state through ubu_store (UBU_DB_PATH throwaway store)
+#   O5: desktop token intake (/desktop/session/github-token) + bootstrap/seed endpoint
+#   O6: readiness next_action with explanation; action recording; bounded diagnostics (UBU-D0210)
+#
+# import_live is a Phase 1 stub (source=github_live_stub) that admits Tasks locally
+# without any outbound HTTP. The fixture/dev token satisfies the token-availability
+# check and is never sent to GitHub.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -30,7 +41,10 @@ command -v cargo   >/dev/null 2>&1 || fail_missing "cargo not found"
 command -v curl    >/dev/null 2>&1 || fail_missing "curl not found"
 command -v python3 >/dev/null 2>&1 || fail_missing "python3 not found"
 
-echo "=== Fixture Demo: store-backed (O4 decision: MemoryState removed) ==="
+echo "=== Fixture Demo: full bootstrap-to-act loop, store-backed ==="
+echo "  O4: throwaway UBU_DB_PATH store"
+echo "  O5: token intake + bootstrap/seed"
+echo "  O6: readiness next_action, action recording, bounded diagnostic (UBU-D0210)"
 echo "orchestrator: $ORCHESTRATOR_DIR"
 echo "manifest:     $MANIFEST"
 echo "port:         $DEMO_PORT"
@@ -40,7 +54,6 @@ echo ""
 
 DEMO_TMPDIR="$(mktemp -d)"
 DEMO_DB="$DEMO_TMPDIR/ubu-demo.db"
-DEMO_FIXTURE="$DEMO_TMPDIR/demo-candidates.json"
 ORCH_LOG="$DEMO_TMPDIR/orchestrator.log"
 ORCH_PID=""
 
@@ -76,37 +89,6 @@ PYEOF
 for f in "$GITHUB_FIXTURES_DIR"/*.json; do
   echo "  github fixture: $f"
 done
-
-# --- Synthesize import fixture in orchestrator format ---
-# Converts devshell fixtures/github/*.json into {"candidates":[...]} for the
-# /github/import/fixture endpoint. This is an offline transform — no network.
-
-echo ""
-echo "Synthesizing import candidates from fixtures/github/*.json..."
-python3 - "$GITHUB_FIXTURES_DIR" "$DEMO_FIXTURE" <<'PYEOF'
-import json, sys, pathlib
-
-github_dir = pathlib.Path(sys.argv[1])
-out_path = sys.argv[2]
-
-candidates = []
-for fn in sorted(github_dir.glob("*.json")):
-    data = json.loads(fn.read_text())
-    for repo in data.get("repositories", []):
-        count = repo.get("fake_issue_count", 1)
-        for i in range(1, count + 1):
-            candidates.append({
-                "title": f"[{repo['name']}] fixture issue #{i}",
-                "source": "github_fixture"
-            })
-
-if not candidates:
-    print("error: no candidates synthesized from fixtures", file=sys.stderr)
-    sys.exit(1)
-
-pathlib.Path(out_path).write_text(json.dumps({"candidates": candidates}, indent=2))
-print(f"  synthesized {len(candidates)} candidate(s) -> {out_path}")
-PYEOF
 
 # --- Build orchestrator ---
 
@@ -154,47 +136,141 @@ if [[ "$READY" -ne 1 ]]; then
   exit 1
 fi
 
-# --- Drive store admission path ---
+# --- Full bootstrap-to-act loop ---
 
 echo ""
-echo "Step 1: bootstrap/start"
-curl -sf -X POST "$DEMO_BASE/bootstrap/start" \
-  -H "content-type: application/json" -d '{}' >/dev/null
-
-echo ""
-echo "Step 2: import fixtures -> store admission (offline: fixture path only)"
-IMPORT_RESP="$(curl -sf -X POST "$DEMO_BASE/github/import/fixture" \
+echo "Step 1: token intake (O5) — set fixture/dev token via desktop session endpoint"
+TOKEN_RESP="$(curl -sf -X POST "$DEMO_BASE/desktop/session/github-token" \
   -H "content-type: application/json" \
-  --data-binary "{\"fixture_path\":\"$DEMO_FIXTURE\"}")"
-echo "  response: $IMPORT_RESP"
-
-ADMITTED="$(echo "$IMPORT_RESP" | python3 -c \
-  "import json,sys; d=json.load(sys.stdin); print(d.get('admitted_to_store',0))")"
-if [[ "$ADMITTED" -lt 1 ]]; then
-  echo "error: no objects admitted to store (admitted_to_store=$ADMITTED)"
-  exit 1
-fi
-echo "  admitted to store: $ADMITTED"
+  -d '{
+    "schema_version": "ubu.orchestrator.desktop_session.v1",
+    "github_token": "fixture-dev-token-ubu-demo"
+  }')"
+echo "  response: $TOKEN_RESP"
+python3 - "$TOKEN_RESP" <<'PYEOF'
+import json, sys
+d = json.loads(sys.argv[1])
+assert d.get("accepted") is True, \
+    f"token intake: expected accepted=true, got: {d}"
+assert d.get("token_available") is True, \
+    f"token intake: expected token_available=true, got: {d}"
+print("  PASS token intake: accepted=true  token_available=true")
+PYEOF
 
 echo ""
-echo "Step 3: planning/generate"
-curl -sf -X POST "$DEMO_BASE/planning/generate" \
-  -H "content-type: application/json" -d '{}' >/dev/null
+echo "Step 2: bootstrap/seed (O5/O6) — admit Objective, Preferences, and Tasks"
+echo "  (import_live stub: creates Task locally, no outbound HTTP)"
+SEED_RESP="$(curl -sf -X POST "$DEMO_BASE/bootstrap/seed" \
+  -H "content-type: application/json" \
+  -d '{
+    "schema_version": "ubu.orchestrator.bootstrap.v1",
+    "selected_repo": {"owner": "UbU-project", "repo": "ubu-design"},
+    "answers": {
+      "primary_objective": "Build and ship Phase 1 of UbU (fixture demo)",
+      "work_style": "balanced",
+      "planning_horizon_days": 7,
+      "attention_preference": "mixed"
+    }
+  }')"
+echo "  response: $SEED_RESP"
+python3 - "$SEED_RESP" <<'PYEOF'
+import json, sys
+d = json.loads(sys.argv[1])
+obj_ids  = d.get("objective_ids", [])
+pref_ids = d.get("preference_ids", [])
+imported = d.get("imported_tasks", {})
+admitted = imported.get("admitted_to_store", 0)
+assert len(obj_ids) >= 1, \
+    f"seed: expected objective_ids non-empty, got: {d}"
+assert len(pref_ids) >= 1, \
+    f"seed: expected preference_ids non-empty, got: {d}"
+assert admitted >= 1, \
+    f"seed: expected imported_tasks.admitted_to_store >= 1, got: {d}"
+print(f"  seed: objective_ids={obj_ids}")
+print(f"  seed: preference_ids={pref_ids}")
+print(f"  seed: imported_tasks.admitted_to_store={admitted}")
+PYEOF
 
 echo ""
-echo "Step 4: GET /next-action (read admitted object back through store)"
-NEXT_RESP="$(curl -sf "$DEMO_BASE/next-action")"
+echo "Step 3: next_action (O6) — assert ready Task with non-empty readiness explanation"
+NEXT_SCHEMA="ubu.orchestrator.next_action.v1"
+NEXT_RESP="$(curl -sf "$DEMO_BASE/next-action?schema_version=$NEXT_SCHEMA")"
 echo "  response: $NEXT_RESP"
-
-TASK_ID="$(echo "$NEXT_RESP" | python3 -c \
-  "import json,sys; d=json.load(sys.stdin); print(d.get('task_id',''))")"
-if [[ -z "$TASK_ID" ]]; then
-  echo "error: next_action returned no task_id — admitted state not readable through store"
-  exit 1
-fi
+TASK_ID="$(python3 - "$NEXT_RESP" <<'PYEOF'
+import json, sys
+d = json.loads(sys.argv[1])
+rec = d.get("recommendation")
+assert rec is not None, \
+    f"next_action: expected recommendation, got diagnostics-only response: {d}"
+assert rec.get("readiness") == "ready", \
+    f"next_action: expected readiness=ready, got: {rec.get('readiness')}"
+msg = rec.get("explanation", {}).get("message", "")
+assert msg.strip(), \
+    f"next_action: expected non-empty explanation.message, got: {rec.get('explanation')}"
+print(rec["task_id"])
+PYEOF
+)"
+echo "  next_action: task_id=$TASK_ID  readiness=ready"
+python3 - "$NEXT_RESP" <<'PYEOF'
+import json, sys
+rec = json.loads(sys.argv[1])["recommendation"]
+print(f"  explanation: {rec['explanation']['message']}")
+PYEOF
 
 echo ""
-echo "PASS: admitted object readable back through store"
-echo "  task_id=$TASK_ID"
-echo "  admitted=$ADMITTED"
+echo "Step 4: action recording (O6) — record complete, assert completed + Log event admitted"
+ACT_SCHEMA="ubu.orchestrator.task_action.v1"
+ACT_RESP="$(curl -sf -X POST "$DEMO_BASE/task/$TASK_ID/action" \
+  -H "content-type: application/json" \
+  -d "{\"schema_version\":\"$ACT_SCHEMA\",\"action\":\"complete\"}")"
+echo "  response: $ACT_RESP"
+python3 - "$ACT_RESP" "$TASK_ID" <<'PYEOF'
+import json, sys
+d = json.loads(sys.argv[1])
+expected_task_id = sys.argv[2]
+assert d.get("log_id", ""), \
+    f"action: expected non-empty log_id, got: {d}"
+assert d.get("task_id") == expected_task_id, \
+    f"action: task_id mismatch — expected {expected_task_id}, got: {d.get('task_id')}"
+assert d.get("task_status") == "completed", \
+    f"action: expected task_status=completed, got: {d.get('task_status')}"
+assert d.get("transition_applied") is True, \
+    f"action: expected transition_applied=true, got: {d.get('transition_applied')}"
+print(f"  action: log_id={d['log_id']}")
+print(f"  action: task_status={d['task_status']}  transition_applied={d['transition_applied']}")
+PYEOF
+
+echo ""
+echo "Step 5: next_action bounded diagnostic (O6, UBU-D0210)"
+echo "  Completing the only Task drives the store into a no-active-Tasks state."
+echo "  Asserting bounded diagnostic is returned — not an opaque empty response."
+NEXT_RESP2="$(curl -sf "$DEMO_BASE/next-action?schema_version=$NEXT_SCHEMA")"
+echo "  response: $NEXT_RESP2"
+python3 - "$NEXT_RESP2" <<'PYEOF'
+import json, sys
+
+BOUNDED_CODES = {
+    "no_admitted_tasks",
+    "no_active_tasks",
+    "all_candidates_blocked_on_unmet_dependencies",
+    "all_candidates_blocked_on_preconditions",
+    "no_ready_task",
+}
+
+d = json.loads(sys.argv[1])
+rec  = d.get("recommendation")
+diags = d.get("diagnostics", [])
+assert rec is None, \
+    f"next_action (bounded): expected no recommendation after completing the only Task, got: {rec}"
+assert len(diags) >= 1, \
+    f"next_action (bounded): expected bounded diagnostic (UBU-D0210), got empty diagnostics: {d}"
+code = diags[0].get("code", "")
+assert code in BOUNDED_CODES, \
+    f"next_action (bounded): unknown diagnostic code '{code}'; expected one of {sorted(BOUNDED_CODES)}"
+print(f"  bounded diagnostic (UBU-D0210): code={code}")
+print(f"  message: {diags[0].get('message', '')}")
+PYEOF
+
+echo ""
+echo "PASS: full bootstrap-to-act loop verified store-backed on throwaway store"
 echo "  store=$DEMO_DB (ephemeral — removed on exit)"
