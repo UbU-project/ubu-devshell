@@ -79,4 +79,22 @@ Governing decisions:
 - **UBU-D0230**: policy-summary guardrails and `compartment_boundary_decided` Log
   vocabulary
 
+## Standing Boundary Diagnostics
+
+`scripts/check-all.sh` and `scripts/test-all.sh` run the cap-74 hard-boundary
+diagnostics on every contributor run:
+
+- the `ubu_core` export-gate property checks for deny-by-default behavior,
+  worker-authority gating, and redaction-identity export-boundary behavior;
+- the `ubu_orchestrator` bypass-resistance and worker-authority checks for the
+  projection export path;
+- a static guard that fails if `apply_mock_managed_label_write` gains an
+  ungated call site outside the core export-permit path;
+- `scripts/run-fixture-demo.sh`, including the projection gate deny path.
+
+These checks are governed by **UBU-D0226** for authority paths
+(`authority_source`, including `automation_worker`) and **UBU-D0230** for the
+Compartment policy guardrails (`local_only`, `no_cloud_llm`,
+`no_external_export`) and `compartment_boundary_decided` vocabulary.
+
 See `docs/fixture-demo.md` for the full demo description.

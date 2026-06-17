@@ -23,6 +23,11 @@ repo_dir_name() {
   printf '%s\n' "${name//_/-}"
 }
 
+repo_path() {
+  local name="$1"
+  printf '%s/%s\n' "$REPOS_DIR" "$(repo_dir_name "$name")"
+}
+
 run_if_package_script() {
   local dir="$1"
   local script="$2"
@@ -48,6 +53,97 @@ sig_label() {
     N) printf 'unsigned' ;;
     *) printf 'unknown(%s)' "$code" ;;
   esac
+}
+
+require_repo() {
+  local name="$1"
+  local dir
+  dir="$(repo_path "$name")"
+  if [[ ! -d "$dir" ]]; then
+    echo "error: required repo missing for standing diagnostics: $dir" >&2
+    exit 1
+  fi
+  printf '%s\n' "$dir"
+}
+
+run_hard_boundary_diagnostics() {
+  local core_dir orchestrator_dir
+  core_dir="$(require_repo ubu_core)"
+  orchestrator_dir="$(require_repo ubu_orchestrator)"
+
+  echo "=== Standing hard-boundary diagnostics ==="
+  echo ""
+
+  echo "core export gate: deny-by-default matrix + worker-authority"
+  (cd "$core_dir" && cargo test --lib export_gate_denies_by_default_and_only_permits_worker_accepted_adjudication)
+
+  echo "core export gate: redaction-identity export-boundary"
+  (cd "$core_dir" && cargo test --lib denied_export_path_does_not_leak_compartment_names_or_labels)
+
+  echo "orchestrator export gate: user-authority bypass resistance"
+  (cd "$orchestrator_dir" && cargo test --lib user_authority_export_context_is_rejected_without_permit)
+
+  echo "orchestrator export gate: deny path writes no worker export"
+  (cd "$orchestrator_dir" && cargo test --test projection_preview rejected_projection_is_logged_and_not_written)
+
+  echo "orchestrator export gate: accepted path uses automation_worker authority"
+  (cd "$orchestrator_dir" && cargo test --test projection_preview reconciliation_surfaces_conflict_and_accepts_external_change)
+}
+
+run_static_bypass_guard() {
+  local orchestrator_dir file count
+  orchestrator_dir="$(require_repo ubu_orchestrator)"
+  file="$orchestrator_dir/src/services/projection_service.rs"
+
+  echo "=== Static bypass guard ==="
+  echo ""
+  echo "checking apply_mock_managed_label_write call sites"
+
+  count="$(
+    awk '
+      /apply_mock_managed_label_write[[:space:]]*\(/ &&
+      $0 !~ /async fn apply_mock_managed_label_write/ {
+        count += 1
+      }
+      END { print count + 0 }
+    ' "$file"
+  )"
+
+  if [[ "$count" -ne 1 ]]; then
+    echo "error: expected exactly one gated call site for apply_mock_managed_label_write; found $count" >&2
+    awk '
+      /apply_mock_managed_label_write[[:space:]]*\(/ &&
+      $0 !~ /async fn apply_mock_managed_label_write/ {
+        printf "  %s:%d:%s\n", FILENAME, FNR, $0
+      }
+    ' "$file" >&2
+    exit 1
+  fi
+
+  awk '
+    /apply_mock_managed_label_write[[:space:]]*\(/ &&
+    $0 !~ /async fn apply_mock_managed_label_write/ &&
+    /permit/ {
+      ok = 1
+    }
+    END { exit ok ? 0 : 1 }
+  ' "$file" || {
+    echo "error: apply_mock_managed_label_write call site does not pass the core export permit" >&2
+    exit 1
+  }
+
+  awk '
+    /adjudication\.permit\(\)/ {
+      ok = 1
+    }
+    END { exit ok ? 0 : 1 }
+  ' "$file" || {
+    echo "error: export path does not visibly extract adjudication.permit()" >&2
+    exit 1
+  }
+
+  echo "PASS static bypass guard: mock adapter export entry is reached through the permit path only"
+  echo ""
 }
 
 echo "=== Git state ==="
@@ -131,3 +227,10 @@ while read -r name; do
     echo "skip: no known check target in $dir"
   fi
 done < <(repo_names)
+
+run_static_bypass_guard
+run_hard_boundary_diagnostics
+
+echo "=== Fixture demo standing diagnostic ==="
+echo ""
+"$SCRIPT_DIR/run-fixture-demo.sh"

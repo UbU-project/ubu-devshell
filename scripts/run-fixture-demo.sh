@@ -554,7 +554,8 @@ cur.execute(
 log_payload = json.loads(cur.fetchone()[0])
 assert log_payload.get("adjudication_result") == "rejected", log_payload
 assert log_payload.get("member_evaluated") == "no_external_export", log_payload
-assert "rejected" in log_payload.get("reason", ""), log_payload
+reason = log_payload.get("reason", "")
+assert "no_external_export" in reason or "forbids external export" in reason, log_payload
 print("  PASS deny path: no mock write and compartment_boundary_decided rejected")
 PYEOF
 
