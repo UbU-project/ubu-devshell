@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# Fixture smoke test: exercises the full bootstrap-to-act loop and the gated
-# projection loop against the store-backed orchestrator (O5: token intake and
-# bootstrap/seed; O6: readiness next_action with explanation, action recording,
-# and bounded diagnostic; O7: projection preview, approval, gated mock write,
-# reconciliation, and gate-deny path).
+# Fixture smoke test: exercises the full bootstrap-to-act loop, the gated
+# projection loop, and canonical Plan generation / Compact Calendar /
+# override-safe recalculation against the store-backed orchestrator (O5: token
+# intake and bootstrap/seed; O6: readiness next_action with explanation, action
+# recording, and bounded diagnostic; O7: projection preview, approval, gated
+# mock write, reconciliation, and gate-deny path; S9/P3/P4/O9: canonical timed
+# Plan, Compact Calendar, and repair-mode recalculation with override-safety).
 # Creates a throwaway SQLite store under a temp directory; removed on exit,
 # including on failure. Requires no live GitHub and no network egress.
 #
@@ -12,12 +14,19 @@
 #   O5: desktop token intake (/desktop/session/github-token) + bootstrap/seed endpoint
 #   O6: readiness next_action with explanation; action recording; bounded diagnostics (UBU-D0210)
 #   O7: gated managed-label projection loop, mock write, reconciliation, deny path
+#   S9/P3/P4/O9: canonical timed Plan (/planning/generate), Compact Calendar
+#               (/calendar/current), and repair-mode recalculation
+#               (/planning/recalculate) that supersedes the prior Plan
 #   UBU-D0226: authority_source remains the authority-path enum
+#   UBU-D0227: persisted Task.status lifecycle (active/completed/failed/moot)
+#              drives which Tasks are frozen and not re-placed on recalculation
 #   UBU-D0230: policy-summary guardrails and compartment_boundary_decided log vocabulary
 #
 # import_live is a Phase 1 stub (source=github_live_stub) that admits Tasks locally
 # without any outbound HTTP. The fixture/dev token satisfies the token-availability
-# check and is never sent to GitHub.
+# check and is never sent to GitHub. Plan generation and recalculation are
+# fixture-driven and offline: the planner adapter is the in-process CPU strategy
+# and the Compact Calendar window is seeded directly into the throwaway store.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -26,6 +35,7 @@ REPOS_DIR="${REPOS_DIR:-$(cd "$ROOT_DIR/.." && pwd)}"
 ORCHESTRATOR_DIR="${ORCHESTRATOR_DIR:-$REPOS_DIR/ubu-orchestrator}"
 MANIFEST="$ROOT_DIR/fixtures/demo/phase1-demo-manifest.json"
 GITHUB_FIXTURES_DIR="$ROOT_DIR/fixtures/github"
+PLANNING_FIXTURE="$ROOT_DIR/fixtures/demo/planning-candidates.json"
 DEMO_PORT="${DEMO_PORT:-17878}"
 DEMO_BASE="http://127.0.0.1:$DEMO_PORT"
 
@@ -39,6 +49,9 @@ fail_missing() { echo "error: $1"; exit 1; }
 ls "$GITHUB_FIXTURES_DIR"/*.json >/dev/null 2>&1 \
   || fail_missing "no *.json files in $GITHUB_FIXTURES_DIR (run-fixture-demo.sh requires fixtures)"
 
+[[ -f "$PLANNING_FIXTURE" ]] \
+  || fail_missing "planning fixture not found: $PLANNING_FIXTURE (required for Plan/Calendar/recalculation steps)"
+
 [[ -d "$ORCHESTRATOR_DIR" ]] \
   || fail_missing "orchestrator repo not found at $ORCHESTRATOR_DIR (run clone-all.sh first)"
 
@@ -51,6 +64,7 @@ echo "  O4: throwaway UBU_DB_PATH store"
 echo "  O5: token intake + bootstrap/seed"
 echo "  O6: readiness next_action, action recording, bounded diagnostic (UBU-D0210)"
 echo "  O7: gated projection preview/approval/write/reconcile loop with deny path"
+echo "  S9/P3/P4/O9: canonical timed Plan, Compact Calendar, override-safe recalculation"
 echo "orchestrator: $ORCHESTRATOR_DIR"
 echo "manifest:     $MANIFEST"
 echo "port:         $DEMO_PORT"
@@ -560,5 +574,249 @@ print("  PASS deny path: no mock write and compartment_boundary_decided rejected
 PYEOF
 
 echo ""
-echo "PASS: full bootstrap-to-act and gated projection loops verified store-backed on throwaway store"
+echo "Step 9: import planning candidates (S9/P3) — admit active Tasks via fixture import"
+echo "  (offline fixture import: $PLANNING_FIXTURE; no outbound HTTP)"
+IMPORT_RESP="$(curl -sf -X POST "$DEMO_BASE/github/import/fixture" \
+  -H "content-type: application/json" \
+  -d "{\"fixture_path\":\"$PLANNING_FIXTURE\"}")"
+echo "  response: $IMPORT_RESP"
+PLAN_TASK_IDS="$(python3 - "$IMPORT_RESP" <<'PYEOF'
+import json, sys
+d = json.loads(sys.argv[1])
+assert d.get("admitted_to_store", 0) >= 3, \
+    f"import: expected >=3 admitted planning candidates, got: {d}"
+ids = [c["task_id"] for c in d.get("candidates", [])]
+assert len(ids) >= 3, f"import: expected >=3 candidate task_ids, got: {d}"
+print("\n".join(ids[:3]))
+PYEOF
+)"
+TASK_A="$(printf '%s\n' "$PLAN_TASK_IDS" | sed -n '1p')"
+TASK_B="$(printf '%s\n' "$PLAN_TASK_IDS" | sed -n '2p')"
+TASK_C="$(printf '%s\n' "$PLAN_TASK_IDS" | sed -n '3p')"
+echo "  admitted Tasks: A=$TASK_A  B=$TASK_B  C=$TASK_C"
+
+echo ""
+echo "Step 10: canonical timed Plan + Compact Calendar (S9/P3/P4/O9)"
+CAL_WINDOW_START="2026-06-17T09:00:00Z"
+CAL_WINDOW_END="2026-06-17T17:00:00Z"
+echo "  seeding Compact Calendar window [$CAL_WINDOW_START .. $CAL_WINDOW_END] into throwaway store"
+# Phase A: the Compact Calendar window is a deterministic skeleton. The
+# orchestrator has no API to create one in Phase 1, so the fixture seeds the
+# throwaway store directly (offline; mirrors the O9 planning contract test).
+python3 - "$DEMO_DB" "$CAL_WINDOW_START" "$CAL_WINDOW_END" <<'PYEOF'
+import sqlite3, sys
+db, w_start, w_end = sys.argv[1], sys.argv[2], sys.argv[3]
+con = sqlite3.connect(db)
+con.execute(
+    "INSERT INTO calendars (id, plan_id, window_start, window_end, payload_json, created_at) "
+    "VALUES (?, ?, ?, ?, ?, ?)",
+    (
+        "cal_demo_window",
+        "plan_demo_window",
+        w_start,
+        w_end,
+        '{"windows": [{"start": "%s", "end": "%s"}]}' % (w_start, w_end),
+        "2026-06-17T08:00:00Z",
+    ),
+)
+con.commit()
+PYEOF
+
+PLAN_RESP="$(curl -sf -X POST "$DEMO_BASE/planning/generate" \
+  -H "content-type: application/json" \
+  -d '{}')"
+echo "  plan response: $PLAN_RESP"
+PLAN_ID="$(python3 - "$PLAN_RESP" "$CAL_WINDOW_START" "$CAL_WINDOW_END" "$TASK_A" "$TASK_B" "$TASK_C" <<'PYEOF'
+import json, sys
+from datetime import datetime
+
+
+def minutes(ts):
+    dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+    return int(dt.timestamp()) // 60
+
+
+resp = json.loads(sys.argv[1])
+w_start = minutes(sys.argv[2])
+w_end = minutes(sys.argv[3])
+expected = set(sys.argv[4:7])
+
+assert resp.get("schema_version") == "planning-kernel-contract/0.1", \
+    f"plan: unexpected schema_version: {resp.get('schema_version')}"
+# Phase A always emits NotYetImplemented advisories for the later Legitimizer
+# engine; those are advisory, not failures. Any other diagnostic is unexpected.
+ADVISORY_CODES = {"NotYetImplemented"}
+unexpected = [d for d in resp.get("diagnostics", []) if d.get("code") not in ADVISORY_CODES]
+assert not unexpected, f"plan: unexpected diagnostics: {unexpected}"
+plan = resp.get("plan")
+assert plan is not None, f"plan: expected a generated Plan, got: {resp}"
+assert plan.get("status") == "admitted", f"plan: expected admitted, got: {plan.get('status')}"
+assert plan.get("id"), f"plan: expected non-empty id, got: {plan}"
+assert "tasks" not in plan, \
+    f"plan: expected canonical PlanBody (no kernel 'tasks' field), got: {plan}"
+
+steps = plan.get("steps", [])
+assert len(steps) == 3, f"plan: expected 3 timed steps, got {len(steps)}: {steps}"
+
+# Canonical timed Plan: contiguous indexes, non-empty summaries, valid intervals,
+# and every placement inside the seeded Compact Calendar window.
+seen = []
+for i, step in enumerate(sorted(steps, key=lambda s: s["index"])):
+    assert step["index"] == i, f"plan: step indexes must be contiguous, got: {steps}"
+    assert step.get("summary", "").strip(), f"plan: step summary required: {step}"
+    assert step["start"] < step["end"], f"plan: impossible interval: {step}"
+    assert w_start <= step["start"] < step["end"] <= w_end, \
+        f"plan: placement {step['start']}..{step['end']} outside calendar window {w_start}..{w_end}"
+    seen.append(step["task_id"])
+
+# Compact Calendar skeleton: placements do not overlap.
+by_start = sorted(steps, key=lambda s: (s["start"], s["end"]))
+for a, b in zip(by_start, by_start[1:]):
+    assert a["end"] <= b["start"], f"plan: overlapping placements: {a} {b}"
+
+assert set(seen) == expected, f"plan: planned task set {set(seen)} != imported {expected}"
+print(plan["id"])
+PYEOF
+)"
+echo "  PASS plan: canonical timed Plan id=$PLAN_ID with 3 placements inside the Calendar window"
+
+CAL_RESP="$(curl -sf "$DEMO_BASE/calendar/current")"
+echo "  calendar response: $CAL_RESP"
+python3 - "$CAL_RESP" "$PLAN_RESP" <<'PYEOF'
+import json, sys
+cal = json.loads(sys.argv[1])
+plan = json.loads(sys.argv[2])["plan"]
+assert cal.get("plan_id") == plan["id"], \
+    f"calendar: plan_id {cal.get('plan_id')} != generated plan {plan['id']}"
+cal_steps = {s["task_id"]: (s["start"], s["end"]) for s in cal.get("steps", [])}
+plan_steps = {s["task_id"]: (s["start"], s["end"]) for s in plan["steps"]}
+assert cal_steps == plan_steps, \
+    f"calendar: timed steps {cal_steps} do not match the Plan {plan_steps}"
+print(f"  PASS calendar: /calendar/current serves {len(cal_steps)} timed steps matching the Plan")
+PYEOF
+
+echo ""
+echo "Step 11: recalculation in repair mode (task_completed) — completed Task not re-placed"
+# Complete Task A (UBU-D0227 lifecycle transition). It must stay frozen at its
+# prior placement when the Plan is recalculated.
+COMPLETE_RESP="$(curl -sf -X POST "$DEMO_BASE/task/$TASK_A/action" \
+  -H "content-type: application/json" \
+  -d "{\"schema_version\":\"$ACT_SCHEMA\",\"action\":\"complete\"}")"
+python3 - "$COMPLETE_RESP" "$TASK_A" <<'PYEOF'
+import json, sys
+d = json.loads(sys.argv[1])
+assert d.get("task_status") == "completed", f"recalc setup: expected completed, got: {d}"
+assert d.get("task_id") == sys.argv[2], f"recalc setup: task_id mismatch: {d}"
+print("  completed Task A (frozen for recalculation)")
+PYEOF
+
+RECALC_SCHEMA="ubu.orchestrator.recalculation.v1"
+RECALC_RESP="$(curl -sf -X POST "$DEMO_BASE/planning/recalculate" \
+  -H "content-type: application/json" \
+  -d "{
+    \"schema_version\":\"$RECALC_SCHEMA\",
+    \"triggered_at\":\"2026-06-17T12:00:00Z\",
+    \"trigger_type\":\"task_completed\",
+    \"objects\":[{\"id\":\"$TASK_A\",\"object_type\":\"Task\"}]
+  }")"
+echo "  recalculation response: $RECALC_RESP"
+PLAN2_ID="$(python3 - "$RECALC_RESP" "$PLAN_RESP" "$PLAN_ID" "$TASK_A" <<'PYEOF'
+import json, sys
+recalc = json.loads(sys.argv[1])
+prior = json.loads(sys.argv[2])["plan"]
+prior_id = sys.argv[3]
+task_a = sys.argv[4]
+
+assert recalc.get("schema_version") == "ubu.orchestrator.recalculation.v1", recalc
+assert recalc.get("repair_scope") == "remaining_window", \
+    f"recalc: expected remaining_window scope for task_completed, got: {recalc.get('repair_scope')}"
+assert recalc.get("prior_plan_id") == prior_id, \
+    f"recalc: prior_plan_id {recalc.get('prior_plan_id')} != {prior_id}"
+plan = recalc.get("plan")
+assert plan is not None, f"recalc: expected a repair-mode Plan, got: {recalc}"
+assert plan["id"] != prior_id, "recalc: repair Plan must have a new id"
+assert plan.get("supersedes_plan_id") == prior_id, \
+    f"recalc: supersedes_plan_id {plan.get('supersedes_plan_id')} != {prior_id}"
+
+prior_a = next(s for s in prior["steps"] if s["task_id"] == task_a)
+new_a = next((s for s in plan["steps"] if s["task_id"] == task_a), None)
+assert new_a is not None, f"recalc: completed Task A missing from repair Plan: {plan}"
+assert (new_a["start"], new_a["end"]) == (prior_a["start"], prior_a["end"]), \
+    f"recalc: completed Task A was re-placed {new_a} != prior {prior_a}"
+print(plan["id"])
+PYEOF
+)"
+echo "  PASS recalc: repair Plan $PLAN2_ID supersedes $PLAN_ID; completed Task A not re-placed"
+python3 - "$DEMO_DB" "$PLAN_ID" <<'PYEOF'
+import sqlite3, sys
+con = sqlite3.connect(sys.argv[1])
+cur = con.cursor()
+cur.execute("SELECT status FROM plans WHERE id = ?", (sys.argv[2],))
+row = cur.fetchone()
+assert row is not None, "recalc: prior plan row missing"
+assert row[0] == "superseded", f"recalc: prior plan status={row[0]}, expected superseded"
+print("  PASS recalc: prior Plan persisted as superseded")
+PYEOF
+
+echo ""
+echo "Step 12: override-safety — user_override placement survives recalculation"
+# Apply a user_override placement on Task B (authority_source=user_override).
+# It must be carried over unchanged when the Plan is recalculated again.
+OVERRIDE_RESP="$(curl -sf -X POST "$DEMO_BASE/task/$TASK_B/action" \
+  -H "content-type: application/json" \
+  -d "{\"schema_version\":\"$ACT_SCHEMA\",\"action\":\"override\"}")"
+echo "  override response: $OVERRIDE_RESP"
+python3 - "$OVERRIDE_RESP" "$TASK_B" <<'PYEOF'
+import json, sys
+d = json.loads(sys.argv[1])
+assert d.get("authority_source") == "user_override", \
+    f"override: expected authority_source=user_override, got: {d}"
+assert d.get("task_id") == sys.argv[2], f"override: task_id mismatch: {d}"
+print("  applied user_override placement on Task B")
+PYEOF
+
+RECALC2_RESP="$(curl -sf -X POST "$DEMO_BASE/planning/recalculate" \
+  -H "content-type: application/json" \
+  -d "{
+    \"schema_version\":\"$RECALC_SCHEMA\",
+    \"triggered_at\":\"2026-06-17T13:00:00Z\",
+    \"trigger_type\":\"user_override\",
+    \"objects\":[{\"id\":\"$TASK_B\",\"object_type\":\"Task\"}]
+  }")"
+echo "  recalculation response: $RECALC2_RESP"
+python3 - "$RECALC2_RESP" "$RECALC_RESP" "$PLAN2_ID" "$TASK_B" "$TASK_A" <<'PYEOF'
+import json, sys
+recalc2 = json.loads(sys.argv[1])
+prior = json.loads(sys.argv[2])["plan"]  # the repair Plan from Step 11
+prior_id = sys.argv[3]
+task_b = sys.argv[4]
+task_a = sys.argv[5]
+
+assert recalc2.get("repair_scope") == "override_placement", \
+    f"override recalc: expected override_placement scope, got: {recalc2.get('repair_scope')}"
+assert recalc2.get("prior_plan_id") == prior_id, \
+    f"override recalc: prior_plan_id {recalc2.get('prior_plan_id')} != {prior_id}"
+plan = recalc2.get("plan")
+assert plan is not None, f"override recalc: expected a repair Plan, got: {recalc2}"
+assert plan.get("supersedes_plan_id") == prior_id, \
+    f"override recalc: supersedes_plan_id {plan.get('supersedes_plan_id')} != {prior_id}"
+
+prior_b = next(s for s in prior["steps"] if s["task_id"] == task_b)
+new_b = next((s for s in plan["steps"] if s["task_id"] == task_b), None)
+assert new_b is not None, f"override recalc: overridden Task B missing from repair Plan: {plan}"
+assert (new_b["start"], new_b["end"]) == (prior_b["start"], prior_b["end"]), \
+    f"override recalc: user_override placement was clobbered {new_b} != {prior_b}"
+
+# The completed Task A also remains frozen at its placement across this repair.
+prior_a = next(s for s in prior["steps"] if s["task_id"] == task_a)
+new_a = next((s for s in plan["steps"] if s["task_id"] == task_a), None)
+assert new_a is not None, f"override recalc: completed Task A missing: {plan}"
+assert (new_a["start"], new_a["end"]) == (prior_a["start"], prior_a["end"]), \
+    f"override recalc: completed Task A was re-placed {new_a} != {prior_a}"
+print("  PASS override-safety: user_override placement survived recalculation unchanged")
+PYEOF
+
+echo ""
+echo "PASS: bootstrap-to-act, gated projection, and Plan/Calendar/recalculation loops"
+echo "      verified store-backed on throwaway store"
 echo "  store=$DEMO_DB (ephemeral — removed on exit)"

@@ -3,7 +3,8 @@
   "public_safe": true,
   "fixtures": [
     "../github/ubu-design-small.json",
-    "../github/multi-repo-small.json"
+    "../github/multi-repo-small.json",
+    "planning-candidates.json"
   ],
   "description": "Placeholder manifest for local dogfooding with fake data."
 }

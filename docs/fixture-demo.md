@@ -10,7 +10,8 @@ Current entry point:
 
 ## What the demo exercises
 
-The demo exercises the **full bootstrap-to-act loop** and gated projection loop
+The demo exercises the **full bootstrap-to-act loop**, the gated projection loop,
+and **Plan generation, the Compact Calendar, and override-safe recalculation**
 store-backed against a throwaway SQLite store. No in-memory (MemoryState) path
 is exercised; all state flows through `ubu_store`.
 
@@ -24,6 +25,10 @@ is exercised; all state flows through `ubu_store`.
 | 6. Projection preview + approval | `POST /projection/preview`, `POST /projection/approve` | O7, UBU-D0226, UBU-D0230 |
 | 7. Projection reconciliation | `POST /projection/reconcile` | O7 |
 | 8. Projection gate deny path | `POST /projection/preview`, `POST /projection/approve` | O7, UBU-D0230 |
+| 9. Plan import | `POST /github/import/fixture` | S9, P3 |
+| 10. Plan generation + Compact Calendar | `POST /planning/generate`, `GET /calendar/current` | S9, P3, P4, O9 |
+| 11. Recalculation (task_completed) | `POST /task/{id}/action`, `POST /planning/recalculate` | S9, P3, P4, O9, UBU-D0227 |
+| 12. Override-safety | `POST /task/{id}/action` (override), `POST /planning/recalculate` | S9, P3, P4, O9 |
 
 ### Assertions
 
@@ -49,6 +54,22 @@ is exercised; all state flows through `ubu_store`.
 8. The deny path sets `no_external_export`; the approved preview returns a failed
    `projection_result`, records `projection_denied`, writes no mock
    `github-label-write`, and records a `compartment_boundary_decided` denial Log.
+9. The fixture import (`fixtures/demo/planning-candidates.json`) admits at least three
+   active Tasks (`admitted_to_store >= 3`) without any outbound HTTP.
+10. After seeding a Compact Calendar window in the throwaway store, `/planning/generate`
+    returns a canonical timed Plan (`schema_version=planning-kernel-contract/0.1`,
+    `status=admitted`, contiguous step indexes, non-empty summaries, valid intervals)
+    whose placements all fall **inside the Calendar window** and do not overlap;
+    `/calendar/current` serves the same `plan_id` and the same timed steps. (The
+    Phase A `NotYetImplemented` Legitimizer advisories are tolerated; they are not
+    failures.)
+11. Completing a Task and firing `/planning/recalculate` with `task_completed` returns a
+    repair-mode Plan whose `supersedes_plan_id` is the prior Plan id; the prior Plan is
+    persisted as `superseded`; and the completed Task keeps its exact prior placement —
+    it is **not re-placed**.
+12. Applying a `user_override` placement (authority_source `user_override`) and firing a
+    second `/planning/recalculate` leaves the overridden Task's placement **unchanged and
+    not clobbered**; the previously completed Task likewise stays frozen.
 
 ## Offline operation and import stub
 
@@ -79,10 +100,14 @@ No real or user store is ever touched.
 - `fixtures/github/ubu-design-small.json`
 - `fixtures/github/multi-repo-small.json`
 - `fixtures/demo/phase1-demo-manifest.json`
+- `fixtures/demo/planning-candidates.json`
 
 These fixtures are validated at startup (checked for existence and parseability). The
-bootstrap/seed step uses `"UbU-project/ubu-design"` as the fixture repo; Tasks are
-admitted via the `import_live` stub, not from the JSON fixture files.
+bootstrap/seed step uses `"UbU-project/ubu-design"` as the fixture repo; its single Task
+is admitted via the `import_live` stub, not from the JSON fixture files. The Plan /
+Calendar / recalculation steps admit their active Tasks from
+`fixtures/demo/planning-candidates.json` via `/github/import/fixture` (offline; no
+outbound HTTP).
 
 ## Prerequisites
 
@@ -99,6 +124,8 @@ admitted via the `import_live` stub, not from the JSON fixture files.
 | **O5** | Desktop token intake (`/desktop/session/github-token`); `bootstrap/seed` endpoint |
 | **O6** | Readiness `next_action` with explanation; action recording (`/task/{id}/action`); bounded diagnostic |
 | **O7** | Projection preview, approval, gated managed-label mock write, reconciliation, and gate-deny path |
+| **S9/P3/P4/O9** | Canonical timed Plan (`/planning/generate`), the Compact Calendar (`/calendar/current`), and repair-mode recalculation (`/planning/recalculate`) that supersedes the prior Plan while preserving frozen placements |
 | **UBU-D0210** | `next_action` must return a bounded diagnostic when no ready Task is available — not an opaque empty result |
 | **UBU-D0226** | `authority_source` records the authority path for projection state; source details remain in provenance |
+| **UBU-D0227** | Persisted `Task.status` lifecycle (`active`/`completed`/`failed`/`moot`) governs which Tasks are frozen and not re-placed on recalculation |
 | **UBU-D0230** | Policy-summary guardrails (`local_only`, `no_cloud_llm`, `no_external_export`) and `compartment_boundary_decided` Log vocabulary |

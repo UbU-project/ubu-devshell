@@ -50,7 +50,8 @@ schema types must reference the relevant decision ID from this range in the
 PR description and in the generated issue draft.
 
 The fixture smoke test (`scripts/run-fixture-demo.sh`) exercises the full
-**bootstrap-to-act loop** and gated projection loop store-backed against a
+**bootstrap-to-act loop**, the gated projection loop, and **Plan generation,
+the Compact Calendar, and override-safe recalculation** store-backed against a
 throwaway SQLite store:
 
 1. Token intake — `/desktop/session/github-token` (O5)
@@ -66,6 +67,19 @@ throwaway SQLite store:
    plus a surfaced conflict and no silent overwrite (O7)
 8. Projection deny path — approved preview with `no_external_export`; asserts no mock
    `github-label-write`, rejected legitimization, and a denial Log entry (O7, UBU-D0230)
+9. Plan import — `/github/import/fixture` admits multiple active Tasks from an offline
+   fixture (`fixtures/demo/planning-candidates.json`) (S9/P3)
+10. Canonical timed Plan + Compact Calendar — seeds a Compact Calendar window in the
+    throwaway store, then `/planning/generate` produces a canonical timed Plan and
+    asserts every placement is inside the Calendar window and non-overlapping;
+    `/calendar/current` serves the same timed steps (S9/P3/P4/O9)
+11. Recalculation — completes a Task, then `/planning/recalculate` with
+    `task_completed`; asserts a repair-mode Plan that supersedes the prior Plan
+    (`supersedes_plan_id` set, prior persisted as `superseded`) and that the completed
+    Task is **not re-placed** (UBU-D0227 lifecycle freeze; S9/P3/P4/O9)
+12. Override-safety — applies a `user_override` placement via `/task/{id}/action`, fires
+    a second recalculation, and asserts the override placement **survives unchanged and
+    is not clobbered** (S9/P3/P4/O9)
 
 Governing decisions:
 - **O4**: MemoryState removed; `UBU_DB_PATH` throwaway store
@@ -75,7 +89,12 @@ Governing decisions:
   (not an opaque empty result) when no ready Task is available
 - **O7**: projection preview, approval, gated managed-label mock write, reconciliation,
   and gate-deny path
+- **S9/P3/P4/O9**: canonical timed Plan (`/planning/generate`), the Compact Calendar
+  (`/calendar/current`), and repair-mode recalculation (`/planning/recalculate`) that
+  supersedes the prior Plan while preserving frozen placements
 - **UBU-D0226**: `authority_source` is the authority-path enum used by projection state
+- **UBU-D0227**: persisted `Task.status` lifecycle (`active`/`completed`/`failed`/`moot`)
+  governs which Tasks are frozen and not re-placed on recalculation
 - **UBU-D0230**: policy-summary guardrails and `compartment_boundary_decided` Log
   vocabulary
 

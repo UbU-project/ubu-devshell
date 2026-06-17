@@ -1,0 +1,19 @@
+{
+  "fixture": "phase1-planning-candidates",
+  "public_safe": true,
+  "notes": "Offline fixture for the D8 Plan / Compact Calendar / recalculation smoke test. Admitted as active Tasks via /github/import/fixture; no live GitHub and no network egress.",
+  "candidates": [
+    {
+      "title": "Draft Phase 1 planning kernel notes",
+      "source": "github_fixture"
+    },
+    {
+      "title": "Wire the Compact Calendar projection",
+      "source": "github_fixture"
+    },
+    {
+      "title": "Review recalculation override safety",
+      "source": "github_fixture"
+    }
+  ]
+}
