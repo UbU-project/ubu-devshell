@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Fixture smoke test: exercises the full bootstrap-to-act loop, the gated
-# projection loop, and canonical Plan generation / Compact Calendar /
-# override-safe recalculation against the store-backed orchestrator (O5: token
+# projection loop, canonical Plan generation / Compact Calendar /
+# override-safe recalculation, and affect legitimization against the
+# store-backed orchestrator (O5: token
 # intake and bootstrap/seed; O6: readiness next_action with explanation, action
 # recording, and bounded diagnostic; O7: projection preview, approval, gated
 # mock write, reconciliation, and gate-deny path; S9/P3/P4/O9: canonical timed
@@ -17,6 +18,8 @@
 #   S9/P3/P4/O9: canonical timed Plan (/planning/generate), Compact Calendar
 #               (/calendar/current), and repair-mode recalculation
 #               (/planning/recalculate) that supersedes the prior Plan
+#   S10/P5/O10: affect profile contract, Phase B affect legitimization, and
+#               orchestrator affect-profile/snapshot wiring
 #   UBU-D0226: authority_source remains the authority-path enum
 #   UBU-D0227: persisted Task.status lifecycle (active/completed/failed/moot)
 #              drives which Tasks are frozen and not re-placed on recalculation
@@ -36,6 +39,7 @@ ORCHESTRATOR_DIR="${ORCHESTRATOR_DIR:-$REPOS_DIR/ubu-orchestrator}"
 MANIFEST="$ROOT_DIR/fixtures/demo/phase1-demo-manifest.json"
 GITHUB_FIXTURES_DIR="$ROOT_DIR/fixtures/github"
 PLANNING_FIXTURE="$ROOT_DIR/fixtures/demo/planning-candidates.json"
+AFFECT_FIXTURE="$ROOT_DIR/fixtures/demo/affect-legitimization-cases.json"
 DEMO_PORT="${DEMO_PORT:-17878}"
 DEMO_BASE="http://127.0.0.1:$DEMO_PORT"
 
@@ -52,6 +56,9 @@ ls "$GITHUB_FIXTURES_DIR"/*.json >/dev/null 2>&1 \
 [[ -f "$PLANNING_FIXTURE" ]] \
   || fail_missing "planning fixture not found: $PLANNING_FIXTURE (required for Plan/Calendar/recalculation steps)"
 
+[[ -f "$AFFECT_FIXTURE" ]] \
+  || fail_missing "affect legitimization fixture not found: $AFFECT_FIXTURE (required for Phase B affect smoke steps)"
+
 [[ -d "$ORCHESTRATOR_DIR" ]] \
   || fail_missing "orchestrator repo not found at $ORCHESTRATOR_DIR (run clone-all.sh first)"
 
@@ -65,6 +72,7 @@ echo "  O5: token intake + bootstrap/seed"
 echo "  O6: readiness next_action, action recording, bounded diagnostic (UBU-D0210)"
 echo "  O7: gated projection preview/approval/write/reconcile loop with deny path"
 echo "  S9/P3/P4/O9: canonical timed Plan, Compact Calendar, override-safe recalculation"
+echo "  S10/P5/O10: affect legitimization feasible/enforce/warn_only/stale paths"
 echo "orchestrator: $ORCHESTRATOR_DIR"
 echo "manifest:     $MANIFEST"
 echo "port:         $DEMO_PORT"
@@ -109,6 +117,21 @@ PYEOF
 for f in "$GITHUB_FIXTURES_DIR"/*.json; do
   echo "  github fixture: $f"
 done
+python3 - "$AFFECT_FIXTURE" <<'PYEOF'
+import json, sys, pathlib
+
+path = pathlib.Path(sys.argv[1])
+fixture = json.loads(path.read_text())
+cases = fixture.get("cases", [])
+required = {"feasible-enforce", "infeasible-enforce", "infeasible-warn-only"}
+names = {case.get("name") for case in cases}
+missing = sorted(required - names)
+assert not missing, f"affect fixture missing required cases: {missing}"
+for case in cases:
+    assert case.get("request"), f"affect fixture case missing request: {case}"
+    assert case.get("expected"), f"affect fixture case missing expected: {case}"
+print(f"  affect fixture: {path} ({len(cases)} cases)")
+PYEOF
 
 # --- Build orchestrator ---
 
@@ -574,7 +597,84 @@ print("  PASS deny path: no mock write and compartment_boundary_decided rejected
 PYEOF
 
 echo ""
-echo "Step 9: import planning candidates (S9/P3) — admit active Tasks via fixture import"
+echo "Step 9: affect legitimization fixtures (S10/P5/O10) — feasible, enforce, warn_only"
+echo "  (offline fixture requests: $AFFECT_FIXTURE; posted only to loopback /planning/generate)"
+python3 - "$AFFECT_FIXTURE" "$DEMO_BASE" <<'PYEOF'
+import json
+import sys
+import urllib.error
+import urllib.request
+
+fixture_path, base_url = sys.argv[1:3]
+fixture = json.loads(open(fixture_path, encoding="utf-8").read())
+
+for case in fixture["cases"]:
+    name = case["name"]
+    expected = case["expected"]
+    body = json.dumps({"request": case["request"]}).encode("utf-8")
+    request = urllib.request.Request(
+        f"{base_url}/planning/generate",
+        data=body,
+        headers={"content-type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise AssertionError(f"{name}: /planning/generate failed: {exc.code} {detail}") from exc
+
+    plan = payload.get("plan")
+    plan_present = plan is not None
+    assert plan_present is expected["plan_present"], (
+        f"{name}: plan_present={plan_present}, expected {expected['plan_present']}: {payload}"
+    )
+
+    legitimization = payload.get("legitimization")
+    assert legitimization is not None, f"{name}: missing legitimization report: {payload}"
+    assert legitimization.get("result") == expected["result"], (
+        f"{name}: result={legitimization.get('result')}, expected {expected['result']}: {payload}"
+    )
+    assert legitimization.get("mode") == expected["mode"], (
+        f"{name}: mode={legitimization.get('mode')}, expected {expected['mode']}: {payload}"
+    )
+    assert legitimization.get("affect_feasible") is expected["affect_feasible"], (
+        f"{name}: affect_feasible={legitimization.get('affect_feasible')}, "
+        f"expected {expected['affect_feasible']}: {payload}"
+    )
+    assert legitimization.get("violated_dimensions", []) == expected["violated_dimensions"], (
+        f"{name}: violated_dimensions={legitimization.get('violated_dimensions')}, "
+        f"expected {expected['violated_dimensions']}: {payload}"
+    )
+    if expected.get("affect_margin_sign") == "negative":
+        margin = legitimization.get("affect_margin")
+        assert margin is not None and margin < 0, (
+            f"{name}: expected negative affect_margin, got {margin}: {payload}"
+        )
+    if plan_present:
+        plan_legitimization = plan.get("legitimization")
+        assert plan_legitimization is not None, (
+            f"{name}: admitted plan did not persist legitimization: {payload}"
+        )
+        assert plan_legitimization.get("violated_dimensions", []) == expected["violated_dimensions"], (
+            f"{name}: persisted plan violation mismatch: {payload}"
+        )
+    print(
+        "  PASS affect {name}: result={result} mode={mode} feasible={feasible} "
+        "violations={violations} plan_present={plan_present}".format(
+            name=name,
+            result=legitimization["result"],
+            mode=legitimization["mode"],
+            feasible=legitimization["affect_feasible"],
+            violations=legitimization.get("violated_dimensions", []),
+            plan_present=plan_present,
+        )
+    )
+PYEOF
+
+echo ""
+echo "Step 10: import planning candidates (S9/P3) — admit active Tasks via fixture import"
 echo "  (offline fixture import: $PLANNING_FIXTURE; no outbound HTTP)"
 IMPORT_RESP="$(curl -sf -X POST "$DEMO_BASE/github/import/fixture" \
   -H "content-type: application/json" \
@@ -596,7 +696,7 @@ TASK_C="$(printf '%s\n' "$PLAN_TASK_IDS" | sed -n '3p')"
 echo "  admitted Tasks: A=$TASK_A  B=$TASK_B  C=$TASK_C"
 
 echo ""
-echo "Step 10: canonical timed Plan + Compact Calendar (S9/P3/P4/O9)"
+echo "Step 11: canonical timed Plan + Compact Calendar with stale-affect handling (S9/P3/P4/O9/S10/P5/O10)"
 CAL_WINDOW_START="2026-06-17T09:00:00Z"
 CAL_WINDOW_END="2026-06-17T17:00:00Z"
 echo "  seeding Compact Calendar window [$CAL_WINDOW_START .. $CAL_WINDOW_END] into throwaway store"
@@ -620,6 +720,95 @@ con.execute(
     ),
 )
 con.commit()
+PYEOF
+echo "  seeding stale live affect observation and freshness preference into throwaway store"
+python3 - "$DEMO_DB" <<'PYEOF'
+import json, sqlite3, sys
+
+db = sys.argv[1]
+con = sqlite3.connect(db)
+preference_payload = {
+    "id": "pref_demo_affect_freshness",
+    "name": "affect_freshness_seconds",
+    "value": 60,
+    "authority_source": "system",
+    "provenance": {
+        "created_at": "2026-06-17T08:00:00Z",
+        "authority_source": "system",
+        "source": {
+            "source_kind": "fixture_demo",
+            "source_id": "stale-affect-freshness"
+        }
+    }
+}
+snapshot_payload = {
+    "id": "snap_demo_stale_affect",
+    "captured_at": "2026-06-17T08:00:00Z",
+    "objects": [],
+    "affect": {
+        "source_kind": "live_observation",
+        "observed_at": "2026-06-17T08:00:00Z",
+        "dimensions": {
+            "energy": {
+                "dimension": "energy",
+                "direction": "higher_is_better",
+                "value": 1.0,
+                "scale": {"min": 0, "max": 10},
+                "threshold": {"warning_delta": 1.0, "critical_delta": 2.0}
+            },
+            "stress": {
+                "dimension": "stress",
+                "direction": "lower_is_better",
+                "value": 10.0,
+                "scale": {"min": 0, "max": 10},
+                "threshold": {"warning_delta": 1.0, "critical_delta": 2.0}
+            },
+            "mood_intensity": {
+                "dimension": "mood_intensity",
+                "direction": "lower_is_better",
+                "value": 10.0,
+                "scale": {"min": 0, "max": 10},
+                "threshold": {"warning_delta": 1.0, "critical_delta": 2.0}
+            }
+        }
+    }
+}
+con.execute(
+    """
+    INSERT INTO objects
+      (id, object_type, version, status, compartment_label, payload_json, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """,
+    (
+        "pref_demo_affect_freshness",
+        "Preference",
+        1,
+        "active",
+        "fixture-demo",
+        json.dumps(preference_payload, separators=(",", ":")),
+        "2026-06-17T08:00:00Z",
+        "2026-06-17T08:00:00Z",
+    ),
+)
+con.execute(
+    """
+    INSERT INTO objects
+      (id, object_type, version, status, compartment_label, payload_json, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """,
+    (
+        "snap_demo_stale_affect",
+        "Snapshot",
+        1,
+        "active",
+        "fixture-demo",
+        json.dumps(snapshot_payload, separators=(",", ":")),
+        "2026-06-17T08:00:00Z",
+        "2026-06-17T08:00:00Z",
+    ),
+)
+con.commit()
+print("  stale affect setup: live observation at 2026-06-17T08:00:00Z, window starts 2026-06-17T09:00:00Z, freshness_seconds=60")
 PYEOF
 
 PLAN_RESP="$(curl -sf -X POST "$DEMO_BASE/planning/generate" \
@@ -655,6 +844,32 @@ assert plan.get("id"), f"plan: expected non-empty id, got: {plan}"
 assert "tasks" not in plan, \
     f"plan: expected canonical PlanBody (no kernel 'tasks' field), got: {plan}"
 
+legitimization = resp.get("legitimization")
+assert legitimization is not None, f"plan: expected affect legitimization report, got: {resp}"
+assert legitimization.get("result") == "passed", \
+    f"stale affect: bootstrap default substitution should pass, got: {legitimization}"
+assert legitimization.get("mode") == "warn_only", \
+    f"stale affect: expected warn_only after stale observation fallback, got: {legitimization}"
+assert legitimization.get("affect_feasible") is True, \
+    f"stale affect: expected bootstrap default feasible=true, got: {legitimization}"
+assert legitimization.get("violated_dimensions", []) == [], \
+    f"stale affect: stale live observation was treated as a violation: {legitimization}"
+assert legitimization.get("stale_dimensions", []) == [], \
+    f"stale affect: stale live observation was presented as current state: {legitimization}"
+warning = legitimization.get("stale_affect_warning", "")
+assert "stale affect observation" in warning and "bootstrap default profile observation" in warning, \
+    f"stale affect: expected marked bootstrap fallback warning, got: {legitimization}"
+for dimension, detail in legitimization.get("dimensions", {}).items():
+    assert detail.get("stale") in (False, None), \
+        f"stale affect: dimension {dimension} was exposed as stale current state: {detail}"
+    assert detail.get("margin", 0) >= 0, \
+        f"stale affect: infeasible stale live value appears to have been used: {detail}"
+
+plan_legitimization = plan.get("legitimization")
+assert plan_legitimization is not None, f"plan: expected persisted legitimization: {plan}"
+assert plan_legitimization.get("stale_affect_warning") == warning, \
+    f"plan: persisted stale warning mismatch: {plan_legitimization}"
+
 steps = plan.get("steps", [])
 assert len(steps) == 3, f"plan: expected 3 timed steps, got {len(steps)}: {steps}"
 
@@ -679,6 +894,7 @@ print(plan["id"])
 PYEOF
 )"
 echo "  PASS plan: canonical timed Plan id=$PLAN_ID with 3 placements inside the Calendar window"
+echo "  PASS stale affect: warn_only bootstrap fallback marked; stale live observation not presented as current"
 
 CAL_RESP="$(curl -sf "$DEMO_BASE/calendar/current")"
 echo "  calendar response: $CAL_RESP"
@@ -692,11 +908,16 @@ cal_steps = {s["task_id"]: (s["start"], s["end"]) for s in cal.get("steps", [])}
 plan_steps = {s["task_id"]: (s["start"], s["end"]) for s in plan["steps"]}
 assert cal_steps == plan_steps, \
     f"calendar: timed steps {cal_steps} do not match the Plan {plan_steps}"
+legitimization = cal.get("legitimization")
+assert legitimization is not None, f"calendar: expected legitimization report, got: {cal}"
+assert legitimization.get("mode") == "warn_only", f"calendar: expected warn_only, got: {legitimization}"
+assert "stale affect observation" in legitimization.get("stale_affect_warning", ""), \
+    f"calendar: expected stale affect warning, got: {legitimization}"
 print(f"  PASS calendar: /calendar/current serves {len(cal_steps)} timed steps matching the Plan")
 PYEOF
 
 echo ""
-echo "Step 11: recalculation in repair mode (task_completed) — completed Task not re-placed"
+echo "Step 12: recalculation in repair mode (task_completed) — completed Task not re-placed"
 # Complete Task A (UBU-D0227 lifecycle transition). It must stay frozen at its
 # prior placement when the Plan is recalculated.
 COMPLETE_RESP="$(curl -sf -X POST "$DEMO_BASE/task/$TASK_A/action" \
@@ -759,7 +980,7 @@ print("  PASS recalc: prior Plan persisted as superseded")
 PYEOF
 
 echo ""
-echo "Step 12: override-safety — user_override placement survives recalculation"
+echo "Step 13: override-safety — user_override placement survives recalculation"
 # Apply a user_override placement on Task B (authority_source=user_override).
 # It must be carried over unchanged when the Plan is recalculated again.
 OVERRIDE_RESP="$(curl -sf -X POST "$DEMO_BASE/task/$TASK_B/action" \
@@ -787,7 +1008,7 @@ echo "  recalculation response: $RECALC2_RESP"
 python3 - "$RECALC2_RESP" "$RECALC_RESP" "$PLAN2_ID" "$TASK_B" "$TASK_A" <<'PYEOF'
 import json, sys
 recalc2 = json.loads(sys.argv[1])
-prior = json.loads(sys.argv[2])["plan"]  # the repair Plan from Step 11
+prior = json.loads(sys.argv[2])["plan"]  # the repair Plan from Step 12
 prior_id = sys.argv[3]
 task_b = sys.argv[4]
 task_a = sys.argv[5]
@@ -817,6 +1038,6 @@ print("  PASS override-safety: user_override placement survived recalculation un
 PYEOF
 
 echo ""
-echo "PASS: bootstrap-to-act, gated projection, and Plan/Calendar/recalculation loops"
+echo "PASS: bootstrap-to-act, gated projection, affect legitimization, and Plan/Calendar/recalculation loops"
 echo "      verified store-backed on throwaway store"
 echo "  store=$DEMO_DB (ephemeral — removed on exit)"

@@ -1,0 +1,181 @@
+{
+  "schema_version": "ubu.devshell.fixture_demo.affect_legitimization_cases.v1",
+  "public_safe": true,
+  "notes": "Offline fixture requests for D9 affect legitimization smoke coverage. Posted directly to /planning/generate against the throwaway orchestrator store; no live GitHub and no network egress.",
+  "cases": [
+    {
+      "name": "feasible-enforce",
+      "request": {
+        "schema_version": "planning-kernel-contract/0.1",
+        "request_id": "fixture-affect-feasible",
+        "mode": "fresh_generation",
+        "rng_seed": 6101,
+        "time_window": {
+          "start": 0,
+          "end": 10
+        },
+        "task_graph": {
+          "topological_order": ["task-a"],
+          "edges": []
+        },
+        "affect_profile": {
+          "mode": "enforce",
+          "dimensions": {
+            "energy": {
+              "direction": "higher_is_better",
+              "location": 5.0,
+              "scale": 1.0,
+              "threshold": 0.5
+            },
+            "stress": {
+              "direction": "lower_is_better",
+              "location": 5.0,
+              "scale": 1.0,
+              "threshold": 0.5
+            },
+            "mood_intensity": {
+              "direction": "lower_is_better",
+              "location": 5.0,
+              "scale": 1.0,
+              "threshold": 0.5
+            }
+          }
+        },
+        "affect_observation": {
+          "dimensions": {
+            "energy": {
+              "value": 6.0,
+              "observed_at": 0,
+              "source_kind": "self_report"
+            },
+            "stress": {
+              "value": 4.0,
+              "observed_at": 0,
+              "source_kind": "self_report"
+            },
+            "mood_intensity": {
+              "value": 4.0,
+              "observed_at": 0,
+              "source_kind": "self_report"
+            }
+          }
+        },
+        "tasks": [
+          {
+            "id": "task-a",
+            "duration": 1
+          }
+        ]
+      },
+      "expected": {
+        "plan_present": true,
+        "result": "passed",
+        "mode": "enforce",
+        "affect_feasible": true,
+        "violated_dimensions": []
+      }
+    },
+    {
+      "name": "infeasible-enforce",
+      "request": {
+        "schema_version": "planning-kernel-contract/0.1",
+        "request_id": "fixture-affect-infeasible-enforce",
+        "mode": "fresh_generation",
+        "rng_seed": 6108,
+        "time_window": {
+          "start": 0,
+          "end": 10
+        },
+        "task_graph": {
+          "topological_order": ["task-a"],
+          "edges": []
+        },
+        "affect_profile": {
+          "mode": "enforce",
+          "dimensions": {
+            "energy": {
+              "direction": "higher_is_better",
+              "location": 5.0,
+              "scale": 1.0,
+              "threshold": 0.5
+            }
+          }
+        },
+        "affect_observation": {
+          "dimensions": {
+            "energy": {
+              "value": 4.0,
+              "observed_at": 0,
+              "source_kind": "self_report"
+            }
+          }
+        },
+        "tasks": [
+          {
+            "id": "task-a",
+            "duration": 1
+          }
+        ]
+      },
+      "expected": {
+        "plan_present": false,
+        "result": "failed",
+        "mode": "enforce",
+        "affect_feasible": false,
+        "violated_dimensions": ["energy"],
+        "affect_margin_sign": "negative"
+      }
+    },
+    {
+      "name": "infeasible-warn-only",
+      "request": {
+        "schema_version": "planning-kernel-contract/0.1",
+        "request_id": "fixture-affect-infeasible-warn-only",
+        "mode": "fresh_generation",
+        "rng_seed": 6108,
+        "time_window": {
+          "start": 0,
+          "end": 10
+        },
+        "task_graph": {
+          "topological_order": ["task-a"],
+          "edges": []
+        },
+        "affect_profile": {
+          "mode": "warn_only",
+          "dimensions": {
+            "energy": {
+              "direction": "higher_is_better",
+              "location": 5.0,
+              "scale": 1.0,
+              "threshold": 0.5
+            }
+          }
+        },
+        "affect_observation": {
+          "dimensions": {
+            "energy": {
+              "value": 4.0,
+              "observed_at": 0,
+              "source_kind": "self_report"
+            }
+          }
+        },
+        "tasks": [
+          {
+            "id": "task-a",
+            "duration": 1
+          }
+        ]
+      },
+      "expected": {
+        "plan_present": true,
+        "result": "failed",
+        "mode": "warn_only",
+        "affect_feasible": false,
+        "violated_dimensions": ["energy"],
+        "affect_margin_sign": "negative"
+      }
+    }
+  ]
+}

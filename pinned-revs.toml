@@ -14,10 +14,10 @@
 # show-revs.sh compares these against local checkout HEADs.
 
 [pinned]
-ubu_schemas         = "23bff250afc7fad324ca4b85c510cea49f991cbd"  # R_schemas (post-S9)
+ubu_schemas         = "257fde319d91b0df052889942154244b268eb297"  # R_schemas (post-S10: affect profile schema)
 ubu_core            = "77640fef718c16b987e3e4a26766f279ad62836a"  # R_core (post-C7: export-boundary, worker-authority, redaction-identity checks)
 ubu_store           = "4204a0e6e5c0bb1882b7672e022e3458789c1061"  # R_store
-ubu_planning_kernel = "2a107ec93ba68f9093707873fb7dd510049e88ee"  # R_planning (post-P3/P4: timed-Plan skeleton repair + phase A goldens)
+ubu_planning_kernel = "41e3d548f82e940fad4d2278a6691e8258f3f587"  # R_planning (post-P5: affect legitimacy goldens)
 ubu_github_adapter  = "d71a169a889a4c0343b9c1970a2afe8db3c60a17"  # R_adapter
-ubu_orchestrator    = "2ceb7371b7a2407df364aff2651951981a77ac41"  # R_orchestrator (post-O9: canonical timed Plan, Compact Calendar, recalculation)
-ubu_ui              = "b8a95de5688c061873b354e62fae346569724281"  # R_ui (post-O9 calendar/recalculation preview view)
+ubu_orchestrator    = "a7de27d31c1d6fca467df118466f2f6f60ca57f8"  # R_orchestrator (post-O10: affect profile planning request)
+ubu_ui              = "e868c02d24580bccb1ea6f5feb15033639622003"  # R_ui (post-O10 calendar affect legitimization)
