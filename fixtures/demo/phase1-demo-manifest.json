@@ -4,7 +4,9 @@
   "fixtures": [
     "../github/ubu-design-small.json",
     "../github/multi-repo-small.json",
-    "planning-candidates.json"
+    "planning-candidates.json",
+    "affect-legitimization-cases.json",
+    "scoring-selection-cases.json"
   ],
   "description": "Placeholder manifest for local dogfooding with fake data."
 }

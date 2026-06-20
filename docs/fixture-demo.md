@@ -11,9 +11,10 @@ Current entry point:
 ## What the demo exercises
 
 The demo exercises the **full bootstrap-to-act loop**, the gated projection loop,
-**affect legitimization**, and **Plan generation, the Compact Calendar, and
-override-safe recalculation** store-backed against a throwaway SQLite store. No
-in-memory (MemoryState) path is exercised; all state flows through `ubu_store`.
+**affect legitimization**, **Plan generation, the Compact Calendar, and
+override-safe recalculation**, and **C-1 bounded candidate scoring and composite
+selection** store-backed against a throwaway SQLite store. No in-memory
+(MemoryState) path is exercised; all state flows through `ubu_store`.
 
 | Step | Endpoint | Governing decision |
 |------|----------|--------------------|
@@ -30,6 +31,7 @@ in-memory (MemoryState) path is exercised; all state flows through `ubu_store`.
 | 11. Plan generation + Compact Calendar + stale-affect handling | `POST /planning/generate`, `GET /calendar/current` | S9, P3, P4, O9, S10, P5, O10 |
 | 12. Recalculation (task_completed) | `POST /task/{id}/action`, `POST /planning/recalculate` | S9, P3, P4, O9, UBU-D0227 |
 | 13. Override-safety | `POST /task/{id}/action` (override), `POST /planning/recalculate` | S9, P3, P4, O9 |
+| 14. Bounded candidate scoring, pruning, and selection | `POST /planning/generate`, `GET /calendar/current` | C-1, P7, P8, O12 |
 
 ### Assertions
 
@@ -58,10 +60,11 @@ in-memory (MemoryState) path is exercised; all state flows through `ubu_store`.
 9. Affect legitimization fixture requests
    (`fixtures/demo/affect-legitimization-cases.json`) assert:
    `feasible-enforce` returns `result=passed`, `affect_feasible=true`, and no
-   `violated_dimensions`; `infeasible-enforce` returns no admitted Plan and records
-   `result=failed`, `affect_feasible=false`, `violated_dimensions=["energy"]`, and a
-   negative `affect_margin`; `infeasible-warn-only` records the same violation and
-   negative margin without failing Plan admission.
+   `violated_dimensions`; `infeasible-enforce` returns no admitted Plan, no selected
+   candidate, and no scored alternatives after every candidate is filtered;
+   `infeasible-warn-only` records `result=failed`, `affect_feasible=false`,
+   `violated_dimensions=["energy"]`, and a negative margin without failing Plan
+   admission.
 10. The fixture import (`fixtures/demo/planning-candidates.json`) admits at least three
    active Tasks (`admitted_to_store >= 3`) without any outbound HTTP.
 11. After seeding a Compact Calendar window in the throwaway store, `/planning/generate`
@@ -81,6 +84,14 @@ in-memory (MemoryState) path is exercised; all state flows through `ubu_store`.
 13. Applying a `user_override` placement (authority_source `user_override`) and firing a
     second `/planning/recalculate` leaves the overridden Task's placement **unchanged and
     not clobbered**; the previously completed Task likewise stays frozen.
+14. The scoring fixture (`fixtures/demo/scoring-selection-cases.json`) asserts that an
+    abundant-slack request produces more than one and at most sixteen scored candidates;
+    every candidate has a `candidate_role`, `score_summary`, and numeric `total_score`;
+    ranks are ordered by descending composite score; and the admitted Plan and Compact
+    Calendar use rank 1. Utility-heavy and schedule-diversity-heavy runs over the same
+    fixed-seed workload select different rank-1 candidates. A static-anchor case records
+    sixteen generated candidates and asserts that the two `reject_obvious` candidates
+    are absent from the fourteen-candidate scored set.
 
 ## Offline operation and import stub
 
@@ -92,7 +103,9 @@ GitHub. The fixture/dev token (`"fixture-dev-token-ubu-demo"`) satisfies the
 token-availability check and is never sent to the network.
 
 The demo fails clearly if a required fixture or prerequisite (orchestrator repo,
-`cargo`, `curl`, `python3`) is missing. It does not fall back to network access.
+`cargo`, `curl`, `python3`, or cached Cargo dependencies) is missing. The orchestrator
+build uses `cargo build --offline`, loopback HTTP clients bypass proxies, and the demo
+does not fall back to network access.
 
 ## Store isolation
 
@@ -113,6 +126,7 @@ No real or user store is ever touched.
 - `fixtures/demo/phase1-demo-manifest.json`
 - `fixtures/demo/planning-candidates.json`
 - `fixtures/demo/affect-legitimization-cases.json`
+- `fixtures/demo/scoring-selection-cases.json`
 
 These fixtures are validated at startup (checked for existence and parseability). The
 bootstrap/seed step uses `"UbU-project/ubu-design"` as the fixture repo; its single Task
@@ -122,6 +136,8 @@ Calendar / recalculation steps admit their active Tasks from
 outbound HTTP). The affect legitimization cases are posted directly to the loopback
 orchestrator API from `fixtures/demo/affect-legitimization-cases.json`; they do not use
 GitHub import or any network path outside `127.0.0.1`.
+The scoring and selection cases likewise post only to loopback; they use fixed seeds
+and frozen expected candidate IDs/counts.
 
 ## Prerequisites
 
@@ -140,6 +156,7 @@ GitHub import or any network path outside `127.0.0.1`.
 | **O7** | Projection preview, approval, gated managed-label mock write, reconciliation, and gate-deny path |
 | **S9/P3/P4/O9** | Canonical timed Plan (`/planning/generate`), the Compact Calendar (`/calendar/current`), and repair-mode recalculation (`/planning/recalculate`) that supersedes the prior Plan while preserving frozen placements |
 | **S10/P5/O10** | Affect profile contract, Phase B affect legitimization, and orchestrator affect-profile/snapshot wiring for feasible, enforce-failure, warn-only, and stale-affect paths |
+| **C-1/P7/P8/O12** | Bounded candidate generation, Stage 3 score summaries and candidate roles, semi-legitimization pruning, ranked candidates, and rank-1 composite selection surfaced through the orchestrator and Compact Calendar |
 | **UBU-D0210** | `next_action` must return a bounded diagnostic when no ready Task is available — not an opaque empty result |
 | **UBU-D0226** | `authority_source` records the authority path for projection state; source details remain in provenance |
 | **UBU-D0227** | Persisted `Task.status` lifecycle (`active`/`completed`/`failed`/`moot`) governs which Tasks are frozen and not re-placed on recalculation |

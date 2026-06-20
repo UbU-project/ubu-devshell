@@ -40,8 +40,11 @@ MANIFEST="$ROOT_DIR/fixtures/demo/phase1-demo-manifest.json"
 GITHUB_FIXTURES_DIR="$ROOT_DIR/fixtures/github"
 PLANNING_FIXTURE="$ROOT_DIR/fixtures/demo/planning-candidates.json"
 AFFECT_FIXTURE="$ROOT_DIR/fixtures/demo/affect-legitimization-cases.json"
+SCORING_FIXTURE="$ROOT_DIR/fixtures/demo/scoring-selection-cases.json"
 DEMO_PORT="${DEMO_PORT:-17878}"
 DEMO_BASE="http://127.0.0.1:$DEMO_PORT"
+export NO_PROXY="127.0.0.1,localhost"
+export no_proxy="$NO_PROXY"
 
 # --- Prerequisites ---
 
@@ -59,6 +62,9 @@ ls "$GITHUB_FIXTURES_DIR"/*.json >/dev/null 2>&1 \
 [[ -f "$AFFECT_FIXTURE" ]] \
   || fail_missing "affect legitimization fixture not found: $AFFECT_FIXTURE (required for Phase B affect smoke steps)"
 
+[[ -f "$SCORING_FIXTURE" ]] \
+  || fail_missing "scoring selection fixture not found: $SCORING_FIXTURE (required for C-1 scoring and selection smoke steps)"
+
 [[ -d "$ORCHESTRATOR_DIR" ]] \
   || fail_missing "orchestrator repo not found at $ORCHESTRATOR_DIR (run clone-all.sh first)"
 
@@ -73,6 +79,7 @@ echo "  O6: readiness next_action, action recording, bounded diagnostic (UBU-D02
 echo "  O7: gated projection preview/approval/write/reconcile loop with deny path"
 echo "  S9/P3/P4/O9: canonical timed Plan, Compact Calendar, override-safe recalculation"
 echo "  S10/P5/O10: affect legitimization feasible/enforce/warn_only/stale paths"
+echo "  C-1/P7/P8/O12: bounded candidates, Stage 3 scoring, pruning, composite selection"
 echo "orchestrator: $ORCHESTRATOR_DIR"
 echo "manifest:     $MANIFEST"
 echo "port:         $DEMO_PORT"
@@ -132,13 +139,32 @@ for case in cases:
     assert case.get("expected"), f"affect fixture case missing expected: {case}"
 print(f"  affect fixture: {path} ({len(cases)} cases)")
 PYEOF
+python3 - "$SCORING_FIXTURE" <<'PYEOF'
+import json, sys, pathlib
+
+path = pathlib.Path(sys.argv[1])
+fixture = json.loads(path.read_text())
+cases = fixture.get("cases", [])
+required = {
+    "abundant-slack-utility-heavy",
+    "abundant-slack-diversity-heavy",
+    "static-anchor-reject-obvious-prune",
+}
+names = {case.get("name") for case in cases}
+missing = sorted(required - names)
+assert not missing, f"scoring fixture missing required cases: {missing}"
+for case in cases:
+    assert case.get("request"), f"scoring fixture case missing request: {case}"
+    assert case.get("expected"), f"scoring fixture case missing expected result: {case}"
+print(f"  scoring fixture: {path} ({len(cases)} cases)")
+PYEOF
 
 # --- Build orchestrator ---
 
 echo ""
-echo "Building orchestrator (cargo build, uses cache if up-to-date)..."
-(cd "$ORCHESTRATOR_DIR" && cargo build --quiet) || {
-  echo "error: orchestrator build failed"
+echo "Building orchestrator offline (cargo build --offline, uses cached dependencies)..."
+(cd "$ORCHESTRATOR_DIR" && cargo build --quiet --offline) || {
+  echo "error: offline orchestrator build failed (required dependencies must already be cached)"
   exit 1
 }
 
@@ -606,7 +632,10 @@ import urllib.error
 import urllib.request
 
 fixture_path, base_url = sys.argv[1:3]
+assert base_url.startswith("http://127.0.0.1:"), \
+    f"affect fixture refuses non-loopback endpoint: {base_url}"
 fixture = json.loads(open(fixture_path, encoding="utf-8").read())
+opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 for case in fixture["cases"]:
     name = case["name"]
@@ -619,7 +648,7 @@ for case in fixture["cases"]:
         method="POST",
     )
     try:
-        with urllib.request.urlopen(request, timeout=30) as response:
+        with opener.open(request, timeout=30) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
@@ -632,7 +661,21 @@ for case in fixture["cases"]:
     )
 
     legitimization = payload.get("legitimization")
-    assert legitimization is not None, f"{name}: missing legitimization report: {payload}"
+    if legitimization is None:
+        assert plan_present is False and expected["plan_present"] is False, (
+            f"{name}: legitimization is absent outside the all-candidates-filtered path: {payload}"
+        )
+        assert payload.get("selected_candidate") is None, (
+            f"{name}: missing legitimization despite a selected candidate: {payload}"
+        )
+        assert payload.get("alternatives", []) == [], (
+            f"{name}: enforce failure exposed scored alternatives: {payload}"
+        )
+        print(
+            f"  PASS affect {name}: enforce failure filtered every candidate; "
+            "plan_present=False"
+        )
+        continue
     assert legitimization.get("result") == expected["result"], (
         f"{name}: result={legitimization.get('result')}, expected {expected['result']}: {payload}"
     )
@@ -832,9 +875,9 @@ expected = set(sys.argv[4:7])
 
 assert resp.get("schema_version") == "planning-kernel-contract/0.1", \
     f"plan: unexpected schema_version: {resp.get('schema_version')}"
-# Phase A always emits NotYetImplemented advisories for the later Legitimizer
-# engine; those are advisory, not failures. Any other diagnostic is unexpected.
-ADVISORY_CODES = {"NotYetImplemented"}
+# The stale fixture intentionally emits StaleAffect once per evaluated candidate;
+# these and the Phase A NotYetImplemented diagnostics are advisory, not failures.
+ADVISORY_CODES = {"NotYetImplemented", "StaleAffect"}
 unexpected = [d for d in resp.get("diagnostics", []) if d.get("code") not in ADVISORY_CODES]
 assert not unexpected, f"plan: unexpected diagnostics: {unexpected}"
 plan = resp.get("plan")
@@ -1038,6 +1081,117 @@ print("  PASS override-safety: user_override placement survived recalculation un
 PYEOF
 
 echo ""
-echo "PASS: bootstrap-to-act, gated projection, affect legitimization, and Plan/Calendar/recalculation loops"
+echo "Step 14: C-1 bounded candidates, Stage 3 scoring, pruning, and composite selection (C-1/P7/P8/O12)"
+echo "  (offline fixture requests: $SCORING_FIXTURE; posted only to loopback /planning/generate)"
+python3 - "$SCORING_FIXTURE" "$DEMO_BASE" <<'PYEOF'
+import json
+import sys
+import urllib.error
+import urllib.request
+
+fixture_path, base_url = sys.argv[1:3]
+assert base_url.startswith("http://127.0.0.1:"), \
+    f"scoring fixture refuses non-loopback endpoint: {base_url}"
+fixture = json.loads(open(fixture_path, encoding="utf-8").read())
+opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+winners = {}
+
+for case in fixture["cases"]:
+    name = case["name"]
+    expected = case["expected"]
+    body = json.dumps({"request": case["request"]}).encode("utf-8")
+    request = urllib.request.Request(
+        f"{base_url}/planning/generate",
+        data=body,
+        headers={"content-type": "application/json"},
+        method="POST",
+    )
+    try:
+        with opener.open(request, timeout=30) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise AssertionError(f"{name}: /planning/generate failed: {exc.code} {detail}") from exc
+
+    selected = payload.get("selected_candidate")
+    alternatives = payload.get("alternatives")
+    assert selected is not None, f"{name}: missing selected_candidate: {payload}"
+    assert isinstance(alternatives, list), f"{name}: alternatives must be a list: {payload}"
+    candidates = [selected, *alternatives]
+    assert 1 < len(candidates) <= 16, \
+        f"{name}: expected 2..16 scored candidates, got {len(candidates)}"
+    assert len(candidates) == expected["scored_candidate_count"], (
+        f"{name}: scored candidate count {len(candidates)} != fixture expectation "
+        f"{expected['scored_candidate_count']}"
+    )
+
+    totals = []
+    for rank, candidate in enumerate(candidates, start=1):
+        assert candidate.get("rank") == rank, \
+            f"{name}: candidate ranks are not contiguous from 1: {candidates}"
+        assert isinstance(candidate.get("candidate_role"), str) and candidate["candidate_role"], \
+            f"{name}: candidate rank {rank} missing candidate_role: {candidate}"
+        summary = candidate.get("score_summary")
+        assert isinstance(summary, dict), \
+            f"{name}: candidate rank {rank} missing score_summary: {candidate}"
+        total = summary.get("total_score")
+        assert isinstance(total, (int, float)), \
+            f"{name}: candidate rank {rank} missing numeric total_score: {candidate}"
+        totals.append(total)
+    assert totals == sorted(totals, reverse=True), \
+        f"{name}: candidates are not ranked by total_score descending: {totals}"
+    assert selected["rank"] == 1 and selected["score_summary"]["total_score"] == max(totals), \
+        f"{name}: selected candidate is not rank 1 by total_score: {selected}"
+    assert payload.get("plan", {}).get("steps") == selected.get("steps"), \
+        f"{name}: admitted Plan does not use selected rank-1 steps: {payload}"
+
+    with opener.open(f"{base_url}/calendar/current", timeout=30) as response:
+        calendar = json.loads(response.read().decode("utf-8"))
+    assert calendar.get("selected_candidate") == selected, \
+        f"{name}: Calendar did not persist the rank-1 candidate: {calendar}"
+    assert calendar.get("steps") == selected.get("steps"), \
+        f"{name}: Calendar steps do not use the rank-1 candidate: {calendar}"
+
+    expected_winner = expected.get("selected_candidate_id")
+    if expected_winner is not None:
+        assert selected.get("candidate_id") == expected_winner, (
+            f"{name}: selected {selected.get('candidate_id')} != expected {expected_winner}"
+        )
+        winners[name] = selected["candidate_id"]
+
+    pruned = set(expected.get("pruned_candidate_ids", []))
+    if pruned:
+        generated_count = expected["generated_candidate_count"]
+        assert generated_count > len(candidates), \
+            f"{name}: fixture does not establish any generated candidate was pruned"
+        assert generated_count - len(candidates) == len(pruned), \
+            f"{name}: generated/scored delta does not match expected reject_obvious set"
+        scored_ids = {candidate["candidate_id"] for candidate in candidates}
+        assert pruned.isdisjoint(scored_ids), \
+            f"{name}: reject_obvious candidate reached scored set: {pruned & scored_ids}"
+        assert all(
+            candidate.get("semi_legitimization_summary", {}).get("result") != "reject_obvious"
+            for candidate in candidates
+        ), f"{name}: scored set contains reject_obvious semi-legitimization result"
+        print(
+            f"  PASS {name}: {len(pruned)} reject_obvious candidates absent from "
+            f"{len(candidates)}-candidate scored set"
+        )
+    else:
+        print(
+            f"  PASS {name}: {len(candidates)} bounded scored candidates; "
+            f"rank-1={selected['candidate_id']} total_score={totals[0]}"
+        )
+
+utility = winners["abundant-slack-utility-heavy"]
+diversity = winners["abundant-slack-diversity-heavy"]
+assert utility != diversity, \
+    f"scoring_policy weighting did not change rank-1 selection: {utility}"
+print(f"  PASS scoring_policy weighting: utility rank-1={utility}; diversity rank-1={diversity}")
+PYEOF
+
+echo ""
+echo "PASS: bootstrap-to-act, gated projection, affect legitimization, Plan/Calendar/recalculation,"
+echo "      and C-1 scoring/selection loops"
 echo "      verified store-backed on throwaway store"
 echo "  store=$DEMO_DB (ephemeral — removed on exit)"

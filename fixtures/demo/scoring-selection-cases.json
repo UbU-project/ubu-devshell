@@ -1,0 +1,141 @@
+{
+  "schema_version": "ubu.devshell.fixture_demo.scoring_selection_cases.v1",
+  "public_safe": true,
+  "notes": "Offline fixed-seed C-1 fixture coverage for bounded Stage 3 scoring, weighting-sensitive composite selection, and reject_obvious semi-legitimization pruning. Requests are posted only to the loopback orchestrator API.",
+  "cases": [
+    {
+      "name": "abundant-slack-utility-heavy",
+      "request": {
+        "schema_version": "planning-kernel-contract/0.1",
+        "request_id": "d10-weighting",
+        "mode": "fresh_generation",
+        "rng_seed": 2026061901,
+        "time_window": {
+          "start": 0,
+          "end": 100
+        },
+        "topological_order": [
+          "foundation",
+          "dependent",
+          "independent"
+        ],
+        "scoring_policy": {
+          "utility_weight": 1.0,
+          "robustness_weight": 0.0,
+          "affect_margin_weight": 0.0,
+          "schedule_diversity_weight": 0.0
+        },
+        "tasks": [
+          {
+            "id": "foundation",
+            "duration": 10
+          },
+          {
+            "id": "dependent",
+            "duration": 10,
+            "depends_on": [
+              "foundation"
+            ]
+          },
+          {
+            "id": "independent",
+            "duration": 10
+          }
+        ]
+      },
+      "expected": {
+        "scored_candidate_count": 16,
+        "selected_candidate_id": "plan-d10-weighting-0000000078c3404d"
+      }
+    },
+    {
+      "name": "abundant-slack-diversity-heavy",
+      "request": {
+        "schema_version": "planning-kernel-contract/0.1",
+        "request_id": "d10-weighting",
+        "mode": "fresh_generation",
+        "rng_seed": 2026061901,
+        "time_window": {
+          "start": 0,
+          "end": 100
+        },
+        "topological_order": [
+          "foundation",
+          "dependent",
+          "independent"
+        ],
+        "scoring_policy": {
+          "utility_weight": 0.0,
+          "robustness_weight": 0.0,
+          "affect_margin_weight": 0.0,
+          "schedule_diversity_weight": 1.0
+        },
+        "tasks": [
+          {
+            "id": "foundation",
+            "duration": 10
+          },
+          {
+            "id": "dependent",
+            "duration": 10,
+            "depends_on": [
+              "foundation"
+            ]
+          },
+          {
+            "id": "independent",
+            "duration": 10
+          }
+        ]
+      },
+      "expected": {
+        "scored_candidate_count": 16,
+        "selected_candidate_id": "plan-d10-weighting-0000000078c3404d-c15"
+      }
+    },
+    {
+      "name": "static-anchor-reject-obvious-prune",
+      "request": {
+        "schema_version": "planning-kernel-contract/0.1",
+        "request_id": "d10-semi-prune",
+        "mode": "fresh_generation",
+        "rng_seed": 880055,
+        "time_window": {
+          "start": 0,
+          "end": 20
+        },
+        "topological_order": [
+          "anchor",
+          "movable"
+        ],
+        "scoring_policy": {
+          "utility_weight": 1.0,
+          "robustness_weight": 1.0,
+          "affect_margin_weight": 1.0,
+          "schedule_diversity_weight": 1.0
+        },
+        "tasks": [
+          {
+            "id": "anchor",
+            "duration": 2,
+            "static_anchor": {
+              "start": 10
+            }
+          },
+          {
+            "id": "movable",
+            "duration": 2
+          }
+        ]
+      },
+      "expected": {
+        "generated_candidate_count": 16,
+        "scored_candidate_count": 14,
+        "pruned_candidate_ids": [
+          "plan-d10-semi-prune-00000000000d6db7-c03",
+          "plan-d10-semi-prune-00000000000d6db7-c04"
+        ]
+      }
+    }
+  ]
+}

@@ -80,6 +80,11 @@ throwaway SQLite store:
 12. Override-safety — applies a `user_override` placement via `/task/{id}/action`, fires
     a second recalculation, and asserts the override placement **survives unchanged and
     is not clobbered** (S9/P3/P4/O9)
+13. C-1 scoring and selection — fixed-seed offline fixtures assert two-to-sixteen scored
+    candidates with `score_summary` and `candidate_role`, descending `total_score`
+    ranking, different utility-heavy and schedule-diversity-heavy winners, rank-1
+    Compact Calendar selection, and `reject_obvious` pruning before scoring
+    (C-1/P7/P8/O12)
 
 Governing decisions:
 - **O4**: MemoryState removed; `UBU_DB_PATH` throwaway store
@@ -92,6 +97,8 @@ Governing decisions:
 - **S9/P3/P4/O9**: canonical timed Plan (`/planning/generate`), the Compact Calendar
   (`/calendar/current`), and repair-mode recalculation (`/planning/recalculate`) that
   supersedes the prior Plan while preserving frozen placements
+- **C-1/P7/P8/O12**: bounded candidate generation, Stage 3 scoring,
+  semi-legitimization pruning, ranked candidates, and composite rank-1 selection
 - **UBU-D0226**: `authority_source` is the authority-path enum used by projection state
 - **UBU-D0227**: persisted `Task.status` lifecycle (`active`/`completed`/`failed`/`moot`)
   governs which Tasks are frozen and not re-placed on recalculation
