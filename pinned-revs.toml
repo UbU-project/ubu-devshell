@@ -14,10 +14,10 @@
 # show-revs.sh compares these against local checkout HEADs.
 
 [pinned]
-ubu_schemas         = "257fde319d91b0df052889942154244b268eb297"  # R_schemas (post-S10: affect profile schema)
+ubu_schemas         = "e191118eb1ce60be77bd782a66e2ac6fa35d808a"  # R_schemas (post-schema cleanup)
 ubu_core            = "77640fef718c16b987e3e4a26766f279ad62836a"  # R_core (post-C7: export-boundary, worker-authority, redaction-identity checks)
 ubu_store           = "4204a0e6e5c0bb1882b7672e022e3458789c1061"  # R_store
-ubu_planning_kernel = "004cd303a60bc74ba3e9d695fe8b87ff34938777"  # R_planning (post-P7/P8: C-1 scoring and selection goldens)
+ubu_planning_kernel = "62c6d7a2f71078d141f7a4b9c91bd78193ee3314"  # R_planning (post-P9_fix/P10 regeneration)
 ubu_github_adapter  = "d71a169a889a4c0343b9c1970a2afe8db3c60a17"  # R_adapter
-ubu_orchestrator    = "3e50b985541da21ed332fbcdbc80b80c1aa8c5e0"  # R_orchestrator (post-O12: ranked candidates and selection)
-ubu_ui              = "e3136fc0d1068b11d356d0bd3a1dd9e1dbf8c0c4"  # R_ui (post-O12 calendar candidate scores)
+ubu_orchestrator    = "201e863e556750a2e0c03e1ba7307ddc1f7bb9aa"  # R_orchestrator (rebased O13; full probability quality)
+ubu_ui              = "511634084e299f7977ec06fcaff6052fd32dedff"  # R_ui (post-O12 calendar candidate scores)

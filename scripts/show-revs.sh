@@ -99,16 +99,17 @@ while read -r name; do
   fi
 
   branch="$(git -C "$dir" rev-parse --abbrev-ref HEAD 2>/dev/null || printf '?')"
-  actual="$(git -C "$dir" rev-parse --short HEAD 2>/dev/null || printf 'no-head')"
+  actual_full="$(git -C "$dir" rev-parse HEAD 2>/dev/null || printf 'no-head')"
+  actual="${actual_full:0:8}"
   sig="$(sig_label "$dir")"
   tree="$(tree_state "$dir")"
 
-  if [[ "$actual" == "no-head" ]]; then
+  if [[ "$actual_full" == "no-head" ]]; then
     status="ERROR"
     mismatch=1
   elif [[ -z "$pinned" ]]; then
     status="unset"
-  elif [[ "$actual" == "$pinned"* || "$pinned" == "$actual"* ]]; then
+  elif [[ "$actual_full" == "$pinned" ]]; then
     status="OK"
   else
     status="MISMATCH"

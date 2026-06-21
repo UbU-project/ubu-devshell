@@ -146,6 +146,21 @@ run_static_bypass_guard() {
   echo ""
 }
 
+assert_no_committed_patch_overrides() {
+  local matches
+
+  echo "=== Committed Cargo patch override guard ==="
+  echo ""
+  matches="$(git -C "$ROOT_DIR" grep -n -E '^\[patch(\.|])' -- '*.toml' || true)"
+  if [[ -n "$matches" ]]; then
+    echo "error: committed Cargo [patch] override found:" >&2
+    printf '%s\n' "$matches" >&2
+    exit 1
+  fi
+  echo "PASS no committed Cargo [patch] overrides"
+  echo ""
+}
+
 echo "=== Git state ==="
 echo ""
 
@@ -195,6 +210,7 @@ echo "=== Pinned revs ==="
 echo ""
 "$SCRIPT_DIR/show-revs.sh"
 echo ""
+assert_no_committed_patch_overrides
 
 echo "=== Build checks ==="
 echo ""

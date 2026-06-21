@@ -20,6 +20,10 @@
 #               (/planning/recalculate) that supersedes the prior Plan
 #   S10/P5/O10: affect profile contract, Phase B affect legitimization, and
 #               orchestrator affect-profile/snapshot wiring
+#   D11 (minimal re-issue): fixed-duration O13 candidate retention,
+#               not_estimated proxy robustness, and full rollout quality
+#   UBU-D0239: stochastic-duration, degraded, strict, and rollout re-rank
+#               assertions are deferred to D12 after the input-path slice
 #   UBU-D0226: authority_source remains the authority-path enum
 #   UBU-D0227: persisted Task.status lifecycle (active/completed/failed/moot)
 #              drives which Tasks are frozen and not re-placed on recalculation
@@ -80,6 +84,8 @@ echo "  O7: gated projection preview/approval/write/reconcile loop with deny pat
 echo "  S9/P3/P4/O9: canonical timed Plan, Compact Calendar, override-safe recalculation"
 echo "  S10/P5/O10: affect legitimization feasible/enforce/warn_only/stale paths"
 echo "  C-1/P7/P8/O12: bounded candidates, Stage 3 scoring, pruning, composite selection"
+echo "  D11/O13: fixed-duration candidate retention, not_estimated, full rollout quality"
+echo "  UBU-D0239: stochastic/degraded/strict/re-rank assertions deferred to D12"
 echo "orchestrator: $ORCHESTRATOR_DIR"
 echo "manifest:     $MANIFEST"
 echo "port:         $DEMO_PORT"
@@ -1081,10 +1087,11 @@ print("  PASS override-safety: user_override placement survived recalculation un
 PYEOF
 
 echo ""
-echo "Step 14: C-1 bounded candidates, Stage 3 scoring, pruning, and composite selection (C-1/P7/P8/O12)"
+echo "Step 14: C-1 scoring plus minimal fixed-duration O13 verification (D11 re-issue)"
 echo "  (offline fixture requests: $SCORING_FIXTURE; posted only to loopback /planning/generate)"
 python3 - "$SCORING_FIXTURE" "$DEMO_BASE" <<'PYEOF'
 import json
+import copy
 import sys
 import urllib.error
 import urllib.request
@@ -1096,10 +1103,9 @@ fixture = json.loads(open(fixture_path, encoding="utf-8").read())
 opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 winners = {}
 
-for case in fixture["cases"]:
-    name = case["name"]
-    expected = case["expected"]
-    body = json.dumps({"request": case["request"]}).encode("utf-8")
+
+def post_planning(request_body, name):
+    body = json.dumps({"request": request_body}).encode("utf-8")
     request = urllib.request.Request(
         f"{base_url}/planning/generate",
         data=body,
@@ -1108,22 +1114,100 @@ for case in fixture["cases"]:
     )
     try:
         with opener.open(request, timeout=30) as response:
-            payload = json.loads(response.read().decode("utf-8"))
+            return json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
-        raise AssertionError(f"{name}: /planning/generate failed: {exc.code} {detail}") from exc
+        raise AssertionError(
+            f"{name}: /planning/generate failed: {exc.code} {detail}"
+        ) from exc
 
+
+def candidate_set(payload, name):
     selected = payload.get("selected_candidate")
     alternatives = payload.get("alternatives")
     assert selected is not None, f"{name}: missing selected_candidate: {payload}"
     assert isinstance(alternatives, list), f"{name}: alternatives must be a list: {payload}"
-    candidates = [selected, *alternatives]
+    return selected, [selected, *alternatives]
+
+
+def contains_value(value, sought):
+    if isinstance(value, dict):
+        return any(contains_value(item, sought) for item in value.values())
+    if isinstance(value, list):
+        return any(contains_value(item, sought) for item in value)
+    return value == sought
+
+for case in fixture["cases"]:
+    name = case["name"]
+    expected = case["expected"]
+    zero_payload = None
+    zero_candidates = None
+    if name.startswith("abundant-slack-"):
+        zero_request = copy.deepcopy(case["request"])
+        zero_request["compute_budget"] = {"n_rollouts": 0, "top_k": 3}
+        zero_payload = post_planning(zero_request, f"{name}-zero-rollouts")
+        _, zero_candidates = candidate_set(zero_payload, f"{name}-zero-rollouts")
+    payload = post_planning(case["request"], name)
+    selected, candidates = candidate_set(payload, name)
     assert 1 < len(candidates) <= 16, \
         f"{name}: expected 2..16 scored candidates, got {len(candidates)}"
     assert len(candidates) == expected["scored_candidate_count"], (
         f"{name}: scored candidate count {len(candidates)} != fixture expectation "
         f"{expected['scored_candidate_count']}"
     )
+
+    # Minimal re-issued D11: abundant slack yields all sixteen C-1 candidates.
+    # Skipping Stage 4 exposes the C-1 proxy without fabricating probabilities;
+    # the default fixed-duration rollout must retain that exact candidate set.
+    if name.startswith("abundant-slack-"):
+        assert zero_payload is not None and zero_candidates is not None
+        assert len(zero_candidates) == expected["scored_candidate_count"] == 16, (
+            f"{name}: zero-rollout C-1 set was not the full bounded set: "
+            f"{len(zero_candidates)}"
+        )
+        zero_ids = {candidate["candidate_id"] for candidate in zero_candidates}
+        default_ids = {candidate["candidate_id"] for candidate in candidates}
+        assert default_ids == zero_ids, (
+            f"{name}: rollout response did not retain the C-1 candidate set: "
+            f"missing={sorted(zero_ids - default_ids)} extra={sorted(default_ids - zero_ids)}"
+        )
+        proxy_by_id = {}
+        for candidate in zero_candidates:
+            assert candidate.get("probability_quality") == "not_estimated", candidate
+            assert candidate.get("display_probability") is None, candidate
+            assert candidate.get("probability_interval_low") is None, candidate
+            assert candidate.get("probability_interval_high") is None, candidate
+            proxy = candidate.get("robustness_score")
+            assert isinstance(proxy, (int, float)), \
+                f"{name}: missing numeric C-1 proxy robustness: {candidate}"
+            assert proxy == candidate.get("score_summary", {}).get("robustness_score"), \
+                f"{name}: exposed robustness is not the C-1 proxy: {candidate}"
+            proxy_by_id[candidate["candidate_id"]] = proxy
+        assert not contains_value(zero_payload, "estimated"), \
+            f"{name}: zero-rollout response contains forbidden estimated quality"
+
+        finalists = candidates[:3]
+        non_finalists = candidates[3:]
+        assert len(finalists) == 3 and non_finalists, \
+            f"{name}: expected three finalists plus retained non-finalists"
+        for candidate in finalists:
+            assert candidate.get("probability_quality") == "full", candidate
+            assert isinstance(candidate.get("display_probability"), (int, float)), candidate
+            assert isinstance(candidate.get("probability_interval_low"), (int, float)), candidate
+            assert isinstance(candidate.get("probability_interval_high"), (int, float)), candidate
+        for candidate in non_finalists:
+            assert candidate.get("probability_quality") == "not_estimated", candidate
+            assert candidate.get("display_probability") is None, candidate
+            assert candidate.get("probability_interval_low") is None, candidate
+            assert candidate.get("probability_interval_high") is None, candidate
+            assert candidate.get("robustness_score") == proxy_by_id[candidate["candidate_id"]], \
+                f"{name}: non-finalist C-1 proxy robustness changed: {candidate}"
+        assert not contains_value(payload, "estimated"), \
+            f"{name}: default rollout response contains forbidden estimated quality"
+        print(
+            f"  PASS {name}: retained all {len(candidates)} C-1 candidates; "
+            "zero rollouts not_estimated; 3 fixed-duration finalists full"
+        )
 
     totals = []
     for rank, candidate in enumerate(candidates, start=1):
@@ -1138,10 +1222,16 @@ for case in fixture["cases"]:
         assert isinstance(total, (int, float)), \
             f"{name}: candidate rank {rank} missing numeric total_score: {candidate}"
         totals.append(total)
-    assert totals == sorted(totals, reverse=True), \
-        f"{name}: candidates are not ranked by total_score descending: {totals}"
-    assert selected["rank"] == 1 and selected["score_summary"]["total_score"] == max(totals), \
-        f"{name}: selected candidate is not rank 1 by total_score: {selected}"
+    # O13 retains separate finalist and non-finalist cohorts. Preserve the D10
+    # ordering check within each cohort; rollout-driven re-rank assertions
+    # remain deferred to D12 (UBU-D0239).
+    finalist_totals = totals[:3]
+    non_finalist_totals = totals[3:]
+    assert finalist_totals == sorted(finalist_totals, reverse=True), \
+        f"{name}: finalists are not ranked by total_score descending: {finalist_totals}"
+    assert non_finalist_totals == sorted(non_finalist_totals, reverse=True), \
+        f"{name}: non-finalists are not ranked by total_score descending: {non_finalist_totals}"
+    assert selected["rank"] == 1, f"{name}: selected candidate is not rank 1: {selected}"
     assert payload.get("plan", {}).get("steps") == selected.get("steps"), \
         f"{name}: admitted Plan does not use selected rank-1 steps: {payload}"
 
@@ -1192,6 +1282,6 @@ PYEOF
 
 echo ""
 echo "PASS: bootstrap-to-act, gated projection, affect legitimization, Plan/Calendar/recalculation,"
-echo "      and C-1 scoring/selection loops"
+echo "      C-1 scoring/selection, and minimal fixed-duration O13 rollout checks"
 echo "      verified store-backed on throwaway store"
 echo "  store=$DEMO_DB (ephemeral — removed on exit)"
