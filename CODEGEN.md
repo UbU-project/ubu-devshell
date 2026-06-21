@@ -85,6 +85,11 @@ throwaway SQLite store:
     ranking, different utility-heavy and schedule-diversity-heavy winners, rank-1
     Compact Calendar selection, and `reject_obvious` pruning before scoring
     (C-1/P7/P8/O12)
+14. D12 stochastic rollout — `shifted_lognormal_p95` request fixtures assert full
+    Wilson probability intervals, p10 robustness, fixed-seed reproducibility, a
+    rollout-grounded re-rank with all sixteen candidates retained, correlated-versus-
+    independent probability change, and the zero-rollout `not_estimated` C-1 proxy
+    (`UBU-D0239`, P10, O14)
 
 Governing decisions:
 - **O4**: MemoryState removed; `UBU_DB_PATH` throwaway store
@@ -99,6 +104,11 @@ Governing decisions:
   supersedes the prior Plan while preserving frozen placements
 - **C-1/P7/P8/O12**: bounded candidate generation, Stage 3 scoring,
   semi-legitimization pruning, ranked candidates, and composite rank-1 selection
+- **D12/UBU-D0239/P10/O14**: stochastic durations and correlation groups traverse
+  `/planning/generate`; the demo verifies API-reachable rollout behavior. Degraded and
+  strict factorization branches remain kernel-unit coverage only: the §7 loading cap
+  (`0.95`) and residual diagonal (`>= 0.0975`) make valid API matrices positive-definite
+  by construction. No raw-matrix or force-degrade request field is part of the contract.
 - **UBU-D0226**: `authority_source` is the authority-path enum used by projection state
 - **UBU-D0227**: persisted `Task.status` lifecycle (`active`/`completed`/`failed`/`moot`)
   governs which Tasks are frozen and not re-placed on recalculation

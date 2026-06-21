@@ -12,8 +12,9 @@ Current entry point:
 
 The demo exercises the **full bootstrap-to-act loop**, the gated projection loop,
 **affect legitimization**, **Plan generation, the Compact Calendar, and
-override-safe recalculation**, and **C-1 bounded candidate scoring and composite
-selection** store-backed against a throwaway SQLite store. No in-memory
+override-safe recalculation**, **C-1 bounded candidate scoring and composite
+selection**, and the **D12 stochastic rollout integration slice** store-backed
+against a throwaway SQLite store. No in-memory
 (MemoryState) path is exercised; all state flows through `ubu_store`.
 
 | Step | Endpoint | Governing decision |
@@ -32,6 +33,7 @@ selection** store-backed against a throwaway SQLite store. No in-memory
 | 12. Recalculation (task_completed) | `POST /task/{id}/action`, `POST /planning/recalculate` | S9, P3, P4, O9, UBU-D0227 |
 | 13. Override-safety | `POST /task/{id}/action` (override), `POST /planning/recalculate` | S9, P3, P4, O9 |
 | 14. Bounded candidate scoring, pruning, and selection | `POST /planning/generate`, `GET /calendar/current` | C-1, P7, P8, O12 |
+| 15. Stochastic rollout, re-rank, correlation effect, and `not_estimated` | `POST /planning/generate`, `GET /calendar/current` | D12, UBU-D0239, P10, O14 |
 
 ### Assertions
 
@@ -92,6 +94,28 @@ selection** store-backed against a throwaway SQLite store. No in-memory
     fixed-seed workload select different rank-1 candidates. A static-anchor case records
     sixteen generated candidates and asserts that the two `reject_obvious` candidates
     are absent from the fourteen-candidate scored set.
+15. The stochastic fixture (`fixtures/demo/stochastic-rollout-cases.json`) sends
+    `shifted_lognormal_p95` duration estimates through `/planning/generate`. It asserts
+    `full` probability quality, a bounded nonzero-width Wilson interval, numeric p10
+    robustness, and byte-equivalent candidate projections on a repeated fixed-seed run.
+    The designed dependency-chain case changes rank 1 from the C-1 composite winner to
+    the rollout-grounded winner, retains all sixteen candidates, leaves non-finalists
+    `not_estimated`, and persists the rollout winner in the Compact Calendar. A paired
+    independent/shared-group workload asserts a material fixed-seed probability change
+    in the frozen direction (`shared > independent`), proving the correlation loadings
+    affect rollout sampling. Setting `n_rollouts=0` exposes the C-1 proxy with no
+    fabricated probability.
+
+## D12 request-contract boundary
+
+D12 is the stochastic integration test enabled by the input-path slice
+(`UBU-D0239`). It deliberately does not assert `degraded_numeric_jitter`,
+`degraded_independence`, or strict factorization rejection through the API. Under the
+§7 construction, per-task group loadings are capped at `0.95` and the correlation
+matrix receives a residual diagonal of at least `0.0975`; valid request inputs are
+therefore positive-definite by construction and Cholesky cannot fail. P10 verifies the
+degraded and strict branches at kernel unit level using raw injected matrices. The API
+does not expose, and this demo does not add, a raw-matrix or force-degrade input.
 
 ## Offline operation and import stub
 

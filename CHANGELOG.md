@@ -7,6 +7,17 @@
   artifact helper scripts.
 - Added local Cargo `[patch]` config generation workflow.
 
+## D12: Stochastic rollout integration test
+
+- Added offline `shifted_lognormal_p95` fixtures for full-quality Monte Carlo rollout,
+  fixed-seed reproducibility, rollout-grounded re-ranking, correlation effects, and
+  zero-rollout `not_estimated` behavior through `/planning/generate` (UBU-D0239).
+- Asserted the full sixteen-candidate set survives rollout, non-finalists remain
+  `not_estimated`, and the Compact Calendar follows the rollout-grounded rank 1.
+- Documented that degraded/strict factorization states are unreachable through valid
+  §7 API inputs by construction and remain verified by P10 raw-matrix kernel tests.
+- Updated post-S12, post-ST5, and post-O14 revision pins.
+
 ## D5: Extend fixture smoke test to full bootstrap-to-act loop
 
 - Extended `run-fixture-demo.sh` to drive the full bootstrap-to-act loop store-backed

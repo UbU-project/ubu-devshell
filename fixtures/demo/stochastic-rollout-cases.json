@@ -1,0 +1,204 @@
+{
+  "schema_version": "ubu.devshell.fixture_demo.stochastic_rollout_cases.v1",
+  "public_safe": true,
+  "notes": "Offline fixed-seed D12 coverage for API-reachable stochastic rollout, rollout re-ranking, correlation effects, and not_estimated. Requests are posted only to the loopback orchestrator API.",
+  "cases": [
+    {
+      "name": "stochastic-rerank",
+      "request": {
+        "schema_version": "planning-kernel-contract/0.1",
+        "request_id": "d12-stochastic-rerank",
+        "mode": "fresh_generation",
+        "rng_seed": 42,
+        "compute_budget": {
+          "n_rollouts": 1000,
+          "top_k": 3
+        },
+        "time_window": {
+          "start": 0,
+          "end": 10
+        },
+        "topological_order": [
+          "task-a",
+          "task-b",
+          "task-c"
+        ],
+        "tasks": [
+          {
+            "id": "task-a",
+            "duration": 1,
+            "duration_estimate": {
+              "type": "shifted_lognormal_p95",
+              "min_seconds": 0,
+              "mode_seconds": 1,
+              "p95_seconds": 4
+            }
+          },
+          {
+            "id": "task-b",
+            "duration": 1,
+            "duration_estimate": {
+              "type": "shifted_lognormal_p95",
+              "min_seconds": 0,
+              "mode_seconds": 1,
+              "p95_seconds": 4
+            },
+            "depends_on": [
+              "task-a"
+            ]
+          },
+          {
+            "id": "task-c",
+            "duration": 1,
+            "duration_estimate": {
+              "type": "shifted_lognormal_p95",
+              "min_seconds": 0,
+              "mode_seconds": 1,
+              "p95_seconds": 4
+            },
+            "depends_on": [
+              "task-b"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "candidate_count": 16,
+        "finalist_count": 3
+      }
+    },
+    {
+      "name": "independent-durations",
+      "request": {
+        "schema_version": "planning-kernel-contract/0.1",
+        "request_id": "d12-correlation-effect",
+        "mode": "fresh_generation",
+        "rng_seed": 2026062002,
+        "compute_budget": {
+          "n_rollouts": 1000,
+          "top_k": 3
+        },
+        "time_window": {
+          "start": 0,
+          "end": 30
+        },
+        "topological_order": [
+          "a",
+          "b",
+          "c"
+        ],
+        "tasks": [
+          {
+            "id": "a",
+            "duration": 10,
+            "duration_estimate": {
+              "type": "shifted_lognormal_p95",
+              "min_seconds": 2,
+              "mode_seconds": 10,
+              "p95_seconds": 40
+            }
+          },
+          {
+            "id": "b",
+            "duration": 10,
+            "duration_estimate": {
+              "type": "shifted_lognormal_p95",
+              "min_seconds": 2,
+              "mode_seconds": 10,
+              "p95_seconds": 40
+            }
+          },
+          {
+            "id": "c",
+            "duration": 10,
+            "duration_estimate": {
+              "type": "shifted_lognormal_p95",
+              "min_seconds": 2,
+              "mode_seconds": 10,
+              "p95_seconds": 40
+            }
+          }
+        ]
+      },
+      "expected": {
+        "probability_direction_vs_independent": "baseline"
+      }
+    },
+    {
+      "name": "shared-correlated-durations",
+      "request": {
+        "schema_version": "planning-kernel-contract/0.1",
+        "request_id": "d12-correlation-effect",
+        "mode": "fresh_generation",
+        "rng_seed": 2026062002,
+        "compute_budget": {
+          "n_rollouts": 1000,
+          "top_k": 3
+        },
+        "time_window": {
+          "start": 0,
+          "end": 30
+        },
+        "topological_order": [
+          "a",
+          "b",
+          "c"
+        ],
+        "tasks": [
+          {
+            "id": "a",
+            "duration": 10,
+            "duration_estimate": {
+              "type": "shifted_lognormal_p95",
+              "min_seconds": 2,
+              "mode_seconds": 10,
+              "p95_seconds": 40
+            },
+            "correlation_groups": [
+              {
+                "group": "shared",
+                "strength": 0.8
+              }
+            ]
+          },
+          {
+            "id": "b",
+            "duration": 10,
+            "duration_estimate": {
+              "type": "shifted_lognormal_p95",
+              "min_seconds": 2,
+              "mode_seconds": 10,
+              "p95_seconds": 40
+            },
+            "correlation_groups": [
+              {
+                "group": "shared",
+                "strength": 0.8
+              }
+            ]
+          },
+          {
+            "id": "c",
+            "duration": 10,
+            "duration_estimate": {
+              "type": "shifted_lognormal_p95",
+              "min_seconds": 2,
+              "mode_seconds": 10,
+              "p95_seconds": 40
+            },
+            "correlation_groups": [
+              {
+                "group": "shared",
+                "strength": 0.8
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "probability_direction_vs_independent": "higher",
+        "minimum_probability_delta": 0.05
+      }
+    }
+  ]
+}

@@ -22,8 +22,8 @@
 #               orchestrator affect-profile/snapshot wiring
 #   D11 (minimal re-issue): fixed-duration O13 candidate retention,
 #               not_estimated proxy robustness, and full rollout quality
-#   UBU-D0239: stochastic-duration, degraded, strict, and rollout re-rank
-#               assertions are deferred to D12 after the input-path slice
+#   D12/UBU-D0239: stochastic-duration rollout, rollout re-rank, correlation
+#               effect, fixed-seed reproducibility, and not_estimated
 #   UBU-D0226: authority_source remains the authority-path enum
 #   UBU-D0227: persisted Task.status lifecycle (active/completed/failed/moot)
 #              drives which Tasks are frozen and not re-placed on recalculation
@@ -45,6 +45,7 @@ GITHUB_FIXTURES_DIR="$ROOT_DIR/fixtures/github"
 PLANNING_FIXTURE="$ROOT_DIR/fixtures/demo/planning-candidates.json"
 AFFECT_FIXTURE="$ROOT_DIR/fixtures/demo/affect-legitimization-cases.json"
 SCORING_FIXTURE="$ROOT_DIR/fixtures/demo/scoring-selection-cases.json"
+STOCHASTIC_FIXTURE="$ROOT_DIR/fixtures/demo/stochastic-rollout-cases.json"
 DEMO_PORT="${DEMO_PORT:-17878}"
 DEMO_BASE="http://127.0.0.1:$DEMO_PORT"
 export NO_PROXY="127.0.0.1,localhost"
@@ -69,6 +70,9 @@ ls "$GITHUB_FIXTURES_DIR"/*.json >/dev/null 2>&1 \
 [[ -f "$SCORING_FIXTURE" ]] \
   || fail_missing "scoring selection fixture not found: $SCORING_FIXTURE (required for C-1 scoring and selection smoke steps)"
 
+[[ -f "$STOCHASTIC_FIXTURE" ]] \
+  || fail_missing "stochastic rollout fixture not found: $STOCHASTIC_FIXTURE (required for D12 stochastic rollout smoke steps)"
+
 [[ -d "$ORCHESTRATOR_DIR" ]] \
   || fail_missing "orchestrator repo not found at $ORCHESTRATOR_DIR (run clone-all.sh first)"
 
@@ -85,7 +89,7 @@ echo "  S9/P3/P4/O9: canonical timed Plan, Compact Calendar, override-safe recal
 echo "  S10/P5/O10: affect legitimization feasible/enforce/warn_only/stale paths"
 echo "  C-1/P7/P8/O12: bounded candidates, Stage 3 scoring, pruning, composite selection"
 echo "  D11/O13: fixed-duration candidate retention, not_estimated, full rollout quality"
-echo "  UBU-D0239: stochastic/degraded/strict/re-rank assertions deferred to D12"
+echo "  D12/UBU-D0239: stochastic rollout, re-rank, correlation effect, reproducibility"
 echo "orchestrator: $ORCHESTRATOR_DIR"
 echo "manifest:     $MANIFEST"
 echo "port:         $DEMO_PORT"
@@ -163,6 +167,29 @@ for case in cases:
     assert case.get("request"), f"scoring fixture case missing request: {case}"
     assert case.get("expected"), f"scoring fixture case missing expected result: {case}"
 print(f"  scoring fixture: {path} ({len(cases)} cases)")
+PYEOF
+python3 - "$STOCHASTIC_FIXTURE" <<'PYEOF'
+import json, sys, pathlib
+
+path = pathlib.Path(sys.argv[1])
+fixture = json.loads(path.read_text())
+cases = fixture.get("cases", [])
+required = {
+    "stochastic-rerank",
+    "independent-durations",
+    "shared-correlated-durations",
+}
+names = {case.get("name") for case in cases}
+missing = sorted(required - names)
+assert not missing, f"stochastic rollout fixture missing required cases: {missing}"
+for case in cases:
+    assert case.get("request"), f"stochastic fixture case missing request: {case}"
+    assert case.get("expected"), f"stochastic fixture case missing expected result: {case}"
+    for task in case["request"].get("tasks", []):
+        estimate = task.get("duration_estimate")
+        assert estimate and estimate.get("type") == "shifted_lognormal_p95", \
+            f"stochastic fixture task lacks shifted_lognormal_p95 estimate: {task}"
+print(f"  stochastic rollout fixture: {path} ({len(cases)} cases)")
 PYEOF
 
 # --- Build orchestrator ---
@@ -1223,8 +1250,7 @@ for case in fixture["cases"]:
             f"{name}: candidate rank {rank} missing numeric total_score: {candidate}"
         totals.append(total)
     # O13 retains separate finalist and non-finalist cohorts. Preserve the D10
-    # ordering check within each cohort; rollout-driven re-rank assertions
-    # remain deferred to D12 (UBU-D0239).
+    # ordering check within each cohort; D12 exercises stochastic re-ranking.
     finalist_totals = totals[:3]
     non_finalist_totals = totals[3:]
     assert finalist_totals == sorted(finalist_totals, reverse=True), \
@@ -1281,7 +1307,149 @@ print(f"  PASS scoring_policy weighting: utility rank-1={utility}; diversity ran
 PYEOF
 
 echo ""
+echo "Step 15: D12 stochastic rollout, re-rank, correlation effect, and reproducibility"
+echo "  (offline fixture requests: $STOCHASTIC_FIXTURE; posted only to loopback /planning/generate)"
+python3 - "$STOCHASTIC_FIXTURE" "$DEMO_BASE" <<'PYEOF'
+import copy
+import json
+import sys
+import urllib.error
+import urllib.request
+
+fixture_path, base_url = sys.argv[1:3]
+assert base_url.startswith("http://127.0.0.1:"), \
+    f"stochastic fixture refuses non-loopback endpoint: {base_url}"
+fixture = json.loads(open(fixture_path, encoding="utf-8").read())
+cases = {case["name"]: case for case in fixture["cases"]}
+opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
+def post_planning(request_body, name):
+    body = json.dumps({"request": request_body}).encode("utf-8")
+    request = urllib.request.Request(
+        f"{base_url}/planning/generate",
+        data=body,
+        headers={"content-type": "application/json"},
+        method="POST",
+    )
+    try:
+        with opener.open(request, timeout=30) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise AssertionError(
+            f"{name}: /planning/generate failed: {exc.code} {detail}"
+        ) from exc
+
+
+def candidates(payload, name):
+    selected = payload.get("selected_candidate")
+    alternatives = payload.get("alternatives")
+    assert selected is not None, f"{name}: missing selected candidate: {payload}"
+    assert isinstance(alternatives, list), f"{name}: alternatives must be a list"
+    result = [selected, *alternatives]
+    assert [candidate.get("rank") for candidate in result] == list(range(1, len(result) + 1)), \
+        f"{name}: candidate ranks are not contiguous: {result}"
+    return result
+
+
+def assert_full(candidate, name):
+    probability = candidate.get("display_probability")
+    low = candidate.get("probability_interval_low")
+    high = candidate.get("probability_interval_high")
+    robustness = candidate.get("robustness_score")
+    assert candidate.get("probability_quality") == "full", candidate
+    assert isinstance(probability, (int, float)), f"{name}: missing probability: {candidate}"
+    assert isinstance(low, (int, float)) and isinstance(high, (int, float)), \
+        f"{name}: missing Wilson interval: {candidate}"
+    assert 0.0 <= low <= probability <= high <= 1.0 and low < high, \
+        f"{name}: invalid Wilson interval [{low}, {high}] for {probability}"
+    assert isinstance(robustness, (int, float)), f"{name}: missing p10 robustness: {candidate}"
+    assert robustness == candidate.get("score_summary", {}).get("robustness_score"), \
+        f"{name}: exposed p10 robustness disagrees with score summary: {candidate}"
+
+
+rerank_case = cases["stochastic-rerank"]
+full_request = rerank_case["request"]
+zero_request = copy.deepcopy(full_request)
+zero_request["compute_budget"]["n_rollouts"] = 0
+
+zero_payload = post_planning(zero_request, "stochastic-rerank-zero-rollouts")
+zero_candidates = candidates(zero_payload, "stochastic-rerank-zero-rollouts")
+expected_count = rerank_case["expected"]["candidate_count"]
+assert len(zero_candidates) == expected_count == 16, \
+    f"stochastic-rerank: expected full bounded C-1 set, got {len(zero_candidates)}"
+for candidate in zero_candidates:
+    assert candidate.get("probability_quality") == "not_estimated", candidate
+    assert candidate.get("display_probability") is None, candidate
+    assert candidate.get("probability_interval_low") is None, candidate
+    assert candidate.get("probability_interval_high") is None, candidate
+    proxy = candidate.get("robustness_score")
+    assert isinstance(proxy, (int, float)), f"missing C-1 proxy: {candidate}"
+    assert proxy == candidate.get("score_summary", {}).get("robustness_score"), \
+        f"not_estimated robustness is not the C-1 proxy: {candidate}"
+
+first_payload = post_planning(full_request, "stochastic-rerank-first")
+second_payload = post_planning(full_request, "stochastic-rerank-reproducibility")
+first_candidates = candidates(first_payload, "stochastic-rerank-first")
+second_candidates = candidates(second_payload, "stochastic-rerank-reproducibility")
+assert first_candidates == second_candidates, \
+    "stochastic-rerank: fixed-seed candidate projections were not reproducible"
+assert len(first_candidates) == expected_count, \
+    f"stochastic-rerank: rollout did not retain all {expected_count} candidates"
+assert {candidate["candidate_id"] for candidate in first_candidates} == {
+    candidate["candidate_id"] for candidate in zero_candidates
+}, "stochastic-rerank: rollout changed the bounded C-1 candidate set"
+assert first_candidates[0]["candidate_id"] != zero_candidates[0]["candidate_id"], (
+    "stochastic-rerank: rollout rank-1 did not differ from the C-1 composite rank-1"
+)
+finalist_count = rerank_case["expected"]["finalist_count"]
+for candidate in first_candidates[:finalist_count]:
+    assert_full(candidate, "stochastic-rerank")
+for candidate in first_candidates[finalist_count:]:
+    assert candidate.get("probability_quality") == "not_estimated", candidate
+    assert candidate.get("display_probability") is None, candidate
+    assert candidate.get("probability_interval_low") is None, candidate
+    assert candidate.get("probability_interval_high") is None, candidate
+
+with opener.open(f"{base_url}/calendar/current", timeout=30) as response:
+    calendar = json.loads(response.read().decode("utf-8"))
+assert calendar.get("selected_candidate") == second_payload["selected_candidate"], \
+    "stochastic-rerank: Calendar did not persist rollout-grounded rank-1"
+assert calendar.get("steps") == second_payload["selected_candidate"]["steps"], \
+    "stochastic-rerank: Calendar steps do not follow rollout-grounded rank-1"
+print(
+    "  PASS stochastic-rerank: "
+    f"C-1 rank-1={zero_candidates[0]['candidate_id']}; "
+    f"rollout rank-1={first_candidates[0]['candidate_id']}; "
+    "16 retained; fixed-seed projection reproduced"
+)
+
+probabilities = {}
+for name in ("independent-durations", "shared-correlated-durations"):
+    payload = post_planning(cases[name]["request"], name)
+    candidate = candidates(payload, name)[0]
+    assert_full(candidate, name)
+    probabilities[name] = candidate["display_probability"]
+
+independent = probabilities["independent-durations"]
+correlated = probabilities["shared-correlated-durations"]
+expected = cases["shared-correlated-durations"]["expected"]
+assert expected["probability_direction_vs_independent"] == "higher"
+assert correlated > independent, \
+    f"correlation effect direction changed: correlated={correlated}, independent={independent}"
+assert correlated - independent >= expected["minimum_probability_delta"], \
+    f"correlation effect was not material: correlated={correlated}, independent={independent}"
+print(
+    "  PASS correlation effect: "
+    f"shared={correlated:.3f} > independent={independent:.3f} "
+    f"(delta={correlated - independent:.3f})"
+)
+print("  PASS not_estimated: zero rollouts exposed C-1 proxies without probability")
+PYEOF
+
+echo ""
 echo "PASS: bootstrap-to-act, gated projection, affect legitimization, Plan/Calendar/recalculation,"
-echo "      C-1 scoring/selection, and minimal fixed-duration O13 rollout checks"
+echo "      C-1 scoring/selection, fixed-duration O13, and stochastic D12 rollout checks"
 echo "      verified store-backed on throwaway store"
 echo "  store=$DEMO_DB (ephemeral — removed on exit)"
