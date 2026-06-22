@@ -206,7 +206,7 @@ while read -r name; do
   printf '\n'
 done < <(repo_names)
 
-echo "=== Pinned revs ==="
+echo "=== Recorded R_* pin equality ==="
 echo ""
 "$SCRIPT_DIR/show-revs.sh"
 echo ""

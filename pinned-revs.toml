@@ -14,10 +14,10 @@
 # show-revs.sh compares these against local checkout HEADs.
 
 [pinned]
-ubu_schemas         = "6f544c4527ca9aff8f1fedf277bd136b951f5ac2"  # R_schemas (post-S12 duration estimates)
+ubu_schemas         = "723c06fe3a5c595e6a85f2e68e80854628a7ded1"  # R_schemas (post-S14 structured plan-quality findings)
 ubu_core            = "77640fef718c16b987e3e4a26766f279ad62836a"  # R_core (post-C7: export-boundary, worker-authority, redaction-identity checks)
 ubu_store           = "12e2d563a6ebe941645a5544cbbdd40d2f2375fe"  # R_store (post-ST5 duration admission)
 ubu_planning_kernel = "62c6d7a2f71078d141f7a4b9c91bd78193ee3314"  # R_planning (post-P9_fix/P10 regeneration)
 ubu_github_adapter  = "d71a169a889a4c0343b9c1970a2afe8db3c60a17"  # R_adapter
-ubu_orchestrator    = "97e83caa5b907f995d3f5d87a348e102d8ed32d7"  # R_orchestrator (post-O14 input-path slice)
-ubu_ui              = "511634084e299f7977ec06fcaff6052fd32dedff"  # R_ui (post-O12 calendar candidate scores)
+ubu_orchestrator    = "eaa611dbef928b05cfeefd3251fa0e6a6a60a387"  # R_orchestrator (post-O15 derived planning reports)
+ubu_ui              = "7c1007eb2131dae7dd4997b8054a924974eb5086"  # R_ui (post-U15 risk and plan-quality views)

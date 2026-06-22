@@ -1,0 +1,185 @@
+{
+  "schema_version": "ubu.devshell.fixture_demo.risk_plan_quality_cases.v1",
+  "public_safe": true,
+  "notes": "Offline D13 fixtures for UBU-D0240 derived risk reports, plan-quality assessments, and blocking-risk recalculation. Requests are posted only to the loopback orchestrator API.",
+  "store_setup": {
+    "tasks": [
+      {
+        "id": "d13-deadline-task",
+        "title": "Deadline-bound fixture task",
+        "due_at": 0
+      }
+    ],
+    "recent_logs": [
+      {
+        "id": "log_d13_wrong_estimate",
+        "event_type": "task_failed",
+        "payload": {
+          "cause": "wrong_estimate",
+          "note": "Synthetic model-input failure for fixture verification"
+        },
+        "created_at": "2099-01-01T00:00:00Z"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "tight-deadline",
+      "request": {
+        "schema_version": "planning-kernel-contract/0.1",
+        "request_id": "d13-tight-deadline",
+        "mode": "fresh_generation",
+        "rng_seed": 1301,
+        "compute_budget": { "n_rollouts": 0, "top_k": 1 },
+        "time_window": { "start": 0, "end": 20 },
+        "task_graph": {
+          "topological_order": ["d13-deadline-task"],
+          "edges": []
+        },
+        "tasks": [
+          { "id": "d13-deadline-task", "duration": 10 }
+        ]
+      },
+      "expected": {
+        "plan_present": true,
+        "risk_level": "high",
+        "findings": [
+          { "category": "deadline_risk", "blocking": true }
+        ],
+        "blocking_recalculation": true,
+        "calendar_stale": true
+      }
+    },
+    {
+      "name": "near-affect-limits",
+      "request": {
+        "schema_version": "planning-kernel-contract/0.1",
+        "request_id": "d13-near-affect-limits",
+        "mode": "fresh_generation",
+        "rng_seed": 1302,
+        "compute_budget": { "n_rollouts": 0, "top_k": 1 },
+        "time_window": { "start": 0, "end": 10 },
+        "task_graph": {
+          "topological_order": ["d13-near-limit-task"],
+          "edges": []
+        },
+        "affect_profile": {
+          "mode": "warn_only",
+          "dimensions": {
+            "energy": {
+              "direction": "higher_is_better",
+              "location": 5.0,
+              "scale": 1.0,
+              "threshold": 0.5
+            }
+          }
+        },
+        "affect_observation": {
+          "dimensions": {
+            "energy": {
+              "value": 4.0,
+              "observed_at": 0,
+              "source_kind": "self_report"
+            }
+          }
+        },
+        "tasks": [
+          { "id": "d13-near-limit-task", "duration": 1 }
+        ]
+      },
+      "expected": {
+        "plan_present": true,
+        "risk_level": "high",
+        "findings": [
+          { "category": "affect_margin", "blocking": false },
+          { "category": "destructive_pressure", "blocking": true }
+        ],
+        "stretch_pressure": "destructive_pressure",
+        "post_plan_state_delta": ["depleted", "at_risk"],
+        "blocking_recalculation": true,
+        "calendar_stale": true
+      }
+    },
+    {
+      "name": "recommendation-skeleton-failure",
+      "request": {
+        "schema_version": "planning-kernel-contract/0.1",
+        "request_id": "d13-recommendation-skeleton-failure",
+        "mode": "fresh_generation",
+        "rng_seed": 1303,
+        "compute_budget": { "n_rollouts": 0, "top_k": 1 },
+        "time_window": { "start": 10, "end": 20 },
+        "task_graph": {
+          "topological_order": ["d13-recommendation-task"],
+          "edges": []
+        },
+        "tasks": [
+          {
+            "id": "d13-recommendation-task",
+            "duration": 1,
+            "static_anchor": { "start": 0 }
+          }
+        ]
+      },
+      "expected": {
+        "plan_present": false,
+        "risk_level": "high",
+        "findings": [
+          {
+            "category": "skeleton_failure",
+            "blocking": true,
+            "subject_ref": "d13-recommendation-task"
+          }
+        ],
+        "blocking_recalculation": true
+      }
+    },
+    {
+      "name": "clean",
+      "request": {
+        "schema_version": "planning-kernel-contract/0.1",
+        "request_id": "d13-clean",
+        "mode": "fresh_generation",
+        "rng_seed": 1304,
+        "compute_budget": { "n_rollouts": 0, "top_k": 1 },
+        "time_window": { "start": 0, "end": 10 },
+        "task_graph": {
+          "topological_order": ["d13-clean-task"],
+          "edges": []
+        },
+        "affect_profile": {
+          "mode": "enforce",
+          "dimensions": {
+            "energy": {
+              "direction": "higher_is_better",
+              "location": 5.0,
+              "scale": 1.0,
+              "threshold": 0.5
+            }
+          }
+        },
+        "affect_observation": {
+          "dimensions": {
+            "energy": {
+              "value": 6.0,
+              "observed_at": 0,
+              "source_kind": "self_report"
+            }
+          }
+        },
+        "tasks": [
+          { "id": "d13-clean-task", "duration": 1 }
+        ]
+      },
+      "expected": {
+        "plan_present": true,
+        "risk_level": "low",
+        "no_blocking_findings": true,
+        "stretch_pressure": ["comfort", "sustainable_stretch"],
+        "post_plan_state_delta": ["better", "neutral"],
+        "failure_pattern": "wrong_estimates",
+        "calendar_stale": false
+      }
+    }
+  ]
+}

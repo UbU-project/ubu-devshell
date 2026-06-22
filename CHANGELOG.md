@@ -1,5 +1,17 @@
 # Changelog
 
+## D13: Risk and plan-quality fixture reports
+
+- Added offline designed fixtures and smoke assertions for derived deadline,
+  affect-margin, destructive-pressure, and recommendation-path skeleton risks.
+- Asserted bounded human-complete plan-quality signals and model-cause-only failure
+  patterns from a synthetic recent failure Log.
+- Verified that blocking findings append a recalculation request and mark an admitted
+  Compact Calendar stale, while the clean fixture stays low-risk and non-stale
+  (`UBU-D0240`).
+- Recorded the post-O15 orchestrator and post-S14 schemas revisions; `show-revs.sh`
+  verifies each recorded pin against the corresponding checkout.
+
 ## Unreleased
 
 - Initial public scaffold for the UbU Phase 1 development harness.

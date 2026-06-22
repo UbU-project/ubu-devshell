@@ -90,6 +90,10 @@ throwaway SQLite store:
     rollout-grounded re-rank with all sixteen candidates retained, correlated-versus-
     independent probability change, and the zero-rollout `not_estimated` C-1 proxy
     (`UBU-D0239`, P10, O14)
+15. D13 derived reports — designed offline fixtures assert deadline, affect-margin,
+    destructive-pressure, and recommendation-path skeleton findings; bounded
+    human-complete plan-quality signals; model-cause-only failure patterns; and the
+    blocking-risk Calendar staleness/recalculation path (`UBU-D0240`, O15, S14)
 
 Governing decisions:
 - **O4**: MemoryState removed; `UBU_DB_PATH` throwaway store
@@ -114,6 +118,8 @@ Governing decisions:
   governs which Tasks are frozen and not re-placed on recalculation
 - **UBU-D0230**: policy-summary guardrails and `compartment_boundary_decided` Log
   vocabulary
+- **UBU-D0240**: derived risk and human-complete plan-quality reports, including
+  blocking-risk recalculation and Calendar staleness
 
 ## Standing Boundary Diagnostics
 

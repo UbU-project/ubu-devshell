@@ -13,9 +13,10 @@ Current entry point:
 The demo exercises the **full bootstrap-to-act loop**, the gated projection loop,
 **affect legitimization**, **Plan generation, the Compact Calendar, and
 override-safe recalculation**, **C-1 bounded candidate scoring and composite
-selection**, and the **D12 stochastic rollout integration slice** store-backed
-against a throwaway SQLite store. No in-memory
-(MemoryState) path is exercised; all state flows through `ubu_store`.
+selection**, the **D12 stochastic rollout integration slice**, and the **D13
+derived risk and human-complete plan-quality reports** store-backed against a
+throwaway SQLite store. No in-memory (MemoryState) path is exercised; all state
+flows through `ubu_store`.
 
 | Step | Endpoint | Governing decision |
 |------|----------|--------------------|
@@ -34,6 +35,7 @@ against a throwaway SQLite store. No in-memory
 | 13. Override-safety | `POST /task/{id}/action` (override), `POST /planning/recalculate` | S9, P3, P4, O9 |
 | 14. Bounded candidate scoring, pruning, and selection | `POST /planning/generate`, `GET /calendar/current` | C-1, P7, P8, O12 |
 | 15. Stochastic rollout, re-rank, correlation effect, and `not_estimated` | `POST /planning/generate`, `GET /calendar/current` | D12, UBU-D0239, P10, O14 |
+| 16. Derived risk and plan-quality reports + blocking recalculation | `POST /planning/generate`, `GET /calendar/current` | D13, UBU-D0240, O15, S14 |
 
 ### Assertions
 
@@ -105,6 +107,15 @@ against a throwaway SQLite store. No in-memory
     in the frozen direction (`shared > independent`), proving the correlation loadings
     affect rollout sampling. Setting `n_rollouts=0` exposes the C-1 proxy with no
     fabricated probability.
+16. The derived-report fixture (`fixtures/demo/risk-plan-quality-cases.json`)
+    asserts `deadline_risk`, blocking `destructive_pressure` beside
+    `affect_margin`, and a blocking recommendation-path `skeleton_failure`. Its
+    clean case has `level=low` and no blocking findings. The near-limit and clean
+    cases assert the bounded `stretch_pressure` and `post_plan_state_delta`
+    outcomes, while a synthetic recent failure Log must map `failure_pattern` to
+    the model-cause enum (`wrong_estimates`), never user-directed text. Each
+    blocking case appends a `recalculation_requested` Log, and admitted blocking
+    Plans make `/calendar/current` stale; the clean Plan is not stale (UBU-D0240).
 
 ## D12 request-contract boundary
 
@@ -151,6 +162,8 @@ No real or user store is ever touched.
 - `fixtures/demo/planning-candidates.json`
 - `fixtures/demo/affect-legitimization-cases.json`
 - `fixtures/demo/scoring-selection-cases.json`
+- `fixtures/demo/stochastic-rollout-cases.json`
+- `fixtures/demo/risk-plan-quality-cases.json`
 
 These fixtures are validated at startup (checked for existence and parseability). The
 bootstrap/seed step uses `"UbU-project/ubu-design"` as the fixture repo; its single Task
@@ -162,6 +175,8 @@ orchestrator API from `fixtures/demo/affect-legitimization-cases.json`; they do 
 GitHub import or any network path outside `127.0.0.1`.
 The scoring and selection cases likewise post only to loopback; they use fixed seeds
 and frozen expected candidate IDs/counts.
+The risk and plan-quality cases seed only synthetic Task and Log rows in the same
+throwaway store, then post designed requests to the loopback orchestrator API.
 
 ## Prerequisites
 
@@ -185,3 +200,4 @@ and frozen expected candidate IDs/counts.
 | **UBU-D0226** | `authority_source` records the authority path for projection state; source details remain in provenance |
 | **UBU-D0227** | Persisted `Task.status` lifecycle (`active`/`completed`/`failed`/`moot`) governs which Tasks are frozen and not re-placed on recalculation |
 | **UBU-D0230** | Policy-summary guardrails (`local_only`, `no_cloud_llm`, `no_external_export`) and `compartment_boundary_decided` Log vocabulary |
+| **UBU-D0240** | Derived risk findings and human-complete plan-quality signals; blocking findings request recalculation and mark the admitted Calendar stale |

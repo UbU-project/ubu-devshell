@@ -24,6 +24,8 @@
 #               not_estimated proxy robustness, and full rollout quality
 #   D12/UBU-D0239: stochastic-duration rollout, rollout re-rank, correlation
 #               effect, fixed-seed reproducibility, and not_estimated
+#   D13/UBU-D0240: derived risk and human-complete plan-quality reports;
+#               blocking findings drive Calendar staleness and recalculation
 #   UBU-D0226: authority_source remains the authority-path enum
 #   UBU-D0227: persisted Task.status lifecycle (active/completed/failed/moot)
 #              drives which Tasks are frozen and not re-placed on recalculation
@@ -46,6 +48,7 @@ PLANNING_FIXTURE="$ROOT_DIR/fixtures/demo/planning-candidates.json"
 AFFECT_FIXTURE="$ROOT_DIR/fixtures/demo/affect-legitimization-cases.json"
 SCORING_FIXTURE="$ROOT_DIR/fixtures/demo/scoring-selection-cases.json"
 STOCHASTIC_FIXTURE="$ROOT_DIR/fixtures/demo/stochastic-rollout-cases.json"
+REPORTS_FIXTURE="$ROOT_DIR/fixtures/demo/risk-plan-quality-cases.json"
 DEMO_PORT="${DEMO_PORT:-17878}"
 DEMO_BASE="http://127.0.0.1:$DEMO_PORT"
 export NO_PROXY="127.0.0.1,localhost"
@@ -73,6 +76,9 @@ ls "$GITHUB_FIXTURES_DIR"/*.json >/dev/null 2>&1 \
 [[ -f "$STOCHASTIC_FIXTURE" ]] \
   || fail_missing "stochastic rollout fixture not found: $STOCHASTIC_FIXTURE (required for D12 stochastic rollout smoke steps)"
 
+[[ -f "$REPORTS_FIXTURE" ]] \
+  || fail_missing "risk and plan-quality fixture not found: $REPORTS_FIXTURE (required for D13 derived-report smoke steps)"
+
 [[ -d "$ORCHESTRATOR_DIR" ]] \
   || fail_missing "orchestrator repo not found at $ORCHESTRATOR_DIR (run clone-all.sh first)"
 
@@ -90,6 +96,7 @@ echo "  S10/P5/O10: affect legitimization feasible/enforce/warn_only/stale paths
 echo "  C-1/P7/P8/O12: bounded candidates, Stage 3 scoring, pruning, composite selection"
 echo "  D11/O13: fixed-duration candidate retention, not_estimated, full rollout quality"
 echo "  D12/UBU-D0239: stochastic rollout, re-rank, correlation effect, reproducibility"
+echo "  D13/UBU-D0240: derived risk and plan-quality reports with blocking recalculation"
 echo "orchestrator: $ORCHESTRATOR_DIR"
 echo "manifest:     $MANIFEST"
 echo "port:         $DEMO_PORT"
@@ -190,6 +197,30 @@ for case in cases:
         assert estimate and estimate.get("type") == "shifted_lognormal_p95", \
             f"stochastic fixture task lacks shifted_lognormal_p95 estimate: {task}"
 print(f"  stochastic rollout fixture: {path} ({len(cases)} cases)")
+PYEOF
+
+python3 - "$REPORTS_FIXTURE" <<'PYEOF'
+import json, pathlib, sys
+path = pathlib.Path(sys.argv[1])
+fixture = json.loads(path.read_text())
+cases = fixture.get("cases", [])
+required = {
+    "tight-deadline",
+    "near-affect-limits",
+    "recommendation-skeleton-failure",
+    "clean",
+}
+names = {case.get("name") for case in cases}
+missing = sorted(required - names)
+assert not missing, f"risk/quality fixture missing required cases: {missing}"
+assert fixture.get("store_setup", {}).get("tasks"), \
+    "risk/quality fixture requires deadline Task store setup"
+assert fixture.get("store_setup", {}).get("recent_logs"), \
+    "risk/quality fixture requires a recent failure Log"
+for case in cases:
+    assert case.get("request"), f"risk/quality fixture case missing request: {case}"
+    assert case.get("expected"), f"risk/quality fixture case missing expected result: {case}"
+print(f"  risk/quality fixture: {path} ({len(cases)} cases)")
 PYEOF
 
 # --- Build orchestrator ---
@@ -1449,7 +1480,174 @@ print("  PASS not_estimated: zero rollouts exposed C-1 proxies without probabili
 PYEOF
 
 echo ""
+echo "Step 16: D13 derived risk and human-complete plan-quality reports (UBU-D0240)"
+echo "  (offline fixture requests: $REPORTS_FIXTURE; posted only to loopback /planning/generate)"
+python3 - "$REPORTS_FIXTURE" "$DEMO_BASE" "$DEMO_DB" <<'PYEOF'
+import json
+import sqlite3
+import sys
+import urllib.error
+import urllib.request
+
+fixture_path, base_url, db_path = sys.argv[1:4]
+assert base_url.startswith("http://127.0.0.1:"), \
+    f"risk/quality fixture refuses non-loopback endpoint: {base_url}"
+fixture = json.loads(open(fixture_path, encoding="utf-8").read())
+opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
+def post_planning(request_body, name):
+    body = json.dumps({"request": request_body}).encode("utf-8")
+    request = urllib.request.Request(
+        f"{base_url}/planning/generate",
+        data=body,
+        headers={"content-type": "application/json"},
+        method="POST",
+    )
+    try:
+        with opener.open(request, timeout=30) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise AssertionError(
+            f"{name}: /planning/generate failed: {exc.code} {detail}"
+        ) from exc
+
+
+def get_calendar():
+    with opener.open(f"{base_url}/calendar/current", timeout=30) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def recalculation_count(connection):
+    return connection.execute(
+        "SELECT COUNT(*) FROM logs WHERE event_type = 'recalculation_requested'"
+    ).fetchone()[0]
+
+
+connection = sqlite3.connect(db_path, timeout=30)
+setup = fixture["store_setup"]
+for task in setup["tasks"]:
+    payload = dict(task)
+    connection.execute(
+        """
+        INSERT INTO objects
+          (id, object_type, version, status, compartment_label, payload_json, created_at, updated_at)
+        VALUES (?, 'Task', 1, 'active', 'fixture-demo', ?, ?, ?)
+        """,
+        (
+            task["id"],
+            json.dumps(payload, separators=(",", ":")),
+            "2026-06-22T00:00:00Z",
+            "2026-06-22T00:00:00Z",
+        ),
+    )
+for log in setup["recent_logs"]:
+    connection.execute(
+        """
+        INSERT INTO logs
+          (id, event_type, object_refs_json, payload_json, provenance_json, created_at)
+        VALUES (?, ?, '[]', ?, ?, ?)
+        """,
+        (
+            log["id"],
+            log["event_type"],
+            json.dumps(log["payload"], separators=(",", ":")),
+            json.dumps({"authority_source": "system"}, separators=(",", ":")),
+            log["created_at"],
+        ),
+    )
+connection.commit()
+
+failure_patterns = {
+    "none",
+    "wrong_estimates",
+    "missing_dependencies",
+    "stale_affect",
+    "interruption",
+    "overload",
+    "changed_objective",
+}
+
+for case in fixture["cases"]:
+    name = case["name"]
+    expected = case["expected"]
+    trigger_count_before = recalculation_count(connection)
+    payload = post_planning(case["request"], name)
+    plan = payload.get("plan")
+    assert (plan is not None) is expected["plan_present"], \
+        f"{name}: plan presence mismatch: {payload}"
+
+    report = payload.get("risk_report")
+    assert report is not None, f"{name}: missing risk_report: {payload}"
+    assert report.get("level") == expected["risk_level"], \
+        f"{name}: risk level {report.get('level')} != {expected['risk_level']}"
+    findings = report.get("findings")
+    assert isinstance(findings, list), f"{name}: findings must be a list: {report}"
+    for wanted in expected.get("findings", []):
+        assert any(
+            all(finding.get(key) == value for key, value in wanted.items())
+            for finding in findings
+        ), f"{name}: missing expected finding {wanted}: {findings}"
+    if expected.get("no_blocking_findings"):
+        assert not any(finding.get("blocking") is True for finding in findings), \
+            f"{name}: clean fixture returned a blocking finding: {findings}"
+
+    quality = payload.get("human_complete_plan_quality")
+    if plan is not None:
+        assert quality is not None, f"{name}: admitted Plan missing plan-quality assessment"
+        stretch = expected.get("stretch_pressure")
+        if stretch is not None:
+            allowed = stretch if isinstance(stretch, list) else [stretch]
+            assert quality.get("stretch_pressure") in allowed, \
+                f"{name}: stretch_pressure {quality.get('stretch_pressure')} not in {allowed}"
+        delta = expected.get("post_plan_state_delta")
+        if delta is not None:
+            allowed = delta if isinstance(delta, list) else [delta]
+            assert quality.get("post_plan_state_delta") in allowed, \
+                f"{name}: post_plan_state_delta {quality.get('post_plan_state_delta')} not in {allowed}"
+        failure_pattern = quality.get("failure_pattern")
+        assert failure_pattern in failure_patterns, \
+            f"{name}: failure_pattern is not a model-cause enum: {failure_pattern!r}"
+        assert "you" not in failure_pattern and " " not in failure_pattern, \
+            f"{name}: failure_pattern contains user-directed text: {failure_pattern!r}"
+        if "failure_pattern" in expected:
+            assert failure_pattern == expected["failure_pattern"], \
+                f"{name}: recent failure Log did not yield {expected['failure_pattern']}: {quality}"
+
+    connection.commit()
+    trigger_count_after = recalculation_count(connection)
+    if expected.get("blocking_recalculation"):
+        assert trigger_count_after == trigger_count_before + 1, \
+            f"{name}: blocking set did not append exactly one recalculation request"
+    else:
+        assert trigger_count_after == trigger_count_before, \
+            f"{name}: non-blocking report unexpectedly requested recalculation"
+
+    if "calendar_stale" in expected:
+        calendar = get_calendar()
+        assert calendar.get("plan_id") == plan["id"], \
+            f"{name}: Calendar does not serve the generated Plan: {calendar}"
+        assert calendar.get("stale") is expected["calendar_stale"], \
+            f"{name}: Calendar stale={calendar.get('stale')} expected {expected['calendar_stale']}"
+        assert calendar.get("risk_report") == report, \
+            f"{name}: Calendar risk report differs from generated Plan"
+
+    categories = [finding.get("category") for finding in findings]
+    print(
+        f"  PASS {name}: risk={report['level']} findings={categories}"
+        + (f" quality={quality['stretch_pressure']}/{quality['post_plan_state_delta']}"
+           if quality is not None else "")
+    )
+
+connection.close()
+print("  PASS blocking reports: recalculation_requested Log appended; admitted blocking Plans mark Calendar stale")
+print("  PASS failure_pattern: recent failure Log maps only to the bounded model-cause enum")
+PYEOF
+
+echo ""
 echo "PASS: bootstrap-to-act, gated projection, affect legitimization, Plan/Calendar/recalculation,"
-echo "      C-1 scoring/selection, fixed-duration O13, and stochastic D12 rollout checks"
+echo "      C-1 scoring/selection, fixed-duration O13, stochastic D12 rollout,"
+echo "      and D13 risk/plan-quality report checks"
 echo "      verified store-backed on throwaway store"
 echo "  store=$DEMO_DB (ephemeral — removed on exit)"
