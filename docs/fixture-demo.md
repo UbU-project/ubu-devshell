@@ -14,14 +14,15 @@ The demo exercises the **full bootstrap-to-act loop**, the gated projection loop
 **affect legitimization**, **Plan generation, the Compact Calendar, and
 override-safe recalculation**, **C-1 bounded candidate scoring and composite
 selection**, the **D12 stochastic rollout integration slice**, the **D13
-derived risk and human-complete plan-quality reports**, and the **D14
-UniverseState facts container semantics** store-backed against throwaway SQLite
-stores. No in-memory (MemoryState) path is exercised; all state flows through
-`ubu_store`.
+derived risk and human-complete plan-quality reports**, the **D14 UniverseState
+facts container semantics**, and **D15 precondition-gated planning** store-backed
+against throwaway SQLite stores. No in-memory (MemoryState) path is exercised;
+all state flows through `ubu_store`.
 
 | Step | Endpoint | Governing decision |
 |------|----------|--------------------|
 | 0. UniverseState facts container smoke | local `ubu-core`/`ubu-store` crates | D14, UBU-D0241 |
+| 0b. Precondition-gated planning | `POST /planning/generate` | D15, UBU-D0242 |
 | 1. Token intake | `POST /desktop/session/github-token` | O5 |
 | 2. Bootstrap/seed | `POST /bootstrap/seed` | O5, O6 |
 | 3. next_action (ready) | `GET /next-action?schema_version=…` | O6 |
@@ -128,6 +129,15 @@ stores. No in-memory (MemoryState) path is exercised; all state flows through
     list, evaluates an `all_of`/`any_of` precondition tree over `equals`,
     `member_of`, and `absent`, treats unknown targets as absent, and rejects a
     malformed numeric membership predicate as an error (UBU-D0241).
+18. The precondition planning fixture
+    (`fixtures/demo/precondition-planning-cases.json`) seeds a populated
+    `UniverseState` and five active Tasks directly into the throwaway store,
+    then posts to `/planning/generate`. It asserts that a Task with no
+    `preconditions`, a Task whose precondition is satisfied, and a Task whose
+    precondition references an absent target with `predicate=absent` are planned;
+    that a failed precondition is excluded and surfaced in `blocked_tasks`; and
+    that a malformed precondition is excluded and surfaced separately in
+    `invalid_tasks`, with distinct diagnostics (`UBU-D0242`).
 
 ## D12 request-contract boundary
 
@@ -177,6 +187,7 @@ No real or user store is ever touched.
 - `fixtures/demo/stochastic-rollout-cases.json`
 - `fixtures/demo/risk-plan-quality-cases.json`
 - `fixtures/demo/universe-state-semantics.json`
+- `fixtures/demo/precondition-planning-cases.json`
 
 These fixtures are validated at startup (checked for existence and parseability). The
 bootstrap/seed step uses `"UbU-project/ubu-design"` as the fixture repo; its single Task
@@ -194,6 +205,9 @@ The UniverseState semantics case runs before the orchestrator starts, compiles a
 temporary local smoke harness with `cargo run --offline`, uses only local
 `ubu-core` and `ubu-store` path dependencies, and writes to a separate throwaway
 SQLite store removed on exit.
+The precondition planning case seeds only synthetic `UniverseState` and Task rows
+in the throwaway orchestrator store, posts to loopback `/planning/generate`, and
+retires those fixture Tasks before the bootstrap-to-act loop continues.
 
 ## Prerequisites
 
@@ -219,3 +233,4 @@ SQLite store removed on exit.
 | **UBU-D0230** | Policy-summary guardrails (`local_only`, `no_cloud_llm`, `no_external_export`) and `compartment_boundary_decided` Log vocabulary |
 | **UBU-D0240** | Derived risk findings and human-complete plan-quality signals; blocking findings request recalculation and mark the admitted Calendar stale |
 | **UBU-D0241** | `UniverseState` four-collection facts container, mutation applicator, and precondition evaluator |
+| **UBU-D0242** | Task `preconditions` partition planning into eligible, blocked, and invalid against `UniverseState` |

@@ -206,7 +206,7 @@ while read -r name; do
   printf '\n'
 done < <(repo_names)
 
-echo "=== Recorded R_* pin equality (post-C9 R_core, post-ST6 R_store) ==="
+echo "=== Recorded R_* pin equality (post-O16 R_orchestrator, post-S16 R_schemas, post-C10 R_core, post-ST6 R_store) ==="
 echo ""
 "$SCRIPT_DIR/show-revs.sh"
 echo ""

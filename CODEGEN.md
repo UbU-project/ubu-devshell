@@ -53,7 +53,8 @@ The fixture smoke test (`scripts/run-fixture-demo.sh`) exercises the full
 **bootstrap-to-act loop**, the gated projection loop, and **Plan generation,
 the Compact Calendar, and override-safe recalculation** store-backed against a
 throwaway SQLite store. It also runs an offline `UniverseState` facts-container
-smoke over local `ubu-core`/`ubu-store` crates:
+smoke over local `ubu-core`/`ubu-store` crates and an offline precondition-gated
+planning smoke over fixture-seeded `UniverseState` and Tasks:
 
 1. Token intake — `/desktop/session/github-token` (O5)
 2. Bootstrap/seed — `/bootstrap/seed` admits Objectives, Preferences, and Tasks (O5/O6)
@@ -99,6 +100,10 @@ smoke over local `ubu-core`/`ubu-store` crates:
     four-collection `UniverseState`, apply all seven mutation operations, reject an
     invalid mutation list without partial application, and evaluate preconditions
     over `equals`, `member_of`, and `absent` (`UBU-D0241`)
+17. D15 precondition-gated planning — fixture-seeded Tasks assert the eligible,
+    blocked, and invalid partitions through `/planning/generate`, including
+    no-precondition, satisfied, failed, malformed, and absent-target cases
+    (`UBU-D0242`)
 
 Governing decisions:
 - **O4**: MemoryState removed; `UBU_DB_PATH` throwaway store
@@ -127,6 +132,8 @@ Governing decisions:
   blocking-risk recalculation and Calendar staleness
 - **UBU-D0241**: `UniverseState` four-collection facts container, mutation
   applicator, and precondition evaluator
+- **UBU-D0242**: Task `preconditions` partition planning into eligible, blocked,
+  and invalid against `UniverseState`
 
 ## Standing Boundary Diagnostics
 

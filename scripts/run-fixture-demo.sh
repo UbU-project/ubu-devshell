@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Fixture smoke test: exercises the full bootstrap-to-act loop, the gated
 # projection loop, canonical Plan generation / Compact Calendar /
-# override-safe recalculation, and affect legitimization against the
+# override-safe recalculation, precondition-gated planning, and affect legitimization against the
 # store-backed orchestrator (O5: token
 # intake and bootstrap/seed; O6: readiness next_action with explanation, action
 # recording, and bounded diagnostic; O7: projection preview, approval, gated
@@ -28,6 +28,8 @@
 #               blocking findings drive Calendar staleness and recalculation
 #   D14/UBU-D0241: UniverseState four-collection facts container,
 #               mutation semantics, and precondition evaluation
+#   D15/UBU-D0242: Task preconditions partition planning into eligible,
+#               blocked, and invalid against UniverseState
 #   UBU-D0226: authority_source remains the authority-path enum
 #   UBU-D0227: persisted Task.status lifecycle (active/completed/failed/moot)
 #              drives which Tasks are frozen and not re-placed on recalculation
@@ -54,6 +56,7 @@ SCORING_FIXTURE="$ROOT_DIR/fixtures/demo/scoring-selection-cases.json"
 STOCHASTIC_FIXTURE="$ROOT_DIR/fixtures/demo/stochastic-rollout-cases.json"
 REPORTS_FIXTURE="$ROOT_DIR/fixtures/demo/risk-plan-quality-cases.json"
 UNIVERSE_FIXTURE="$ROOT_DIR/fixtures/demo/universe-state-semantics.json"
+PRECONDITION_PLANNING_FIXTURE="$ROOT_DIR/fixtures/demo/precondition-planning-cases.json"
 DEMO_PORT="${DEMO_PORT:-17878}"
 DEMO_BASE="http://127.0.0.1:$DEMO_PORT"
 export NO_PROXY="127.0.0.1,localhost"
@@ -87,6 +90,9 @@ ls "$GITHUB_FIXTURES_DIR"/*.json >/dev/null 2>&1 \
 [[ -f "$UNIVERSE_FIXTURE" ]] \
   || fail_missing "UniverseState fixture not found: $UNIVERSE_FIXTURE (required for D14 UniverseState smoke steps)"
 
+[[ -f "$PRECONDITION_PLANNING_FIXTURE" ]] \
+  || fail_missing "precondition planning fixture not found: $PRECONDITION_PLANNING_FIXTURE (required for D15 precondition-gated planning)"
+
 [[ -d "$ORCHESTRATOR_DIR" ]] \
   || fail_missing "orchestrator repo not found at $ORCHESTRATOR_DIR (run clone-all.sh first)"
 
@@ -112,10 +118,12 @@ echo "  D11/O13: fixed-duration candidate retention, not_estimated, full rollout
 echo "  D12/UBU-D0239: stochastic rollout, re-rank, correlation effect, reproducibility"
 echo "  D13/UBU-D0240: derived risk and plan-quality reports with blocking recalculation"
 echo "  D14/UBU-D0241: UniverseState facts container round-trip and semantics"
+echo "  D15/UBU-D0242: precondition-gated planning partitions eligible/blocked/invalid Tasks"
 echo "orchestrator: $ORCHESTRATOR_DIR"
 echo "core:         $CORE_DIR"
 echo "store:        $STORE_DIR"
 echo "manifest:     $MANIFEST"
+echo "preconditions: $PRECONDITION_PLANNING_FIXTURE"
 echo "port:         $DEMO_PORT"
 echo ""
 
@@ -280,6 +288,36 @@ for name in ("satisfied", "unsatisfied", "unknown_absent", "numeric_malformed"):
     assert name in fixture["preconditions"], \
         f"UniverseState fixture missing precondition case: {name}"
 print(f"  UniverseState fixture: {path} ({len(fixture['mutations'])} mutations)")
+PYEOF
+
+python3 - "$PRECONDITION_PLANNING_FIXTURE" <<'PYEOF'
+import json, pathlib, sys
+
+path = pathlib.Path(sys.argv[1])
+fixture = json.loads(path.read_text())
+assert fixture.get("decision") == "UBU-D0242", \
+    f"precondition planning fixture must cite UBU-D0242: {fixture.get('decision')}"
+state = fixture.get("universe_state")
+assert isinstance(state, dict), "precondition planning fixture missing universe_state"
+tasks = fixture.get("tasks", [])
+assert len(tasks) == 5, f"precondition planning fixture expected five tasks, got {len(tasks)}"
+cases = {task.get("case"): task for task in tasks}
+required = {"no_preconditions", "satisfied", "failed", "malformed", "absent_target"}
+missing = sorted(required - cases.keys())
+assert not missing, f"precondition planning fixture missing cases: {missing}"
+assert "preconditions" not in cases["no_preconditions"], \
+    "no_preconditions case must omit preconditions"
+for case in ("satisfied", "failed", "malformed", "absent_target"):
+    assert cases[case].get("preconditions"), f"{case} case missing preconditions"
+expected = fixture.get("expected", {})
+assert set(expected.get("eligible_cases", [])) == {"no_preconditions", "satisfied", "absent_target"}
+assert set(expected.get("blocked_cases", [])) == {"failed"}
+assert set(expected.get("invalid_cases", [])) == {"malformed"}
+assert set(expected.get("diagnostic_codes", [])) == {
+    "task_precondition_blocked",
+    "task_precondition_invalid",
+}
+print(f"  precondition planning fixture: {path} ({len(tasks)} tasks)")
 PYEOF
 
 # --- UniverseState facts container smoke (D14/UBU-D0241) ---
@@ -525,6 +563,165 @@ if [[ "$READY" -ne 1 ]]; then
   cat "$ORCH_LOG" >&2
   exit 1
 fi
+
+# --- Precondition-gated planning smoke (D15/UBU-D0242) ---
+
+echo ""
+echo "Step 0b: precondition-gated planning (D15/UBU-D0242) — eligible, blocked, invalid"
+echo "  (offline fixture seed: $PRECONDITION_PLANNING_FIXTURE; posted only to loopback /planning/generate)"
+python3 - "$DEMO_DB" "$PRECONDITION_PLANNING_FIXTURE" <<'PYEOF'
+import json, sqlite3, sys
+
+db, fixture_path = sys.argv[1:3]
+fixture = json.loads(open(fixture_path, encoding="utf-8").read())
+con = sqlite3.connect(db)
+now = "2026-06-23T12:00:00Z"
+
+state = fixture["universe_state"]
+con.execute(
+    """
+    INSERT INTO objects
+      (id, object_type, version, status, compartment_label, payload_json, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """,
+    (
+        state["id"],
+        "UniverseState",
+        1,
+        "active",
+        "fixture-demo-d15",
+        json.dumps(state, separators=(",", ":")),
+        now,
+        now,
+    ),
+)
+
+for task in fixture["tasks"]:
+    payload = {
+        "id": task["id"],
+        "title": task["title"],
+        "status": "active",
+        "duration_minutes": task["duration_minutes"],
+        "provenance": {
+            "created_at": now,
+            "authority_source": "user",
+            "source": {
+                "source_kind": "fixture_demo",
+                "source_id": task["case"],
+            },
+        },
+    }
+    if "preconditions" in task:
+        payload["preconditions"] = task["preconditions"]
+    con.execute(
+        """
+        INSERT INTO objects
+          (id, object_type, version, status, compartment_label, payload_json, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            task["id"],
+            "Task",
+            1,
+            "active",
+            "fixture-demo-d15",
+            json.dumps(payload, separators=(",", ":")),
+            now,
+            now,
+        ),
+    )
+
+con.commit()
+print("  seeded UniverseState and five D15 precondition Tasks")
+PYEOF
+
+PRECONDITION_PLAN_RESP="$(curl -sf -X POST "$DEMO_BASE/planning/generate" \
+  -H "content-type: application/json" \
+  -d "{\"schema_version\":\"planning-kernel-contract/0.1\",\"request_id\":\"fixture-d15-preconditions\"}")"
+echo "  plan response: $PRECONDITION_PLAN_RESP"
+python3 - "$PRECONDITION_PLAN_RESP" "$PRECONDITION_PLANNING_FIXTURE" <<'PYEOF'
+import json, sys
+
+resp = json.loads(sys.argv[1])
+fixture = json.loads(open(sys.argv[2], encoding="utf-8").read())
+by_case = {task["case"]: task for task in fixture["tasks"]}
+case_by_id = {task["id"]: task["case"] for task in fixture["tasks"]}
+expected = fixture["expected"]
+
+assert resp.get("schema_version") == "planning-kernel-contract/0.1", resp
+plan = resp.get("plan")
+assert plan is not None, f"precondition planning: expected admitted Plan, got {resp}"
+planned_ids = {step["task_id"] for step in plan.get("steps", [])}
+planned_cases = {case_by_id[task_id] for task_id in planned_ids if task_id in case_by_id}
+assert planned_cases == set(expected["eligible_cases"]), (
+    f"precondition planning: planned cases {planned_cases} != {set(expected['eligible_cases'])}"
+)
+for case in expected["blocked_cases"] + expected["invalid_cases"]:
+    assert by_case[case]["id"] not in planned_ids, \
+        f"precondition planning: excluded case {case} appeared in plan"
+
+blocked_cases = {
+    case_by_id[item["task_id"]]: item
+    for item in resp.get("blocked_tasks", [])
+    if item["task_id"] in case_by_id
+}
+invalid_cases = {
+    case_by_id[item["task_id"]]: item
+    for item in resp.get("invalid_tasks", [])
+    if item["task_id"] in case_by_id
+}
+assert set(blocked_cases) == set(expected["blocked_cases"]), (
+    f"precondition planning: blocked cases {set(blocked_cases)} != {set(expected['blocked_cases'])}"
+)
+assert set(invalid_cases) == set(expected["invalid_cases"]), (
+    f"precondition planning: invalid cases {set(invalid_cases)} != {set(expected['invalid_cases'])}"
+)
+assert blocked_cases["failed"]["precondition"]["target"] == "facts.ticket.status", blocked_cases
+assert "malformed precondition" in invalid_cases["malformed"]["error"], invalid_cases
+assert "not_a_collection" in invalid_cases["malformed"]["error"], invalid_cases
+
+diagnostic_codes = {
+    diagnostic.get("code")
+    for diagnostic in resp.get("diagnostics", [])
+    if diagnostic.get("code") in expected["diagnostic_codes"]
+}
+assert diagnostic_codes == set(expected["diagnostic_codes"]), (
+    f"precondition planning: diagnostic codes {diagnostic_codes} != {set(expected['diagnostic_codes'])}"
+)
+assert "absent_target" in planned_cases, \
+    "precondition planning: absent target must be eligible under absent rule"
+print(
+    "  PASS precondition planning: eligible={eligible} blocked={blocked} invalid={invalid}".format(
+        eligible=sorted(planned_cases),
+        blocked=sorted(blocked_cases),
+        invalid=sorted(invalid_cases),
+    )
+)
+PYEOF
+
+python3 - "$DEMO_DB" "$PRECONDITION_PLANNING_FIXTURE" "$PRECONDITION_PLAN_RESP" <<'PYEOF'
+import json, sqlite3, sys
+
+db, fixture_path, response_json = sys.argv[1:4]
+fixture = json.loads(open(fixture_path, encoding="utf-8").read())
+ids = [task["id"] for task in fixture["tasks"]]
+plan_id = json.loads(response_json)["plan"]["id"]
+con = sqlite3.connect(db)
+con.executemany(
+    "UPDATE objects SET status = 'completed', updated_at = '2026-06-23T12:05:00Z' WHERE id = ?",
+    [(task_id,) for task_id in ids],
+)
+row = con.execute("SELECT payload_json FROM plans WHERE id = ?", (plan_id,)).fetchone()
+assert row is not None, f"D15 Plan not found for cleanup: {plan_id}"
+payload = json.loads(row[0])
+payload["status"] = "superseded"
+con.execute(
+    "UPDATE plans SET status = 'superseded', payload_json = ? WHERE id = ?",
+    (json.dumps(payload, separators=(",", ":")), plan_id),
+)
+con.commit()
+print("  retired D15 fixture Tasks and superseded its temporary Plan before the bootstrap-to-act loop")
+PYEOF
 
 # --- Full bootstrap-to-act loop ---
 
@@ -1905,6 +2102,7 @@ PYEOF
 echo ""
 echo "PASS: bootstrap-to-act, gated projection, affect legitimization, Plan/Calendar/recalculation,"
 echo "      C-1 scoring/selection, fixed-duration O13, stochastic D12 rollout,"
-echo "      D13 risk/plan-quality report checks, and D14 UniverseState semantics"
+echo "      D13 risk/plan-quality report checks, D14 UniverseState semantics,"
+echo "      and D15 precondition-gated planning"
 echo "      verified store-backed on throwaway store"
 echo "  store=$DEMO_DB (ephemeral — removed on exit)"

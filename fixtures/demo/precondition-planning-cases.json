@@ -1,0 +1,95 @@
+{
+  "schema_version": "ubu.devshell.fixture_demo.precondition_planning_cases.v1",
+  "decision": "UBU-D0242",
+  "notes": "Offline D15 fixture for precondition-gated planning. The smoke test seeds this UniverseState and these Tasks directly into the throwaway orchestrator store, then posts only to loopback /planning/generate.",
+  "universe_state": {
+    "id": "ustate_00000000000170008000000000000000",
+    "captured_at": "2026-06-23T12:00:00Z",
+    "facts": {
+      "ticket.status": "ready",
+      "workspace.mode": "offline"
+    },
+    "numeric_values": {},
+    "set_memberships": {
+      "labels": [
+        "review"
+      ]
+    },
+    "event_markers": {},
+    "source_summary": "D15 precondition planning fixture",
+    "confidence_summary": "designed fixture"
+  },
+  "tasks": [
+    {
+      "case": "no_preconditions",
+      "expected_partition": "eligible",
+      "id": "task_00000000010170008000000000000000",
+      "title": "D15 no-preconditions eligible Task",
+      "duration_minutes": 10
+    },
+    {
+      "case": "satisfied",
+      "expected_partition": "eligible",
+      "id": "task_00000000010270008000000000000000",
+      "title": "D15 satisfied-precondition eligible Task",
+      "duration_minutes": 10,
+      "preconditions": {
+        "target": "facts.ticket.status",
+        "predicate": "equals",
+        "expected": "ready"
+      }
+    },
+    {
+      "case": "failed",
+      "expected_partition": "blocked",
+      "id": "task_00000000010370008000000000000000",
+      "title": "D15 failed-precondition blocked Task",
+      "duration_minutes": 10,
+      "preconditions": {
+        "target": "facts.ticket.status",
+        "predicate": "equals",
+        "expected": "done"
+      }
+    },
+    {
+      "case": "malformed",
+      "expected_partition": "invalid",
+      "id": "task_00000000010470008000000000000000",
+      "title": "D15 malformed-precondition invalid Task",
+      "duration_minutes": 10,
+      "preconditions": {
+        "target": "not_a_collection.ticket.status",
+        "predicate": "equals",
+        "expected": "ready"
+      }
+    },
+    {
+      "case": "absent_target",
+      "expected_partition": "eligible",
+      "id": "task_00000000010570008000000000000000",
+      "title": "D15 absent-target eligible Task",
+      "duration_minutes": 10,
+      "preconditions": {
+        "target": "facts.ticket.owner",
+        "predicate": "absent"
+      }
+    }
+  ],
+  "expected": {
+    "eligible_cases": [
+      "no_preconditions",
+      "satisfied",
+      "absent_target"
+    ],
+    "blocked_cases": [
+      "failed"
+    ],
+    "invalid_cases": [
+      "malformed"
+    ],
+    "diagnostic_codes": [
+      "task_precondition_blocked",
+      "task_precondition_invalid"
+    ]
+  }
+}

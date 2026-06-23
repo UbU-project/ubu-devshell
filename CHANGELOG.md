@@ -1,5 +1,14 @@
 # Changelog
 
+## D15: Precondition-gated planning fixture
+
+- Added an offline fixture smoke assertion for `UBU-D0242` that seeds a
+  `UniverseState` and five Tasks, then verifies `/planning/generate` partitions
+  no-precondition, satisfied, failed, malformed, and absent-target preconditions
+  into eligible, blocked, and invalid outcomes.
+- Updated recorded `R_orchestrator`, `R_schemas`, and `R_core` labels for the
+  post-O16/post-S16/post-C10 revs.
+
 ## D14: UniverseState fixture semantics
 
 - Added an offline UniverseState fixture smoke step for `UBU-D0241` that admits and
