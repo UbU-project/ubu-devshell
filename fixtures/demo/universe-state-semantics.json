@@ -1,0 +1,212 @@
+{
+  "schema_version": "ubu.devshell.fixture_demo.universe_state_semantics.v1",
+  "decision": "UBU-D0241",
+  "notes": "Offline D14 fixture for UniverseState store round-trip, mutation semantics, and precondition evaluation. The smoke test runs only against local sibling crates and a throwaway SQLite store.",
+  "round_trip_state": {
+    "schema_version": "core/universe-state/0.1",
+    "id": "USTATE_REPLACED_BY_SMOKE_TEST",
+    "captured_at": "2026-06-22T12:45:00Z",
+    "facts": {
+      "task.owner": "fixture-user",
+      "task.status": "pending",
+      "workspace.mode": {
+        "kind": "offline",
+        "source": "fixture"
+      }
+    },
+    "numeric_values": {
+      "available_minutes": 45.0,
+      "energy": 7.5
+    },
+    "set_memberships": {
+      "labels": [
+        "review",
+        "todo"
+      ]
+    },
+    "event_markers": {
+      "empty_timeline": [],
+      "history": [
+        {
+          "at": "2026-06-22T12:40:00Z",
+          "code": "seeded"
+        }
+      ]
+    },
+    "source_summary": "D14 UniverseState fixture smoke test",
+    "confidence_summary": "designed fixture"
+  },
+  "mutations": [
+    {
+      "operation": "set_fact",
+      "target": "facts.task.status",
+      "payload": "ready"
+    },
+    {
+      "operation": "set_fact",
+      "target": "facts.task.owner",
+      "payload": "codex"
+    },
+    {
+      "operation": "clear_fact",
+      "target": "facts.task.owner"
+    },
+    {
+      "operation": "increment_numeric",
+      "target": "numeric_values.energy",
+      "payload": 2.5
+    },
+    {
+      "operation": "decrement_numeric",
+      "target": "numeric_values.energy",
+      "payload": 1.25
+    },
+    {
+      "operation": "increment_numeric",
+      "target": "numeric_values.missing_increment",
+      "payload": 3.0
+    },
+    {
+      "operation": "decrement_numeric",
+      "target": "numeric_values.missing_decrement",
+      "payload": 2.0
+    },
+    {
+      "operation": "add_membership",
+      "target": "set_memberships.labels",
+      "payload": "done"
+    },
+    {
+      "operation": "remove_membership",
+      "target": "set_memberships.labels",
+      "payload": "todo"
+    },
+    {
+      "operation": "append_event_marker",
+      "target": "event_markers.empty_timeline",
+      "payload": {
+        "at": "2026-06-22T12:50:00Z",
+        "code": "first-empty-append"
+      }
+    },
+    {
+      "operation": "append_event_marker",
+      "target": "event_markers.history",
+      "payload": {
+        "at": "2026-06-22T12:55:00Z",
+        "code": "mutation-applied"
+      }
+    }
+  ],
+  "expected_after_mutations": {
+    "facts": {
+      "task.status": "ready",
+      "workspace.mode": {
+        "kind": "offline",
+        "source": "fixture"
+      }
+    },
+    "numeric_values": {
+      "available_minutes": 45.0,
+      "energy": 8.75,
+      "missing_decrement": -2.0,
+      "missing_increment": 3.0
+    },
+    "set_memberships": {
+      "labels": [
+        "done",
+        "review"
+      ]
+    },
+    "event_markers": {
+      "empty_timeline": [
+        {
+          "at": "2026-06-22T12:50:00Z",
+          "code": "first-empty-append"
+        }
+      ],
+      "history": [
+        {
+          "at": "2026-06-22T12:40:00Z",
+          "code": "seeded"
+        },
+        {
+          "at": "2026-06-22T12:55:00Z",
+          "code": "mutation-applied"
+        }
+      ]
+    }
+  },
+  "invalid_mutations": [
+    {
+      "operation": "set_fact",
+      "target": "facts.invalid.should_not_apply",
+      "payload": true
+    },
+    {
+      "operation": "set_fact",
+      "target": "facts.invalid.missing_payload"
+    }
+  ],
+  "preconditions": {
+    "satisfied": {
+      "all_of": [
+        {
+          "target": "facts.task.status",
+          "predicate": "equals",
+          "expected": "ready"
+        },
+        {
+          "any_of": [
+            {
+              "target": "set_memberships.labels",
+              "predicate": "member_of",
+              "expected": "blocked"
+            },
+            {
+              "target": "set_memberships.labels",
+              "predicate": "member_of",
+              "expected": "done"
+            }
+          ]
+        },
+        {
+          "target": "facts.task.owner",
+          "predicate": "absent"
+        }
+      ]
+    },
+    "unsatisfied": {
+      "all_of": [
+        {
+          "target": "facts.task.status",
+          "predicate": "equals",
+          "expected": "ready"
+        },
+        {
+          "any_of": [
+            {
+              "target": "set_memberships.labels",
+              "predicate": "member_of",
+              "expected": "blocked"
+            },
+            {
+              "target": "facts.task.priority",
+              "predicate": "equals",
+              "expected": "high"
+            }
+          ]
+        }
+      ]
+    },
+    "unknown_absent": {
+      "target": "facts.unknown.target",
+      "predicate": "absent"
+    },
+    "numeric_malformed": {
+      "target": "numeric_values.energy",
+      "predicate": "member_of",
+      "expected": 8.75
+    }
+  }
+}

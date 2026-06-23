@@ -1,5 +1,14 @@
 # Changelog
 
+## D14: UniverseState fixture semantics
+
+- Added an offline UniverseState fixture smoke step for `UBU-D0241` that admits and
+  reads back a four-collection `UniverseState`, applies all seven mutation
+  operations, rejects an invalid mutation list without partial application, and
+  evaluates preconditions over `equals`, `member_of`, and `absent`.
+- Updated recorded `R_schemas`, `R_core`, and `R_store` labels for the
+  post-S15/post-C9/post-ST6 revs.
+
 ## D13: Risk and plan-quality fixture reports
 
 - Added offline designed fixtures and smoke assertions for derived deadline,

@@ -52,7 +52,8 @@ PR description and in the generated issue draft.
 The fixture smoke test (`scripts/run-fixture-demo.sh`) exercises the full
 **bootstrap-to-act loop**, the gated projection loop, and **Plan generation,
 the Compact Calendar, and override-safe recalculation** store-backed against a
-throwaway SQLite store:
+throwaway SQLite store. It also runs an offline `UniverseState` facts-container
+smoke over local `ubu-core`/`ubu-store` crates:
 
 1. Token intake — `/desktop/session/github-token` (O5)
 2. Bootstrap/seed — `/bootstrap/seed` admits Objectives, Preferences, and Tasks (O5/O6)
@@ -94,6 +95,10 @@ throwaway SQLite store:
     destructive-pressure, and recommendation-path skeleton findings; bounded
     human-complete plan-quality signals; model-cause-only failure patterns; and the
     blocking-risk Calendar staleness/recalculation path (`UBU-D0240`, O15, S14)
+16. D14 UniverseState semantics — designed offline fixtures admit and read back a
+    four-collection `UniverseState`, apply all seven mutation operations, reject an
+    invalid mutation list without partial application, and evaluate preconditions
+    over `equals`, `member_of`, and `absent` (`UBU-D0241`)
 
 Governing decisions:
 - **O4**: MemoryState removed; `UBU_DB_PATH` throwaway store
@@ -120,6 +125,8 @@ Governing decisions:
   vocabulary
 - **UBU-D0240**: derived risk and human-complete plan-quality reports, including
   blocking-risk recalculation and Calendar staleness
+- **UBU-D0241**: `UniverseState` four-collection facts container, mutation
+  applicator, and precondition evaluator
 
 ## Standing Boundary Diagnostics
 

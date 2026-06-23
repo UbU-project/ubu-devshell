@@ -26,6 +26,8 @@
 #               effect, fixed-seed reproducibility, and not_estimated
 #   D13/UBU-D0240: derived risk and human-complete plan-quality reports;
 #               blocking findings drive Calendar staleness and recalculation
+#   D14/UBU-D0241: UniverseState four-collection facts container,
+#               mutation semantics, and precondition evaluation
 #   UBU-D0226: authority_source remains the authority-path enum
 #   UBU-D0227: persisted Task.status lifecycle (active/completed/failed/moot)
 #              drives which Tasks are frozen and not re-placed on recalculation
@@ -42,6 +44,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPOS_DIR="${REPOS_DIR:-$(cd "$ROOT_DIR/.." && pwd)}"
 ORCHESTRATOR_DIR="${ORCHESTRATOR_DIR:-$REPOS_DIR/ubu-orchestrator}"
+CORE_DIR="${CORE_DIR:-$REPOS_DIR/ubu-core}"
+STORE_DIR="${STORE_DIR:-$REPOS_DIR/ubu-store}"
 MANIFEST="$ROOT_DIR/fixtures/demo/phase1-demo-manifest.json"
 GITHUB_FIXTURES_DIR="$ROOT_DIR/fixtures/github"
 PLANNING_FIXTURE="$ROOT_DIR/fixtures/demo/planning-candidates.json"
@@ -49,6 +53,7 @@ AFFECT_FIXTURE="$ROOT_DIR/fixtures/demo/affect-legitimization-cases.json"
 SCORING_FIXTURE="$ROOT_DIR/fixtures/demo/scoring-selection-cases.json"
 STOCHASTIC_FIXTURE="$ROOT_DIR/fixtures/demo/stochastic-rollout-cases.json"
 REPORTS_FIXTURE="$ROOT_DIR/fixtures/demo/risk-plan-quality-cases.json"
+UNIVERSE_FIXTURE="$ROOT_DIR/fixtures/demo/universe-state-semantics.json"
 DEMO_PORT="${DEMO_PORT:-17878}"
 DEMO_BASE="http://127.0.0.1:$DEMO_PORT"
 export NO_PROXY="127.0.0.1,localhost"
@@ -79,8 +84,17 @@ ls "$GITHUB_FIXTURES_DIR"/*.json >/dev/null 2>&1 \
 [[ -f "$REPORTS_FIXTURE" ]] \
   || fail_missing "risk and plan-quality fixture not found: $REPORTS_FIXTURE (required for D13 derived-report smoke steps)"
 
+[[ -f "$UNIVERSE_FIXTURE" ]] \
+  || fail_missing "UniverseState fixture not found: $UNIVERSE_FIXTURE (required for D14 UniverseState smoke steps)"
+
 [[ -d "$ORCHESTRATOR_DIR" ]] \
   || fail_missing "orchestrator repo not found at $ORCHESTRATOR_DIR (run clone-all.sh first)"
+
+[[ -d "$CORE_DIR" ]] \
+  || fail_missing "ubu-core repo not found at $CORE_DIR (required for D14 UniverseState semantics)"
+
+[[ -d "$STORE_DIR" ]] \
+  || fail_missing "ubu-store repo not found at $STORE_DIR (required for D14 UniverseState admission)"
 
 command -v cargo   >/dev/null 2>&1 || fail_missing "cargo not found"
 command -v curl    >/dev/null 2>&1 || fail_missing "curl not found"
@@ -97,7 +111,10 @@ echo "  C-1/P7/P8/O12: bounded candidates, Stage 3 scoring, pruning, composite s
 echo "  D11/O13: fixed-duration candidate retention, not_estimated, full rollout quality"
 echo "  D12/UBU-D0239: stochastic rollout, re-rank, correlation effect, reproducibility"
 echo "  D13/UBU-D0240: derived risk and plan-quality reports with blocking recalculation"
+echo "  D14/UBU-D0241: UniverseState facts container round-trip and semantics"
 echo "orchestrator: $ORCHESTRATOR_DIR"
+echo "core:         $CORE_DIR"
+echo "store:        $STORE_DIR"
 echo "manifest:     $MANIFEST"
 echo "port:         $DEMO_PORT"
 echo ""
@@ -106,6 +123,7 @@ echo ""
 
 DEMO_TMPDIR="$(mktemp -d)"
 DEMO_DB="$DEMO_TMPDIR/ubu-demo.db"
+DEMO_UNIVERSE_DB="$DEMO_TMPDIR/universe-state-smoke.db"
 ORCH_LOG="$DEMO_TMPDIR/orchestrator.log"
 ORCH_PID=""
 
@@ -222,6 +240,245 @@ for case in cases:
     assert case.get("expected"), f"risk/quality fixture case missing expected result: {case}"
 print(f"  risk/quality fixture: {path} ({len(cases)} cases)")
 PYEOF
+
+python3 - "$UNIVERSE_FIXTURE" <<'PYEOF'
+import json, pathlib, sys
+
+path = pathlib.Path(sys.argv[1])
+fixture = json.loads(path.read_text())
+required_top = {
+    "round_trip_state",
+    "mutations",
+    "expected_after_mutations",
+    "invalid_mutations",
+    "preconditions",
+}
+missing = sorted(required_top - fixture.keys())
+assert not missing, f"UniverseState fixture missing required keys: {missing}"
+operations = {item.get("operation") for item in fixture["mutations"]}
+required_ops = {
+    "set_fact",
+    "clear_fact",
+    "increment_numeric",
+    "decrement_numeric",
+    "add_membership",
+    "remove_membership",
+    "append_event_marker",
+}
+missing_ops = sorted(required_ops - operations)
+assert not missing_ops, f"UniverseState fixture missing mutation operations: {missing_ops}"
+expected = fixture["expected_after_mutations"]
+for collection in ("facts", "numeric_values", "set_memberships", "event_markers"):
+    assert collection in expected, f"UniverseState expected result missing {collection}"
+assert "missing_increment" in expected["numeric_values"], \
+    "UniverseState fixture must assert increment against a missing numeric key"
+assert "missing_decrement" in expected["numeric_values"], \
+    "UniverseState fixture must assert decrement against a missing numeric key"
+assert expected["event_markers"].get("empty_timeline"), \
+    "UniverseState fixture must assert append to an empty marker list"
+for name in ("satisfied", "unsatisfied", "unknown_absent", "numeric_malformed"):
+    assert name in fixture["preconditions"], \
+        f"UniverseState fixture missing precondition case: {name}"
+print(f"  UniverseState fixture: {path} ({len(fixture['mutations'])} mutations)")
+PYEOF
+
+# --- UniverseState facts container smoke (D14/UBU-D0241) ---
+
+echo ""
+echo "Step 0: UniverseState fixture smoke (D14/UBU-D0241) — store round-trip, mutations, preconditions"
+echo "  (offline local crates: $UNIVERSE_FIXTURE; throwaway store: $DEMO_UNIVERSE_DB)"
+UNIVERSE_SMOKE_DIR="$DEMO_TMPDIR/universe-state-smoke"
+mkdir -p "$UNIVERSE_SMOKE_DIR/src"
+cat >"$UNIVERSE_SMOKE_DIR/Cargo.toml" <<EOF
+[package]
+name = "ubu_universe_state_fixture_smoke"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+serde_json = "1.0"
+tokio = { version = "1.38", features = ["macros", "rt-multi-thread"] }
+ubu_core = { path = "$CORE_DIR" }
+ubu_store = { path = "$STORE_DIR" }
+
+[patch."https://github.com/UbU-project/ubu-core"]
+ubu_core = { path = "$CORE_DIR" }
+EOF
+cat >"$UNIVERSE_SMOKE_DIR/src/main.rs" <<'EOF'
+use std::env;
+use std::fs;
+
+use serde_json::{json, Value};
+use ubu_core::core::{
+    apply_universe_mutations, evaluate_universe_precondition, UniverseEventMarkers,
+    UniverseFacts, UniverseMutation, UniverseNumericValues, UniversePrecondition,
+    UniverseSetMemberships, UniverseState,
+};
+use ubu_core::id_registry::ObjectType;
+use ubu_core::UbuId;
+use ubu_store::models::object_record::NewObjectRecord;
+use ubu_store::{queries, UbuStore};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args: Vec<String> = env::args().collect();
+    assert_eq!(args.len(), 3, "usage: smoke <fixture-json> <sqlite-path>");
+    let fixture: Value = serde_json::from_str(&fs::read_to_string(&args[1])?)?;
+    let store = UbuStore::connect(&args[2]).await?;
+
+    let state = fixture_state(&fixture)?;
+    let payload = store_payload(&state);
+
+    queries::admit_object(
+        store.pool(),
+        NewObjectRecord {
+            id: state.id.to_string(),
+            object_type: ObjectType::UniverseState.as_str().to_owned(),
+            version: 1,
+            status: "active".to_owned(),
+            compartment_label: "fixture-demo".to_owned(),
+            payload: payload.clone(),
+            created_at: "2026-06-22T13:00:00Z".to_owned(),
+            updated_at: "2026-06-22T13:00:00Z".to_owned(),
+        },
+    )
+    .await?;
+
+    let fetched = queries::get_current_state(store.pool(), &state.id.to_string())
+        .await?
+        .expect("admitted UniverseState is readable");
+    let stored_payload: Value = serde_json::from_str(&fetched.payload_json)?;
+    assert_eq!(stored_payload, payload, "store payload round-trip changed JSON");
+    let round_tripped: UniverseState = serde_json::from_value(stored_payload)?;
+    assert_eq!(round_tripped, state, "UniverseState deep equality failed");
+    println!("  PASS UniverseState store round-trip: four collections deeply equal");
+
+    let mutations: Vec<UniverseMutation> =
+        serde_json::from_value(fixture["mutations"].clone())?;
+    let mutated = apply_universe_mutations(&state, &mutations)?;
+    assert_expected_collections(&fixture["expected_after_mutations"], &mutated)?;
+    println!("  PASS UniverseState mutations: all seven operations, missing numeric keys, empty marker append");
+
+    let invalid_mutations: Vec<UniverseMutation> =
+        serde_json::from_value(fixture["invalid_mutations"].clone())?;
+    let before_invalid = state.clone();
+    let rejected = apply_universe_mutations(&state, &invalid_mutations);
+    assert!(rejected.is_err(), "invalid mutation list was accepted");
+    assert!(
+        !state.facts.contains_key("invalid.should_not_apply"),
+        "fixture baseline unexpectedly contains invalid mutation target"
+    );
+    assert_eq!(
+        state, before_invalid,
+        "validate-then-apply rejection changed the source state"
+    );
+    println!("  PASS UniverseState mutations: invalid list rejected as a whole");
+
+    let preconditions = &fixture["preconditions"];
+    let satisfied: UniversePrecondition =
+        serde_json::from_value(preconditions["satisfied"].clone())?;
+    assert_eq!(
+        evaluate_universe_precondition(&mutated, &satisfied)?,
+        true,
+        "satisfied precondition tree evaluated false"
+    );
+
+    let unsatisfied: UniversePrecondition =
+        serde_json::from_value(preconditions["unsatisfied"].clone())?;
+    assert_eq!(
+        evaluate_universe_precondition(&mutated, &unsatisfied)?,
+        false,
+        "unsatisfied precondition tree evaluated true"
+    );
+
+    let unknown_absent: UniversePrecondition =
+        serde_json::from_value(preconditions["unknown_absent"].clone())?;
+    assert_eq!(
+        evaluate_universe_precondition(&mutated, &unknown_absent)?,
+        true,
+        "unknown target did not evaluate as absent"
+    );
+
+    let numeric_malformed: UniversePrecondition =
+        serde_json::from_value(preconditions["numeric_malformed"].clone())?;
+    assert!(
+        evaluate_universe_precondition(&mutated, &numeric_malformed).is_err(),
+        "numeric target with non-equality/non-absence predicate was not malformed"
+    );
+    println!("  PASS UniverseState preconditions: all_of/any_of, equals/member_of/absent, absent unknown, malformed numeric");
+
+    Ok(())
+}
+
+fn fixture_state(fixture: &Value) -> Result<UniverseState, serde_json::Error> {
+    let mut value = fixture["round_trip_state"].clone();
+    value["id"] = json!(UbuId::new(ObjectType::UniverseState).to_string());
+    serde_json::from_value(value)
+}
+
+fn store_payload(state: &UniverseState) -> Value {
+    let mut payload = serde_json::to_value(state).expect("UniverseState serializes");
+    payload["schema_version"] = json!("core/universe-state/0.1");
+    payload["provenance"] = json!({
+        "created_at": "2026-06-22T13:00:00Z",
+        "created_by": "fixture-demo-d14",
+        "authority_source": "user"
+    });
+    payload
+}
+
+fn assert_expected_collections(
+    expected: &Value,
+    actual: &UniverseState,
+) -> Result<(), serde_json::Error> {
+    let facts: UniverseFacts = serde_json::from_value(expected["facts"].clone())?;
+    assert_eq!(actual.facts, facts, "facts collection mismatch");
+
+    let numeric_values: UniverseNumericValues =
+        serde_json::from_value(expected["numeric_values"].clone())?;
+    assert_eq!(
+        actual.numeric_values, numeric_values,
+        "numeric_values collection mismatch"
+    );
+
+    let set_memberships: UniverseSetMemberships =
+        serde_json::from_value(expected["set_memberships"].clone())?;
+    assert_eq!(
+        actual.set_memberships, set_memberships,
+        "set_memberships collection mismatch"
+    );
+
+    let event_markers: UniverseEventMarkers =
+        serde_json::from_value(expected["event_markers"].clone())?;
+    assert_eq!(
+        actual.event_markers, event_markers,
+        "event_markers collection mismatch"
+    );
+
+    assert!(
+        actual.numeric_values.contains_key("missing_increment"),
+        "increment_numeric did not initialize a missing key"
+    );
+    assert!(
+        actual.numeric_values.contains_key("missing_decrement"),
+        "decrement_numeric did not initialize a missing key"
+    );
+    assert_eq!(
+        actual
+            .event_markers
+            .get("empty_timeline")
+            .map(Vec::len),
+        Some(1),
+        "append_event_marker did not append to the empty marker list"
+    );
+
+    Ok(())
+}
+EOF
+CARGO_NET_OFFLINE=true cargo run --quiet --offline \
+  --manifest-path "$UNIVERSE_SMOKE_DIR/Cargo.toml" \
+  -- "$UNIVERSE_FIXTURE" "$DEMO_UNIVERSE_DB"
 
 # --- Build orchestrator ---
 
@@ -1648,6 +1905,6 @@ PYEOF
 echo ""
 echo "PASS: bootstrap-to-act, gated projection, affect legitimization, Plan/Calendar/recalculation,"
 echo "      C-1 scoring/selection, fixed-duration O13, stochastic D12 rollout,"
-echo "      and D13 risk/plan-quality report checks"
+echo "      D13 risk/plan-quality report checks, and D14 UniverseState semantics"
 echo "      verified store-backed on throwaway store"
 echo "  store=$DEMO_DB (ephemeral — removed on exit)"

@@ -8,7 +8,8 @@
     "affect-legitimization-cases.json",
     "scoring-selection-cases.json",
     "stochastic-rollout-cases.json",
-    "risk-plan-quality-cases.json"
+    "risk-plan-quality-cases.json",
+    "universe-state-semantics.json"
   ],
   "description": "Placeholder manifest for local dogfooding with fake data."
 }

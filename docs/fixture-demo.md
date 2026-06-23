@@ -13,13 +13,15 @@ Current entry point:
 The demo exercises the **full bootstrap-to-act loop**, the gated projection loop,
 **affect legitimization**, **Plan generation, the Compact Calendar, and
 override-safe recalculation**, **C-1 bounded candidate scoring and composite
-selection**, the **D12 stochastic rollout integration slice**, and the **D13
-derived risk and human-complete plan-quality reports** store-backed against a
-throwaway SQLite store. No in-memory (MemoryState) path is exercised; all state
-flows through `ubu_store`.
+selection**, the **D12 stochastic rollout integration slice**, the **D13
+derived risk and human-complete plan-quality reports**, and the **D14
+UniverseState facts container semantics** store-backed against throwaway SQLite
+stores. No in-memory (MemoryState) path is exercised; all state flows through
+`ubu_store`.
 
 | Step | Endpoint | Governing decision |
 |------|----------|--------------------|
+| 0. UniverseState facts container smoke | local `ubu-core`/`ubu-store` crates | D14, UBU-D0241 |
 | 1. Token intake | `POST /desktop/session/github-token` | O5 |
 | 2. Bootstrap/seed | `POST /bootstrap/seed` | O5, O6 |
 | 3. next_action (ready) | `GET /next-action?schema_version=…` | O6 |
@@ -116,6 +118,16 @@ flows through `ubu_store`.
     the model-cause enum (`wrong_estimates`), never user-directed text. Each
     blocking case appends a `recalculation_requested` Log, and admitted blocking
     Plans make `/calendar/current` stale; the clean Plan is not stale (UBU-D0240).
+17. The UniverseState fixture (`fixtures/demo/universe-state-semantics.json`)
+    admits a populated four-collection `UniverseState` through `ubu_store`, reads it
+    back, and asserts deep equality. It applies a mutation list covering
+    `set_fact`, `clear_fact`, `increment_numeric`, `decrement_numeric`,
+    `add_membership`, `remove_membership`, and `append_event_marker`, including
+    increment/decrement of missing numeric keys and appending to an empty marker
+    list. It also asserts validate-then-apply rejection for an invalid mutation
+    list, evaluates an `all_of`/`any_of` precondition tree over `equals`,
+    `member_of`, and `absent`, treats unknown targets as absent, and rejects a
+    malformed numeric membership predicate as an error (UBU-D0241).
 
 ## D12 request-contract boundary
 
@@ -164,6 +176,7 @@ No real or user store is ever touched.
 - `fixtures/demo/scoring-selection-cases.json`
 - `fixtures/demo/stochastic-rollout-cases.json`
 - `fixtures/demo/risk-plan-quality-cases.json`
+- `fixtures/demo/universe-state-semantics.json`
 
 These fixtures are validated at startup (checked for existence and parseability). The
 bootstrap/seed step uses `"UbU-project/ubu-design"` as the fixture repo; its single Task
@@ -177,6 +190,10 @@ The scoring and selection cases likewise post only to loopback; they use fixed s
 and frozen expected candidate IDs/counts.
 The risk and plan-quality cases seed only synthetic Task and Log rows in the same
 throwaway store, then post designed requests to the loopback orchestrator API.
+The UniverseState semantics case runs before the orchestrator starts, compiles a
+temporary local smoke harness with `cargo run --offline`, uses only local
+`ubu-core` and `ubu-store` path dependencies, and writes to a separate throwaway
+SQLite store removed on exit.
 
 ## Prerequisites
 
@@ -201,3 +218,4 @@ throwaway store, then post designed requests to the loopback orchestrator API.
 | **UBU-D0227** | Persisted `Task.status` lifecycle (`active`/`completed`/`failed`/`moot`) governs which Tasks are frozen and not re-placed on recalculation |
 | **UBU-D0230** | Policy-summary guardrails (`local_only`, `no_cloud_llm`, `no_external_export`) and `compartment_boundary_decided` Log vocabulary |
 | **UBU-D0240** | Derived risk findings and human-complete plan-quality signals; blocking findings request recalculation and mark the admitted Calendar stale |
+| **UBU-D0241** | `UniverseState` four-collection facts container, mutation applicator, and precondition evaluator |
