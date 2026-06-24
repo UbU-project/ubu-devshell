@@ -10,7 +10,8 @@
     "stochastic-rollout-cases.json",
     "risk-plan-quality-cases.json",
     "universe-state-semantics.json",
-    "precondition-planning-cases.json"
+    "precondition-planning-cases.json",
+    "intrinsic-affect-mode-cases.json"
   ],
   "description": "Placeholder manifest for local dogfooding with fake data."
 }

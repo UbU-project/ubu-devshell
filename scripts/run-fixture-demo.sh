@@ -30,6 +30,9 @@
 #               mutation semantics, and precondition evaluation
 #   D15/UBU-D0242: Task preconditions partition planning into eligible,
 #               blocked, and invalid against UniverseState
+#   D16/UBU-D0242: completed Task effects mutate the current UniverseState
+#               (Wiring-B); organization/worker mode reject intrinsic-affect
+#               targets while user_mode permits them
 #   UBU-D0226: authority_source remains the authority-path enum
 #   UBU-D0227: persisted Task.status lifecycle (active/completed/failed/moot)
 #              drives which Tasks are frozen and not re-placed on recalculation
@@ -57,6 +60,7 @@ STOCHASTIC_FIXTURE="$ROOT_DIR/fixtures/demo/stochastic-rollout-cases.json"
 REPORTS_FIXTURE="$ROOT_DIR/fixtures/demo/risk-plan-quality-cases.json"
 UNIVERSE_FIXTURE="$ROOT_DIR/fixtures/demo/universe-state-semantics.json"
 PRECONDITION_PLANNING_FIXTURE="$ROOT_DIR/fixtures/demo/precondition-planning-cases.json"
+MODE_EFFECTS_FIXTURE="$ROOT_DIR/fixtures/demo/intrinsic-affect-mode-cases.json"
 DEMO_PORT="${DEMO_PORT:-17878}"
 DEMO_BASE="http://127.0.0.1:$DEMO_PORT"
 export NO_PROXY="127.0.0.1,localhost"
@@ -93,6 +97,9 @@ ls "$GITHUB_FIXTURES_DIR"/*.json >/dev/null 2>&1 \
 [[ -f "$PRECONDITION_PLANNING_FIXTURE" ]] \
   || fail_missing "precondition planning fixture not found: $PRECONDITION_PLANNING_FIXTURE (required for D15 precondition-gated planning)"
 
+[[ -f "$MODE_EFFECTS_FIXTURE" ]] \
+  || fail_missing "intrinsic-affect/effects fixture not found: $MODE_EFFECTS_FIXTURE (required for D16 effect application and mode rejection)"
+
 [[ -d "$ORCHESTRATOR_DIR" ]] \
   || fail_missing "orchestrator repo not found at $ORCHESTRATOR_DIR (run clone-all.sh first)"
 
@@ -119,6 +126,7 @@ echo "  D12/UBU-D0239: stochastic rollout, re-rank, correlation effect, reproduc
 echo "  D13/UBU-D0240: derived risk and plan-quality reports with blocking recalculation"
 echo "  D14/UBU-D0241: UniverseState facts container round-trip and semantics"
 echo "  D15/UBU-D0242: precondition-gated planning partitions eligible/blocked/invalid Tasks"
+echo "  D16/UBU-D0242: effect application on completion (Wiring-B) and intrinsic-affect mode rejection"
 echo "orchestrator: $ORCHESTRATOR_DIR"
 echo "core:         $CORE_DIR"
 echo "store:        $STORE_DIR"
@@ -2100,9 +2108,336 @@ print("  PASS failure_pattern: recent failure Log maps only to the bounded model
 PYEOF
 
 echo ""
+echo "Step 17a: intrinsic-affect mode rejection (D16/UBU-D0242, Wiring-B) — offline ubu-core validators"
+echo "  (offline local crate: $MODE_EFFECTS_FIXTURE; pure validate_*_for_mode across all three instance modes)"
+echo "  The running orchestrator is fixed to user_mode (MVP_INSTANCE_MODE); organization/worker-mode"
+echo "  rejection is asserted directly against the canonical ubu-core validators, which is authoritative."
+MODE_SMOKE_DIR="$DEMO_TMPDIR/mode-rejection-smoke"
+mkdir -p "$MODE_SMOKE_DIR/src"
+cat >"$MODE_SMOKE_DIR/Cargo.toml" <<EOF
+[package]
+name = "ubu_mode_rejection_smoke"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+serde_json = "1.0"
+ubu_core = { path = "$CORE_DIR" }
+EOF
+cat >"$MODE_SMOKE_DIR/src/main.rs" <<'EOF'
+use std::env;
+use std::fs;
+
+use serde_json::Value;
+use ubu_core::core::{
+    validate_mutations_for_mode, validate_precondition_for_mode, InstanceMode, ModeValidationError,
+    UniverseMutation, UniversePrecondition,
+};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args: Vec<String> = env::args().collect();
+    assert_eq!(args.len(), 2, "usage: mode-smoke <fixture-json>");
+    let fixture: Value = serde_json::from_str(&fs::read_to_string(&args[1])?)?;
+
+    assert_eq!(fixture["decision"], "UBU-D0242", "fixture must cite UBU-D0242");
+    assert_eq!(fixture["wiring"], "Wiring-B", "fixture must cite Wiring-B");
+
+    let mr = &fixture["mode_rejection"];
+    let intrinsic_precondition: UniversePrecondition =
+        serde_json::from_value(mr["intrinsic_affect_precondition"].clone())?;
+    let intrinsic_mutations: Vec<UniverseMutation> =
+        serde_json::from_value(mr["intrinsic_affect_mutations"].clone())?;
+    let non_affect_precondition: UniversePrecondition =
+        serde_json::from_value(mr["non_affect_precondition"].clone())?;
+    let non_affect_mutations: Vec<UniverseMutation> =
+        serde_json::from_value(mr["non_affect_mutations"].clone())?;
+    let expected_precondition_target = mr["expected_precondition_target"]
+        .as_str()
+        .expect("expected_precondition_target");
+    let expected_mutation_target = mr["expected_mutation_target"]
+        .as_str()
+        .expect("expected_mutation_target");
+
+    let permissive: Vec<InstanceMode> =
+        serde_json::from_value(fixture["modes"]["permissive"].clone())?;
+    let rejecting: Vec<InstanceMode> =
+        serde_json::from_value(fixture["modes"]["rejecting"].clone())?;
+    assert!(!permissive.is_empty(), "fixture defines no permissive mode");
+    assert!(!rejecting.is_empty(), "fixture defines no rejecting mode");
+
+    // Rejecting modes (organization_mode, worker_mode) do not model intrinsic
+    // affect: an intrinsic-affect precondition target (found anywhere in the
+    // tree) and an intrinsic-affect mutation target are both rejected, while
+    // non-affect targets continue to pass.
+    for mode in &rejecting {
+        match validate_precondition_for_mode(*mode, &intrinsic_precondition) {
+            Err(ModeValidationError::IntrinsicAffectForbidden { mode: m, target }) => {
+                assert_eq!(m, *mode, "rejection reported the wrong mode");
+                assert_eq!(
+                    target, expected_precondition_target,
+                    "rejection reported the wrong precondition target"
+                );
+            }
+            other => panic!("{mode} accepted an intrinsic-affect precondition: {other:?}"),
+        }
+        match validate_mutations_for_mode(*mode, &intrinsic_mutations) {
+            Err(ModeValidationError::IntrinsicAffectForbidden { mode: m, target }) => {
+                assert_eq!(m, *mode, "rejection reported the wrong mode");
+                assert_eq!(
+                    target, expected_mutation_target,
+                    "rejection reported the wrong mutation target"
+                );
+            }
+            other => panic!("{mode} accepted an intrinsic-affect mutation: {other:?}"),
+        }
+        assert!(
+            validate_precondition_for_mode(*mode, &non_affect_precondition).is_ok(),
+            "{mode} wrongly rejected a non-affect precondition"
+        );
+        assert!(
+            validate_mutations_for_mode(*mode, &non_affect_mutations).is_ok(),
+            "{mode} wrongly rejected non-affect mutations"
+        );
+        println!(
+            "  PASS mode {mode}: intrinsic-affect precondition and effect mutation rejected as invalid; non-affect permitted"
+        );
+    }
+
+    // Permissive modes (user_mode) model intrinsic affect: every target passes.
+    for mode in &permissive {
+        assert!(
+            validate_precondition_for_mode(*mode, &intrinsic_precondition).is_ok(),
+            "{mode} wrongly rejected an intrinsic-affect precondition"
+        );
+        assert!(
+            validate_mutations_for_mode(*mode, &intrinsic_mutations).is_ok(),
+            "{mode} wrongly rejected intrinsic-affect mutations"
+        );
+        assert!(
+            validate_precondition_for_mode(*mode, &non_affect_precondition).is_ok(),
+            "{mode} wrongly rejected a non-affect precondition"
+        );
+        assert!(
+            validate_mutations_for_mode(*mode, &non_affect_mutations).is_ok(),
+            "{mode} wrongly rejected non-affect mutations"
+        );
+        println!("  PASS mode {mode}: intrinsic-affect precondition and effect mutation permitted");
+    }
+
+    Ok(())
+}
+EOF
+CARGO_NET_OFFLINE=true cargo run --quiet --offline \
+  --manifest-path "$MODE_SMOKE_DIR/Cargo.toml" \
+  -- "$MODE_EFFECTS_FIXTURE"
+
+echo ""
+echo "Step 17b: effect application on completion (D16/UBU-D0242, Wiring-B) — store-backed, user_mode"
+echo "  (offline fixture seed: $MODE_EFFECTS_FIXTURE; completions posted only to loopback /task/{id}/action)"
+APPLY_TASK="$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['effects_demo']['ids']['apply_task'])" "$MODE_EFFECTS_FIXTURE")"
+PROB_TASK="$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['effects_demo']['ids']['probabilistic_task'])" "$MODE_EFFECTS_FIXTURE")"
+FAILED_TASK="$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['effects_demo']['ids']['failed_task'])" "$MODE_EFFECTS_FIXTURE")"
+EFFECT_UNIVERSE_ID="$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['effects_demo']['ids']['universe_state'])" "$MODE_EFFECTS_FIXTURE")"
+
+python3 - "$DEMO_DB" "$MODE_EFFECTS_FIXTURE" <<'PYEOF'
+import json, sqlite3, sys
+
+db, fixture_path = sys.argv[1:3]
+demo = json.loads(open(fixture_path, encoding="utf-8").read())["effects_demo"]
+ids = demo["ids"]
+con = sqlite3.connect(db)
+# A late same-day timestamp keeps this the current UniverseState ahead of the
+# D15-seeded one (2026-06-23); read_current_universe_state selects by updated_at.
+seed_ts = "2026-06-24T23:50:00Z"
+
+state = dict(demo["universe_state"])
+state["id"] = ids["universe_state"]
+state["provenance"] = {
+    "created_at": seed_ts,
+    "created_by": "fixture-demo-d16",
+    "authority_source": "user",
+}
+con.execute(
+    """
+    INSERT INTO objects
+      (id, object_type, version, status, compartment_label, payload_json, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """,
+    (
+        state["id"],
+        "UniverseState",
+        1,
+        "active",
+        "fixture-demo-d16",
+        json.dumps(state, separators=(",", ":")),
+        seed_ts,
+        seed_ts,
+    ),
+)
+
+seeds = [
+    (ids["apply_task"], "active", demo["apply_effect"], "apply"),
+    (ids["probabilistic_task"], "active", demo["probabilistic_effect"], "probabilistic"),
+    (ids["failed_task"], "failed", demo["failed_effect"], "failed"),
+]
+for task_id, status, effect, case in seeds:
+    payload = {
+        "id": task_id,
+        "title": f"D16 effect task ({case})",
+        "status": status,
+        "effects": effect,
+        "provenance": {
+            "created_at": seed_ts,
+            "authority_source": "user",
+            "source": {"source_kind": "fixture_demo", "source_id": case},
+        },
+    }
+    con.execute(
+        """
+        INSERT INTO objects
+          (id, object_type, version, status, compartment_label, payload_json, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            task_id,
+            "Task",
+            1,
+            status,
+            "fixture-demo-d16",
+            json.dumps(payload, separators=(",", ":")),
+            seed_ts,
+            seed_ts,
+        ),
+    )
+
+con.commit()
+
+# Defensive: the orchestrator selects the current UniverseState by updated_at;
+# assert the row it will mutate is the one this step seeded, not the D15 one.
+row = con.execute(
+    "SELECT id FROM objects WHERE object_type = 'UniverseState' "
+    "ORDER BY updated_at DESC, created_at DESC LIMIT 1"
+).fetchone()
+assert row is not None and row[0] == ids["universe_state"], (
+    f"D16 seeded UniverseState is not the current one: {row}"
+)
+print("  seeded current UniverseState and three D16 effect Tasks (active apply, active probabilistic, failed)")
+PYEOF
+
+# (1) Complete a Task with effects and a payload; assert UniverseState reflects every mutation.
+APPLY_RESP="$(curl -sf -X POST "$DEMO_BASE/task/$APPLY_TASK/action" \
+  -H "content-type: application/json" \
+  -d "{\"schema_version\":\"$ACT_SCHEMA\",\"action\":\"complete\"}")"
+echo "  apply response: $APPLY_RESP"
+python3 - "$APPLY_RESP" "$DEMO_DB" "$EFFECT_UNIVERSE_ID" "$MODE_EFFECTS_FIXTURE" <<'PYEOF'
+import json, sqlite3, sys
+
+resp = json.loads(sys.argv[1])
+db, uid, fixture_path = sys.argv[2:5]
+expected = json.loads(open(fixture_path, encoding="utf-8").read())["effects_demo"]["expected_after_apply"]
+
+assert resp.get("task_status") == "completed", f"apply: expected completed, got {resp}"
+assert resp.get("transition_applied") is True, f"apply: expected transition_applied, got {resp}"
+codes = [d.get("code") for d in resp.get("diagnostics", [])]
+assert codes == [], f"apply: unexpected effect diagnostics {codes}"
+
+con = sqlite3.connect(db)
+row = con.execute("SELECT version, payload_json FROM objects WHERE id = ?", (uid,)).fetchone()
+assert row is not None, "apply: current UniverseState row missing"
+version, payload = row[0], json.loads(row[1])
+assert version == 2, f"apply: expected persisted version 2, got {version}"
+
+facts = payload["facts"]
+for key, value in expected["facts"].items():
+    assert facts.get(key) == value, f"apply: facts[{key}]={facts.get(key)} != {value}"
+assert facts["ticket.result"] == {"merged": True, "pr_number": 42}, \
+    f"apply: object payload not deep-applied: {facts.get('ticket.result')}"
+assert payload["numeric_values"]["available_minutes"] == 90.0, \
+    f"apply: numeric increment not applied: {payload['numeric_values']}"
+assert set(payload["set_memberships"]["labels"]) == {"reviewed", "todo"}, \
+    f"apply: membership add not applied: {payload['set_memberships']}"
+assert payload["event_markers"]["completions"] == expected["event_markers"]["completions"], \
+    f"apply: event marker not appended: {payload['event_markers']}"
+assert payload["provenance"]["authority_source"] == "user", \
+    f"apply: expected user authority on persisted state, got {payload['provenance']}"
+print("  PASS apply effect: all mutations (incl. object payload) applied; version=2; authority_source=user; untouched facts preserved")
+PYEOF
+
+# (2) Complete a Task whose effect.success_probability is below 1; assert the effect still applies.
+PROB_RESP="$(curl -sf -X POST "$DEMO_BASE/task/$PROB_TASK/action" \
+  -H "content-type: application/json" \
+  -d "{\"schema_version\":\"$ACT_SCHEMA\",\"action\":\"complete\"}")"
+echo "  probabilistic response: $PROB_RESP"
+python3 - "$PROB_RESP" "$DEMO_DB" "$EFFECT_UNIVERSE_ID" "$MODE_EFFECTS_FIXTURE" <<'PYEOF'
+import json, sqlite3, sys
+
+resp = json.loads(sys.argv[1])
+db, uid, fixture_path = sys.argv[2:5]
+demo = json.loads(open(fixture_path, encoding="utf-8").read())["effects_demo"]
+prob = demo["probabilistic_effect"]["success_probability"]
+expected = demo["expected_after_probabilistic"]
+assert prob < 1.0, f"probabilistic fixture must declare success_probability < 1, got {prob}"
+
+assert resp.get("task_status") == "completed", f"probabilistic: expected completed, got {resp}"
+codes = [d.get("code") for d in resp.get("diagnostics", [])]
+assert codes == [], f"probabilistic: unexpected effect diagnostics {codes}"
+
+con = sqlite3.connect(db)
+version, payload = con.execute(
+    "SELECT version, payload_json FROM objects WHERE id = ?", (uid,)
+).fetchone()
+payload = json.loads(payload)
+assert version == 3, f"probabilistic: expected persisted version 3, got {version}"
+assert payload["numeric_values"]["available_minutes"] == expected["numeric_values"]["available_minutes"], \
+    f"probabilistic: decrement not applied: {payload['numeric_values']}"
+assert payload["facts"]["ticket.phase"] == "verified", \
+    f"probabilistic: fact not applied: {payload['facts'].get('ticket.phase')}"
+print(f"  PASS probabilistic effect: success_probability={prob} (<1) still applied; version=3")
+PYEOF
+
+# (3) Transition to failed leaves UniverseState unchanged: completing a failed Task is rejected.
+SNAPSHOT_BEFORE="$(python3 - "$DEMO_DB" "$EFFECT_UNIVERSE_ID" <<'PYEOF'
+import json, sqlite3, sys
+db, uid = sys.argv[1:3]
+version, payload = sqlite3.connect(db).execute(
+    "SELECT version, payload_json FROM objects WHERE id = ?", (uid,)
+).fetchone()
+print(json.dumps({"version": version, "payload": json.loads(payload)}, separators=(",", ":")))
+PYEOF
+)"
+FAILED_HTTP="$(curl -s -o "$DEMO_TMPDIR/d16-failed-body.json" -w '%{http_code}' \
+  -X POST "$DEMO_BASE/task/$FAILED_TASK/action" \
+  -H "content-type: application/json" \
+  -d "{\"schema_version\":\"$ACT_SCHEMA\",\"action\":\"complete\"}")"
+echo "  failed-completion HTTP status: $FAILED_HTTP"
+python3 - "$FAILED_HTTP" "$DEMO_TMPDIR/d16-failed-body.json" "$DEMO_DB" "$EFFECT_UNIVERSE_ID" "$SNAPSHOT_BEFORE" <<'PYEOF'
+import json, sqlite3, sys
+
+http, body_path, db, uid, snapshot_json = sys.argv[1:6]
+assert http == "400", f"failed completion: expected HTTP 400, got {http}"
+body = json.loads(open(body_path, encoding="utf-8").read())
+codes = [d.get("code") for d in body.get("diagnostics", [])]
+assert "invalid_task_state" in codes, f"failed completion: expected invalid_task_state, got {body}"
+
+snapshot = json.loads(snapshot_json)
+version, payload = sqlite3.connect(db).execute(
+    "SELECT version, payload_json FROM objects WHERE id = ?", (uid,)
+).fetchone()
+payload = json.loads(payload)
+assert version == snapshot["version"], \
+    f"failed completion: version changed {snapshot['version']} -> {version}"
+assert payload == snapshot["payload"], "failed completion: UniverseState payload changed"
+assert payload["facts"]["ticket.status"] == "done", \
+    f"failed completion: status fact mutated to {payload['facts'].get('ticket.status')}"
+print("  PASS failed transition: completion rejected (invalid_task_state); UniverseState unchanged (version and payload identical)")
+PYEOF
+
+echo ""
 echo "PASS: bootstrap-to-act, gated projection, affect legitimization, Plan/Calendar/recalculation,"
 echo "      C-1 scoring/selection, fixed-duration O13, stochastic D12 rollout,"
 echo "      D13 risk/plan-quality report checks, D14 UniverseState semantics,"
-echo "      and D15 precondition-gated planning"
+echo "      D15 precondition-gated planning, and D16 effect application on completion"
+echo "      with intrinsic-affect mode rejection (UBU-D0242, Wiring-B)"
 echo "      verified store-backed on throwaway store"
 echo "  store=$DEMO_DB (ephemeral — removed on exit)"

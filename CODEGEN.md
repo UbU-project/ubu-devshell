@@ -53,8 +53,11 @@ The fixture smoke test (`scripts/run-fixture-demo.sh`) exercises the full
 **bootstrap-to-act loop**, the gated projection loop, and **Plan generation,
 the Compact Calendar, and override-safe recalculation** store-backed against a
 throwaway SQLite store. It also runs an offline `UniverseState` facts-container
-smoke over local `ubu-core`/`ubu-store` crates and an offline precondition-gated
-planning smoke over fixture-seeded `UniverseState` and Tasks:
+smoke over local `ubu-core`/`ubu-store` crates, an offline precondition-gated
+planning smoke over fixture-seeded `UniverseState` and Tasks, **effect
+application on Task completion** through the running orchestrator, and an offline
+**intrinsic-affect mode-rejection** smoke over the canonical `ubu-core`
+validators across all three instance modes:
 
 1. Token intake — `/desktop/session/github-token` (O5)
 2. Bootstrap/seed — `/bootstrap/seed` admits Objectives, Preferences, and Tasks (O5/O6)
@@ -104,6 +107,19 @@ planning smoke over fixture-seeded `UniverseState` and Tasks:
     blocked, and invalid partitions through `/planning/generate`, including
     no-precondition, satisfied, failed, malformed, and absent-target cases
     (`UBU-D0242`)
+18. D16 effect application on completion — completing a fixture-seeded Task with
+    `effects` through `/task/{id}/action` mutates the current `UniverseState`
+    (read back and deep-checked, including an object-valued fact payload); a Task
+    whose `effects.success_probability` is below 1 still applies on completion;
+    and a `failed` Task's completion is rejected (`invalid_task_state`) leaving
+    the `UniverseState` version and payload unchanged (`UBU-D0242`, Wiring-B)
+19. D16 intrinsic-affect mode rejection — an offline `ubu-core` smoke asserts that
+    `organization_mode` and `worker_mode` reject a precondition targeting an
+    intrinsic-affect key and an effect mutating one (both `invalid`), while
+    `user_mode` permits both, via the canonical `validate_precondition_for_mode`
+    and `validate_mutations_for_mode` validators (`UBU-D0242`, Wiring-B). The
+    running orchestrator is fixed to `user_mode` (`MVP_INSTANCE_MODE`), so the
+    organization/worker rejection is asserted directly against the validators.
 
 Governing decisions:
 - **O4**: MemoryState removed; `UBU_DB_PATH` throwaway store
@@ -133,7 +149,10 @@ Governing decisions:
 - **UBU-D0241**: `UniverseState` four-collection facts container, mutation
   applicator, and precondition evaluator
 - **UBU-D0242**: Task `preconditions` partition planning into eligible, blocked,
-  and invalid against `UniverseState`
+  and invalid against `UniverseState`; and (Wiring-B) completed Task `effects`
+  mutate the current `UniverseState` under the completing authority, while
+  intrinsic-affect targets are rejected in modes that do not model intrinsic
+  affect (`organization_mode`, `worker_mode`) and permitted in `user_mode`
 
 ## Standing Boundary Diagnostics
 

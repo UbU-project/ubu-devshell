@@ -1,5 +1,24 @@
 # Changelog
 
+## D16: Effect application on completion and intrinsic-affect mode rejection
+
+- Extended the fixture smoke test to assert effect application on Task completion
+  for `UBU-D0242` (Wiring-B): completing a Task with `effects` through
+  `/task/{id}/action` mutates the current `UniverseState` (read back and
+  deep-checked, including an object-valued fact payload); a Task whose
+  `effects.success_probability` is below 1 still applies; and a `failed` Task's
+  completion is rejected (`invalid_task_state`) leaving the `UniverseState`
+  version and payload unchanged.
+- Added an offline `ubu-core` mode-rejection smoke that asserts
+  `organization_mode` and `worker_mode` reject precondition and effect targets in
+  the intrinsic-affect namespace while `user_mode` permits them, across the
+  canonical `validate_precondition_for_mode`/`validate_mutations_for_mode`
+  validators (the running orchestrator is fixed to `user_mode`).
+- Added the `fixtures/demo/intrinsic-affect-mode-cases.json` fixture and
+  registered it in the demo manifest.
+- Updated recorded `R_orchestrator`, `R_schemas`, `R_core`, and `R_store` labels
+  for the post-O17/post-S17/post-C12/post-ST7 revs.
+
 ## D15: Precondition-gated planning fixture
 
 - Added an offline fixture smoke assertion for `UBU-D0242` that seeds a

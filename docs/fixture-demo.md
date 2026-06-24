@@ -15,9 +15,10 @@ The demo exercises the **full bootstrap-to-act loop**, the gated projection loop
 override-safe recalculation**, **C-1 bounded candidate scoring and composite
 selection**, the **D12 stochastic rollout integration slice**, the **D13
 derived risk and human-complete plan-quality reports**, the **D14 UniverseState
-facts container semantics**, and **D15 precondition-gated planning** store-backed
-against throwaway SQLite stores. No in-memory (MemoryState) path is exercised;
-all state flows through `ubu_store`.
+facts container semantics**, **D15 precondition-gated planning**, and **D16
+effect application on Task completion with intrinsic-affect mode rejection**
+store-backed against throwaway SQLite stores. No in-memory (MemoryState) path is
+exercised; all state flows through `ubu_store`.
 
 | Step | Endpoint | Governing decision |
 |------|----------|--------------------|
@@ -39,6 +40,8 @@ all state flows through `ubu_store`.
 | 14. Bounded candidate scoring, pruning, and selection | `POST /planning/generate`, `GET /calendar/current` | C-1, P7, P8, O12 |
 | 15. Stochastic rollout, re-rank, correlation effect, and `not_estimated` | `POST /planning/generate`, `GET /calendar/current` | D12, UBU-D0239, P10, O14 |
 | 16. Derived risk and plan-quality reports + blocking recalculation | `POST /planning/generate`, `GET /calendar/current` | D13, UBU-D0240, O15, S14 |
+| 17a. Intrinsic-affect mode rejection | local `ubu-core` validators (offline) | D16, UBU-D0242 (Wiring-B) |
+| 17b. Effect application on completion | `POST /task/{id}/action` | D16, UBU-D0242 (Wiring-B) |
 
 ### Assertions
 
@@ -138,6 +141,27 @@ all state flows through `ubu_store`.
     that a failed precondition is excluded and surfaced in `blocked_tasks`; and
     that a malformed precondition is excluded and surfaced separately in
     `invalid_tasks`, with distinct diagnostics (`UBU-D0242`).
+19. The intrinsic-affect/effects fixture
+    (`fixtures/demo/intrinsic-affect-mode-cases.json`) drives two D16 checks
+    (`UBU-D0242`, Wiring-B). An offline `ubu-core` smoke (17a) asserts that
+    `organization_mode` and `worker_mode` reject a precondition targeting an
+    intrinsic-affect key and an effect mutating one — each surfaced as the
+    `IntrinsicAffectForbidden` error on the expected target — while `user_mode`
+    permits both, and that non-affect targets pass in every mode. The running
+    orchestrator is fixed to `user_mode` (`MVP_INSTANCE_MODE`), so the
+    organization/worker rejection is asserted directly against the canonical
+    `validate_precondition_for_mode`/`validate_mutations_for_mode` validators.
+20. The same fixture seeds a current `UniverseState` and three Tasks with
+    `effects` into the throwaway store, then drives completion through
+    `/task/{id}/action` (17b). Completing a Task with effects applies every
+    mutation to the current `UniverseState` — read back and deep-checked,
+    including an object-valued fact payload, a numeric increment, a membership
+    add, and an event-marker append — persisting a new version under `user`
+    authority while leaving untouched facts intact. Completing a Task whose
+    `effects.success_probability` is below 1 still applies its mutations
+    (`success_probability` is planning metadata, not a gate). Completing a Task
+    that is already `failed` is rejected with `invalid_task_state`, and the
+    `UniverseState` version and payload are unchanged (`UBU-D0242`, Wiring-B).
 
 ## D12 request-contract boundary
 
@@ -188,6 +212,7 @@ No real or user store is ever touched.
 - `fixtures/demo/risk-plan-quality-cases.json`
 - `fixtures/demo/universe-state-semantics.json`
 - `fixtures/demo/precondition-planning-cases.json`
+- `fixtures/demo/intrinsic-affect-mode-cases.json`
 
 These fixtures are validated at startup (checked for existence and parseability). The
 bootstrap/seed step uses `"UbU-project/ubu-design"` as the fixture repo; its single Task
@@ -233,4 +258,4 @@ retires those fixture Tasks before the bootstrap-to-act loop continues.
 | **UBU-D0230** | Policy-summary guardrails (`local_only`, `no_cloud_llm`, `no_external_export`) and `compartment_boundary_decided` Log vocabulary |
 | **UBU-D0240** | Derived risk findings and human-complete plan-quality signals; blocking findings request recalculation and mark the admitted Calendar stale |
 | **UBU-D0241** | `UniverseState` four-collection facts container, mutation applicator, and precondition evaluator |
-| **UBU-D0242** | Task `preconditions` partition planning into eligible, blocked, and invalid against `UniverseState` |
+| **UBU-D0242** | Task `preconditions` partition planning into eligible, blocked, and invalid against `UniverseState`; and (Wiring-B) completed Task `effects` mutate the current `UniverseState` under the completing authority, with intrinsic-affect targets rejected in `organization_mode`/`worker_mode` and permitted in `user_mode` |

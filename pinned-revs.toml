@@ -14,10 +14,10 @@
 # show-revs.sh compares these against local checkout HEADs.
 
 [pinned]
-ubu_schemas         = "2cd5b48143599ce4f73b95c0fbc044bbcc46795c"  # R_schemas (post-S16 Task preconditions)
-ubu_core            = "22445a2e0702291b845e325257f4fb151ba648cf"  # R_core (post-C10 Task preconditions)
-ubu_store           = "e1b1bc5e3adddd27a2f138efab9a4c5701d8ad1c"  # R_store (post-ST6 UniverseState admission)
+ubu_schemas         = "bb10953dd7e51ae658d3b453ee1734b6d0578628"  # R_schemas (post-S17 intrinsic-affect mode schema)
+ubu_core            = "2444b76e8eed75040e5a5791d1dce2579f0fe006"  # R_core (post-C12 InstanceMode validators + TaskEffect)
+ubu_store           = "2132c22fc05b163fdb3d8963a07a704b4b42c62f"  # R_store (post-ST7 persist_universe_state)
 ubu_planning_kernel = "62c6d7a2f71078d141f7a4b9c91bd78193ee3314"  # R_planning (post-P9_fix/P10 regeneration)
 ubu_github_adapter  = "d71a169a889a4c0343b9c1970a2afe8db3c60a17"  # R_adapter
-ubu_orchestrator    = "96347c4bb11b0ca0a889cf99ddd6ad109008253f"  # R_orchestrator (post-O16 precondition partitioning)
+ubu_orchestrator    = "c2e7148b93e22363c712cc684cd17392d5043c6a"  # R_orchestrator (post-O17 effects-on-completion + mode wiring)
 ubu_ui              = "7c1007eb2131dae7dd4997b8054a924974eb5086"  # R_ui (post-U15 risk and plan-quality views)

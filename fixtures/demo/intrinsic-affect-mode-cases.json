@@ -1,0 +1,98 @@
+{
+  "decision": "UBU-D0242",
+  "wiring": "Wiring-B",
+  "description": "D16 fixture: effect application on Task completion (live, store-backed, user_mode) and intrinsic-affect mode rejection (offline ubu-core validators across all three instance modes). Fake data; public-safe.",
+  "modes": {
+    "permissive": ["user_mode"],
+    "rejecting": ["organization_mode", "worker_mode"]
+  },
+  "mode_rejection": {
+    "expected_precondition_target": "numeric_values.affect.energy",
+    "expected_mutation_target": "facts.affect.recent_state",
+    "intrinsic_affect_precondition": {
+      "all_of": [
+        { "target": "facts.ticket.status", "predicate": "equals", "expected": "ready" },
+        { "target": "numeric_values.affect.energy", "predicate": "equals", "expected": 5.0 }
+      ]
+    },
+    "intrinsic_affect_mutations": [
+      { "operation": "set_fact", "target": "facts.affect.recent_state", "payload": "calm" }
+    ],
+    "non_affect_precondition": {
+      "all_of": [
+        { "target": "facts.ticket.status", "predicate": "equals", "expected": "ready" },
+        { "target": "numeric_values.available_minutes", "predicate": "equals", "expected": 60.0 }
+      ]
+    },
+    "non_affect_mutations": [
+      { "operation": "set_fact", "target": "facts.ticket.status", "payload": "ready" }
+    ]
+  },
+  "effects_demo": {
+    "ids": {
+      "universe_state": "ustate_00000000d16170008000000000000000",
+      "apply_task": "task_00000000d16170008000000000000001",
+      "probabilistic_task": "task_00000000d16170008000000000000002",
+      "failed_task": "task_00000000d16170008000000000000003"
+    },
+    "universe_state": {
+      "schema_version": "core/universe-state/0.1",
+      "captured_at": "2026-06-24T23:45:00Z",
+      "facts": {
+        "ticket.status": "open",
+        "ticket.owner": "fixture-user"
+      },
+      "numeric_values": {
+        "available_minutes": 60.0
+      },
+      "set_memberships": {
+        "labels": ["todo"]
+      },
+      "event_markers": {},
+      "source_summary": "D16 effect-application fixture smoke",
+      "confidence_summary": "designed fixture"
+    },
+    "apply_effect": {
+      "success_probability": 1.0,
+      "mutations": [
+        { "operation": "set_fact", "target": "facts.ticket.status", "payload": "done" },
+        { "operation": "set_fact", "target": "facts.ticket.result", "payload": { "merged": true, "pr_number": 42 } },
+        { "operation": "increment_numeric", "target": "numeric_values.available_minutes", "payload": 30 },
+        { "operation": "add_membership", "target": "set_memberships.labels", "payload": "reviewed" },
+        { "operation": "append_event_marker", "target": "event_markers.completions", "payload": { "task": "apply", "source": "fixture-d16" } }
+      ]
+    },
+    "probabilistic_effect": {
+      "success_probability": 0.3,
+      "mutations": [
+        { "operation": "decrement_numeric", "target": "numeric_values.available_minutes", "payload": 15 },
+        { "operation": "set_fact", "target": "facts.ticket.phase", "payload": "verified" }
+      ]
+    },
+    "failed_effect": {
+      "success_probability": 1.0,
+      "mutations": [
+        { "operation": "set_fact", "target": "facts.ticket.status", "payload": "wrongly_applied" }
+      ]
+    },
+    "expected_after_apply": {
+      "facts": {
+        "ticket.status": "done",
+        "ticket.owner": "fixture-user",
+        "ticket.result": { "merged": true, "pr_number": 42 }
+      },
+      "numeric_values": { "available_minutes": 90.0 },
+      "set_memberships": { "labels": ["reviewed", "todo"] },
+      "event_markers": { "completions": [{ "task": "apply", "source": "fixture-d16" }] }
+    },
+    "expected_after_probabilistic": {
+      "facts": {
+        "ticket.status": "done",
+        "ticket.owner": "fixture-user",
+        "ticket.phase": "verified",
+        "ticket.result": { "merged": true, "pr_number": 42 }
+      },
+      "numeric_values": { "available_minutes": 75.0 }
+    }
+  }
+}
