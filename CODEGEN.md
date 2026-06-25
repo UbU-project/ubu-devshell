@@ -57,63 +57,76 @@ smoke over local `ubu-core`/`ubu-store` crates, an offline precondition-gated
 planning smoke over fixture-seeded `UniverseState` and Tasks, **effect
 application on Task completion** through the running orchestrator, and an offline
 **intrinsic-affect mode-rejection** smoke over the canonical `ubu-core`
-validators across all three instance modes:
+validators across all three instance modes. It also asserts the D17
+bootstrap-seeded fact loop: `/bootstrap/seed` records the mapped `UniverseState`
+facts and numeric horizon from **UBU-D0243**, then `/planning/generate` and
+`/task/{id}/action` consume those bootstrap facts through `preconditions` and
+`effects` as governed by **UBU-D0242**:
 
 1. Token intake — `/desktop/session/github-token` (O5)
 2. Bootstrap/seed — `/bootstrap/seed` admits Objectives, Preferences, and Tasks (O5/O6)
-3. `next_action` — asserts a ready Task with a non-empty readiness explanation (O6)
-4. Action recording — `/task/{id}/action` with `complete`; asserts `task_status=completed`
+3. Bootstrap fact recording — reads back the admitted `UniverseState` and asserts
+   exactly the four mapped facts, one numeric planning-horizon value, and empty
+   `set_memberships`/`event_markers` (`UBU-D0243`)
+4. Bootstrap self-sustaining loop — fixture Tasks whose preconditions reference
+   bootstrap facts partition into eligible and blocked through `/planning/generate`;
+   completing an effectful Task mutates a bootstrap-seeded fact and the mutation is
+   read back from the current `UniverseState` (`UBU-D0242`, `UBU-D0243`)
+5. Re-seed guard — a second `/bootstrap/seed` is rejected with
+   `bootstrap_already_seeded`
+6. `next_action` — asserts a ready Task with a non-empty readiness explanation (O6)
+7. Action recording — `/task/{id}/action` with `complete`; asserts `task_status=completed`
    and an append-only Log event admitted (O6)
-5. `next_action` again — asserts the bounded empty/blocked diagnostic (UBU-D0210, O6)
-6. Projection preview and approval — `/projection/preview` then `/projection/approve`;
+8. `next_action` again — asserts the bounded empty/blocked diagnostic (UBU-D0210, O6)
+9. Projection preview and approval — `/projection/preview` then `/projection/approve`;
    asserts an applied `projection_result`, a mock managed-label write, and a
    `compartment_boundary_decided` Log entry (O7, UBU-D0226, UBU-D0230)
-7. Projection reconciliation — `/projection/reconcile`; asserts `missing` or `drifted`
+10. Projection reconciliation — `/projection/reconcile`; asserts `missing` or `drifted`
    plus a surfaced conflict and no silent overwrite (O7)
-8. Projection deny path — approved preview with `no_external_export`; asserts no mock
+11. Projection deny path — approved preview with `no_external_export`; asserts no mock
    `github-label-write`, rejected legitimization, and a denial Log entry (O7, UBU-D0230)
-9. Plan import — `/github/import/fixture` admits multiple active Tasks from an offline
+12. Plan import — `/github/import/fixture` admits multiple active Tasks from an offline
    fixture (`fixtures/demo/planning-candidates.json`) (S9/P3)
-10. Canonical timed Plan + Compact Calendar — seeds a Compact Calendar window in the
+13. Canonical timed Plan + Compact Calendar — seeds a Compact Calendar window in the
     throwaway store, then `/planning/generate` produces a canonical timed Plan and
     asserts every placement is inside the Calendar window and non-overlapping;
     `/calendar/current` serves the same timed steps (S9/P3/P4/O9)
-11. Recalculation — completes a Task, then `/planning/recalculate` with
+14. Recalculation — completes a Task, then `/planning/recalculate` with
     `task_completed`; asserts a repair-mode Plan that supersedes the prior Plan
     (`supersedes_plan_id` set, prior persisted as `superseded`) and that the completed
     Task is **not re-placed** (UBU-D0227 lifecycle freeze; S9/P3/P4/O9)
-12. Override-safety — applies a `user_override` placement via `/task/{id}/action`, fires
+15. Override-safety — applies a `user_override` placement via `/task/{id}/action`, fires
     a second recalculation, and asserts the override placement **survives unchanged and
     is not clobbered** (S9/P3/P4/O9)
-13. C-1 scoring and selection — fixed-seed offline fixtures assert two-to-sixteen scored
+16. C-1 scoring and selection — fixed-seed offline fixtures assert two-to-sixteen scored
     candidates with `score_summary` and `candidate_role`, descending `total_score`
     ranking, different utility-heavy and schedule-diversity-heavy winners, rank-1
     Compact Calendar selection, and `reject_obvious` pruning before scoring
     (C-1/P7/P8/O12)
-14. D12 stochastic rollout — `shifted_lognormal_p95` request fixtures assert full
+17. D12 stochastic rollout — `shifted_lognormal_p95` request fixtures assert full
     Wilson probability intervals, p10 robustness, fixed-seed reproducibility, a
     rollout-grounded re-rank with all sixteen candidates retained, correlated-versus-
     independent probability change, and the zero-rollout `not_estimated` C-1 proxy
     (`UBU-D0239`, P10, O14)
-15. D13 derived reports — designed offline fixtures assert deadline, affect-margin,
+18. D13 derived reports — designed offline fixtures assert deadline, affect-margin,
     destructive-pressure, and recommendation-path skeleton findings; bounded
     human-complete plan-quality signals; model-cause-only failure patterns; and the
     blocking-risk Calendar staleness/recalculation path (`UBU-D0240`, O15, S14)
-16. D14 UniverseState semantics — designed offline fixtures admit and read back a
+19. D14 UniverseState semantics — designed offline fixtures admit and read back a
     four-collection `UniverseState`, apply all seven mutation operations, reject an
     invalid mutation list without partial application, and evaluate preconditions
     over `equals`, `member_of`, and `absent` (`UBU-D0241`)
-17. D15 precondition-gated planning — fixture-seeded Tasks assert the eligible,
+20. D15 precondition-gated planning — fixture-seeded Tasks assert the eligible,
     blocked, and invalid partitions through `/planning/generate`, including
     no-precondition, satisfied, failed, malformed, and absent-target cases
     (`UBU-D0242`)
-18. D16 effect application on completion — completing a fixture-seeded Task with
+21. D16 effect application on completion — completing a fixture-seeded Task with
     `effects` through `/task/{id}/action` mutates the current `UniverseState`
     (read back and deep-checked, including an object-valued fact payload); a Task
     whose `effects.success_probability` is below 1 still applies on completion;
     and a `failed` Task's completion is rejected (`invalid_task_state`) leaving
     the `UniverseState` version and payload unchanged (`UBU-D0242`, Wiring-B)
-19. D16 intrinsic-affect mode rejection — an offline `ubu-core` smoke asserts that
+22. D16 intrinsic-affect mode rejection — an offline `ubu-core` smoke asserts that
     `organization_mode` and `worker_mode` reject a precondition targeting an
     intrinsic-affect key and an effect mutating one (both `invalid`), while
     `user_mode` permits both, via the canonical `validate_precondition_for_mode`
@@ -153,6 +166,8 @@ Governing decisions:
   mutate the current `UniverseState` under the completing authority, while
   intrinsic-affect targets are rejected in modes that do not model intrinsic
   affect (`organization_mode`, `worker_mode`) and permitted in `user_mode`
+- **UBU-D0243**: bootstrap answer mapping into initial `UniverseState` facts and
+  numeric values
 
 ## Standing Boundary Diagnostics
 

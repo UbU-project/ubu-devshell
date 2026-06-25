@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Fixture smoke test: exercises the full bootstrap-to-act loop, the gated
-# projection loop, canonical Plan generation / Compact Calendar /
+# Fixture smoke test: exercises the full bootstrap-to-act loop, bootstrap-seeded
+# UniverseState fact recording, the self-sustaining precondition/effects loop,
+# the gated projection loop, canonical Plan generation / Compact Calendar /
 # override-safe recalculation, precondition-gated planning, and affect legitimization against the
 # store-backed orchestrator (O5: token
 # intake and bootstrap/seed; O6: readiness next_action with explanation, action
@@ -33,6 +34,9 @@
 #   D16/UBU-D0242: completed Task effects mutate the current UniverseState
 #               (Wiring-B); organization/worker mode reject intrinsic-affect
 #               targets while user_mode permits them
+#   D17/UBU-D0242/UBU-D0243: bootstrap admits the mapped UniverseState facts;
+#               planning preconditions and completion effects then run against
+#               those bootstrap-seeded facts
 #   UBU-D0226: authority_source remains the authority-path enum
 #   UBU-D0227: persisted Task.status lifecycle (active/completed/failed/moot)
 #              drives which Tasks are frozen and not re-placed on recalculation
@@ -127,6 +131,7 @@ echo "  D13/UBU-D0240: derived risk and plan-quality reports with blocking recal
 echo "  D14/UBU-D0241: UniverseState facts container round-trip and semantics"
 echo "  D15/UBU-D0242: precondition-gated planning partitions eligible/blocked/invalid Tasks"
 echo "  D16/UBU-D0242: effect application on completion (Wiring-B) and intrinsic-affect mode rejection"
+echo "  D17/UBU-D0242/UBU-D0243: bootstrap fact recording and self-sustaining precondition/effects loop"
 echo "orchestrator: $ORCHESTRATOR_DIR"
 echo "core:         $CORE_DIR"
 echo "store:        $STORE_DIR"
@@ -773,17 +778,290 @@ import json, sys
 d = json.loads(sys.argv[1])
 obj_ids  = d.get("objective_ids", [])
 pref_ids = d.get("preference_ids", [])
+universe_state_id = d.get("universe_state_id", "")
 imported = d.get("imported_tasks", {})
 admitted = imported.get("admitted_to_store", 0)
 assert len(obj_ids) >= 1, \
     f"seed: expected objective_ids non-empty, got: {d}"
 assert len(pref_ids) >= 1, \
     f"seed: expected preference_ids non-empty, got: {d}"
+assert universe_state_id.startswith("ustate_"), \
+    f"seed: expected canonical universe_state_id, got: {d}"
 assert admitted >= 1, \
     f"seed: expected imported_tasks.admitted_to_store >= 1, got: {d}"
 print(f"  seed: objective_ids={obj_ids}")
 print(f"  seed: preference_ids={pref_ids}")
+print(f"  seed: universe_state_id={universe_state_id}")
 print(f"  seed: imported_tasks.admitted_to_store={admitted}")
+PYEOF
+
+echo ""
+echo "Step 2b: bootstrap UniverseState facts (D17/UBU-D0243) — deep-check mapped entries"
+BOOTSTRAP_UNIVERSE_ID="$(python3 - "$SEED_RESP" <<'PYEOF'
+import json, sys
+print(json.loads(sys.argv[1])["universe_state_id"])
+PYEOF
+)"
+python3 - "$DEMO_DB" "$BOOTSTRAP_UNIVERSE_ID" <<'PYEOF'
+import json, sqlite3, sys
+
+db, universe_state_id = sys.argv[1:3]
+expected_facts = {
+    "facts.operator.work_style": "balanced",
+    "facts.operator.attention_preference": "mixed",
+    "facts.project.repository": "UbU-project/ubu-design",
+    "facts.project.objective": "Build and ship Phase 1 of UbU (fixture demo)",
+}
+expected_numeric = {
+    "numeric_values.operator.planning_horizon_days": 7.0,
+}
+
+con = sqlite3.connect(db)
+row = con.execute(
+    """
+    SELECT id, version, status, compartment_label, payload_json
+    FROM objects
+    WHERE id = ? AND object_type = 'UniverseState'
+    """,
+    (universe_state_id,),
+).fetchone()
+assert row is not None, f"bootstrap UniverseState not found: {universe_state_id}"
+id_, version, status, compartment_label, payload_json = row
+payload = json.loads(payload_json)
+assert id_ == universe_state_id and payload["id"] == universe_state_id, payload
+assert version == 1, f"bootstrap UniverseState starts at version 1, got {version}"
+assert status == "active", f"bootstrap UniverseState status={status}"
+assert compartment_label == "bootstrap", f"bootstrap UniverseState compartment={compartment_label}"
+assert payload["schema_version"] == "core/universe-state/0.1", payload
+assert payload["provenance"]["authority_source"] == "user", payload
+assert payload["provenance"]["source"]["source_kind"] == "bootstrap", payload
+assert payload["facts"] == expected_facts, (
+    f"bootstrap facts mismatch:\nexpected={expected_facts}\nactual={payload['facts']}"
+)
+assert payload["numeric_values"] == expected_numeric, (
+    f"bootstrap numeric_values mismatch:\nexpected={expected_numeric}\nactual={payload['numeric_values']}"
+)
+assert payload["set_memberships"] == {}, payload
+assert payload["event_markers"] == {}, payload
+print("  PASS bootstrap UniverseState: exactly 4 facts, 1 numeric value, empty set_memberships/event_markers")
+PYEOF
+
+echo ""
+echo "Step 2c: re-seed guard (O18/D17) — second bootstrap seed is rejected"
+RESEED_STATUS_AND_BODY="$(curl -sS -X POST "$DEMO_BASE/bootstrap/seed" \
+  -H "content-type: application/json" \
+  -w '\n%{http_code}' \
+  -d '{
+    "schema_version": "ubu.orchestrator.bootstrap.v1",
+    "selected_repo": {"owner": "UbU-project", "repo": "ubu-design"},
+    "answers": {
+      "primary_objective": "Build and ship Phase 1 of UbU (fixture demo)",
+      "work_style": "balanced",
+      "planning_horizon_days": 7,
+      "attention_preference": "mixed"
+    }
+  }')"
+RESEED_BODY="$(printf '%s\n' "$RESEED_STATUS_AND_BODY" | sed '$d')"
+RESEED_STATUS="$(printf '%s\n' "$RESEED_STATUS_AND_BODY" | tail -n 1)"
+echo "  response status: $RESEED_STATUS"
+echo "  response body: $RESEED_BODY"
+python3 - "$RESEED_STATUS" "$RESEED_BODY" "$DEMO_DB" <<'PYEOF'
+import json, sqlite3, sys
+
+status, body_json, db = sys.argv[1:4]
+body = json.loads(body_json)
+assert status == "409", f"re-seed: expected HTTP 409, got {status}: {body}"
+assert body["diagnostics"][0]["code"] == "bootstrap_already_seeded", body
+con = sqlite3.connect(db)
+count = con.execute(
+    """
+    SELECT COUNT(*)
+    FROM objects
+    WHERE object_type IN ('Objective', 'Preference', 'UniverseState')
+      AND payload_json LIKE '%"source_kind":"bootstrap"%'
+    """
+).fetchone()[0]
+assert count == 5, f"re-seed guard: expected 5 bootstrap objects, got {count}"
+print("  PASS re-seed guard: rejected consistently and did not duplicate bootstrap objects")
+PYEOF
+
+echo ""
+echo "Step 2d: self-sustaining loop from bootstrap facts (D17/UBU-D0242/UBU-D0243)"
+echo "  seeding Tasks whose preconditions/effects reference bootstrap-seeded UniverseState facts"
+python3 - "$DEMO_DB" <<'PYEOF'
+import json, sqlite3, sys
+
+db = sys.argv[1]
+con = sqlite3.connect(db)
+now = "2026-06-24T14:00:00Z"
+tasks = [
+    {
+        "id": "task_00000000020170008000000000000000",
+        "title": "D17 eligible bootstrap repository precondition",
+        "duration_minutes": 10,
+        "preconditions": {
+            "target": "facts.facts.project.repository",
+            "predicate": "equals",
+            "expected": "UbU-project/ubu-design",
+        },
+    },
+    {
+        "id": "task_00000000020270008000000000000000",
+        "title": "D17 blocked bootstrap repository precondition",
+        "duration_minutes": 10,
+        "preconditions": {
+            "target": "facts.facts.project.repository",
+            "predicate": "equals",
+            "expected": "UbU-project/ubu-orchestrator",
+        },
+    },
+    {
+        "id": "task_00000000020370008000000000000000",
+        "title": "D17 mutate bootstrap work style",
+        "duration_minutes": 10,
+        "preconditions": {
+            "target": "facts.facts.operator.work_style",
+            "predicate": "equals",
+            "expected": "balanced",
+        },
+        "effects": {
+            "mutations": [
+                {
+                    "operation": "set_fact",
+                    "target": "facts.facts.operator.work_style",
+                    "payload": "responsive",
+                }
+            ]
+        },
+    },
+]
+for task in tasks:
+    payload = {
+        "id": task["id"],
+        "title": task["title"],
+        "status": "active",
+        "duration_minutes": task["duration_minutes"],
+        "preconditions": task["preconditions"],
+        "provenance": {
+            "created_at": now,
+            "authority_source": "user",
+            "source": {
+                "source_kind": "fixture_demo",
+                "source_id": "d17-bootstrap-loop",
+            },
+        },
+    }
+    if "effects" in task:
+        payload["effects"] = task["effects"]
+    con.execute(
+        """
+        INSERT INTO objects
+          (id, object_type, version, status, compartment_label, payload_json, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            task["id"],
+            "Task",
+            1,
+            "active",
+            "fixture-demo-d17",
+            json.dumps(payload, separators=(",", ":")),
+            now,
+            now,
+        ),
+    )
+con.commit()
+print("  seeded D17 eligible, blocked, and effectful Tasks")
+PYEOF
+D17_PLAN_RESP="$(curl -sf -X POST "$DEMO_BASE/planning/generate" \
+  -H "content-type: application/json" \
+  -d "{\"schema_version\":\"planning-kernel-contract/0.1\",\"request_id\":\"fixture-d17-bootstrap-facts\"}")"
+echo "  plan response: $D17_PLAN_RESP"
+python3 - "$D17_PLAN_RESP" <<'PYEOF'
+import json, sys
+
+resp = json.loads(sys.argv[1])
+eligible_id = "task_00000000020170008000000000000000"
+blocked_id = "task_00000000020270008000000000000000"
+effect_id = "task_00000000020370008000000000000000"
+plan = resp.get("plan")
+assert plan is not None, f"D17 precondition planning expected a Plan, got: {resp}"
+planned_ids = {step["task_id"] for step in plan.get("steps", [])}
+assert eligible_id in planned_ids, f"D17 eligible bootstrap-fact Task missing from plan: {planned_ids}"
+assert effect_id in planned_ids, f"D17 effectful bootstrap-fact Task missing from plan: {planned_ids}"
+assert blocked_id not in planned_ids, f"D17 blocked bootstrap-fact Task appeared in plan: {planned_ids}"
+blocked = {item["task_id"]: item for item in resp.get("blocked_tasks", [])}
+assert blocked_id in blocked, f"D17 blocked bootstrap-fact Task missing from blocked_tasks: {resp}"
+assert blocked[blocked_id]["precondition"]["target"] == "facts.facts.project.repository", blocked
+assert not any(item.get("task_id") in {eligible_id, effect_id} for item in resp.get("invalid_tasks", [])), resp
+assert any(d.get("code") == "task_precondition_blocked" for d in resp.get("diagnostics", [])), resp
+print("  PASS D17 planning: bootstrap-fact preconditions partition eligible and blocked Tasks")
+print(plan["id"])
+PYEOF
+D17_PLAN_ID="$(python3 - "$D17_PLAN_RESP" <<'PYEOF'
+import json, sys
+print(json.loads(sys.argv[1])["plan"]["id"])
+PYEOF
+)"
+ACT_SCHEMA="ubu.orchestrator.task_action.v1"
+D17_EFFECT_TASK="task_00000000020370008000000000000000"
+D17_EFFECT_RESP="$(curl -sf -X POST "$DEMO_BASE/task/$D17_EFFECT_TASK/action" \
+  -H "content-type: application/json" \
+  -d "{\"schema_version\":\"$ACT_SCHEMA\",\"action\":\"complete\"}")"
+echo "  effect action response: $D17_EFFECT_RESP"
+python3 - "$D17_EFFECT_RESP" "$D17_EFFECT_TASK" <<'PYEOF'
+import json, sys
+d = json.loads(sys.argv[1])
+assert d["task_id"] == sys.argv[2], d
+assert d["task_status"] == "completed", d
+assert d["transition_applied"] is True, d
+assert d.get("diagnostics", []) == [], d
+print("  PASS D17 effect action: completion accepted without diagnostics")
+PYEOF
+python3 - "$DEMO_DB" "$BOOTSTRAP_UNIVERSE_ID" "$D17_PLAN_ID" <<'PYEOF'
+import json, sqlite3, sys
+
+db, universe_state_id, plan_id = sys.argv[1:4]
+con = sqlite3.connect(db)
+row = con.execute(
+    "SELECT version, payload_json FROM objects WHERE id = ?",
+    (universe_state_id,),
+).fetchone()
+assert row is not None, f"D17 UniverseState missing after effect: {universe_state_id}"
+version, payload_json = row
+payload = json.loads(payload_json)
+assert version == 2, f"D17 effect should persist a new UniverseState version, got {version}"
+assert payload["facts"]["facts.operator.work_style"] == "responsive", payload["facts"]
+assert payload["facts"]["facts.project.repository"] == "UbU-project/ubu-design", payload["facts"]
+assert payload["numeric_values"] == {"numeric_values.operator.planning_horizon_days": 7.0}, payload
+assert payload.get("set_memberships", {}) == {}, payload
+assert payload.get("event_markers", {}) == {}, payload
+assert payload["provenance"]["authority_source"] == "user", payload["provenance"]
+con.execute(
+    "UPDATE objects SET updated_at = '2026-06-24T14:05:00Z' WHERE id = ?",
+    (universe_state_id,),
+)
+
+for task_id in (
+    "task_00000000020170008000000000000000",
+    "task_00000000020270008000000000000000",
+    "task_00000000020370008000000000000000",
+):
+    con.execute(
+        "UPDATE objects SET status = 'completed', updated_at = '2026-06-24T14:05:00Z' WHERE id = ?",
+        (task_id,),
+    )
+row = con.execute("SELECT payload_json FROM plans WHERE id = ?", (plan_id,)).fetchone()
+assert row is not None, f"D17 Plan not found for cleanup: {plan_id}"
+plan_payload = json.loads(row[0])
+plan_payload["status"] = "superseded"
+con.execute(
+    "UPDATE plans SET status = 'superseded', payload_json = ? WHERE id = ?",
+    (json.dumps(plan_payload, separators=(",", ":")), plan_id),
+)
+con.commit()
+print("  PASS D17 effect: bootstrap-seeded fact mutated and unrelated mapped entries preserved")
+print("  retired D17 fixture Tasks and superseded its temporary Plan before next_action")
 PYEOF
 
 echo ""
@@ -814,7 +1092,6 @@ PYEOF
 
 echo ""
 echo "Step 4: action recording (O6) — record complete, assert completed + Log event admitted"
-ACT_SCHEMA="ubu.orchestrator.task_action.v1"
 ACT_RESP="$(curl -sf -X POST "$DEMO_BASE/task/$TASK_ID/action" \
   -H "content-type: application/json" \
   -d "{\"schema_version\":\"$ACT_SCHEMA\",\"action\":\"complete\"}")"
@@ -2437,7 +2714,8 @@ echo ""
 echo "PASS: bootstrap-to-act, gated projection, affect legitimization, Plan/Calendar/recalculation,"
 echo "      C-1 scoring/selection, fixed-duration O13, stochastic D12 rollout,"
 echo "      D13 risk/plan-quality report checks, D14 UniverseState semantics,"
-echo "      D15 precondition-gated planning, and D16 effect application on completion"
-echo "      with intrinsic-affect mode rejection (UBU-D0242, Wiring-B)"
+echo "      D15 precondition-gated planning, D16 effect application on completion"
+echo "      with intrinsic-affect mode rejection, and D17 bootstrap fact recording"
+echo "      plus the self-sustaining loop from bootstrap facts (UBU-D0242/UBU-D0243)"
 echo "      verified store-backed on throwaway store"
 echo "  store=$DEMO_DB (ephemeral — removed on exit)"

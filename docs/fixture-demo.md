@@ -16,9 +16,12 @@ override-safe recalculation**, **C-1 bounded candidate scoring and composite
 selection**, the **D12 stochastic rollout integration slice**, the **D13
 derived risk and human-complete plan-quality reports**, the **D14 UniverseState
 facts container semantics**, **D15 precondition-gated planning**, and **D16
-effect application on Task completion with intrinsic-affect mode rejection**
-store-backed against throwaway SQLite stores. No in-memory (MemoryState) path is
-exercised; all state flows through `ubu_store`.
+effect application on Task completion with intrinsic-affect mode rejection**.
+It now also asserts **D17 bootstrap fact-recording and the self-sustaining
+precondition/effects loop**: bootstrap admits the mapped `UniverseState` facts
+from `UBU-D0243`, and planning/effects then consume those facts per
+`UBU-D0242`. The demo is store-backed against throwaway SQLite stores. No
+in-memory (MemoryState) path is exercised; all state flows through `ubu_store`.
 
 | Step | Endpoint | Governing decision |
 |------|----------|--------------------|
@@ -26,6 +29,9 @@ exercised; all state flows through `ubu_store`.
 | 0b. Precondition-gated planning | `POST /planning/generate` | D15, UBU-D0242 |
 | 1. Token intake | `POST /desktop/session/github-token` | O5 |
 | 2. Bootstrap/seed | `POST /bootstrap/seed` | O5, O6 |
+| 2b. Bootstrap UniverseState facts | direct throwaway-store read | D17, UBU-D0243 |
+| 2c. Re-seed guard | `POST /bootstrap/seed` | D17 |
+| 2d. Self-sustaining loop from bootstrap facts | `POST /planning/generate`, `POST /task/{id}/action` | D17, UBU-D0242, UBU-D0243 |
 | 3. next_action (ready) | `GET /next-action?schema_version=…` | O6 |
 | 4. Action recording | `POST /task/{id}/action` | O6 |
 | 5. next_action (bounded diagnostic) | `GET /next-action?schema_version=…` | O6, UBU-D0210 |
@@ -46,28 +52,43 @@ exercised; all state flows through `ubu_store`.
 ### Assertions
 
 1. Token intake returns `accepted=true` and `token_available=true`.
-2. Bootstrap/seed admits at least one Objective, at least one Preference, and at least
-   one Task (`imported_tasks.admitted_to_store >= 1`).
-3. First `next_action` returns a recommendation with `readiness=ready` and a non-empty
+2. Bootstrap/seed admits at least one Objective, at least one Preference, one
+   canonical `UniverseState`, and at least one Task
+   (`imported_tasks.admitted_to_store >= 1`).
+3. The bootstrap-admitted `UniverseState` is read back from the throwaway store and
+   deep-checked against the `UBU-D0243` mapping: exactly four `facts`
+   (`facts.operator.work_style`, `facts.operator.attention_preference`,
+   `facts.project.repository`, `facts.project.objective`), exactly one
+   `numeric_values.operator.planning_horizon_days` entry, and empty
+   `set_memberships` and `event_markers`.
+4. A second `/bootstrap/seed` call is rejected with `bootstrap_already_seeded` and
+   no duplicate bootstrap Objective, Preference, or `UniverseState` rows.
+5. The D17 loop seeds Tasks whose preconditions reference bootstrap facts, posts to
+   `/planning/generate`, and asserts the satisfied precondition is eligible while
+   the unsatisfied repository precondition is surfaced in `blocked_tasks`. It then
+   completes an effectful Task whose mutation targets a bootstrap-seeded fact and
+   reads the `UniverseState` back to confirm the fact changed while the other mapped
+   entries were preserved (`UBU-D0242`, `UBU-D0243`).
+6. First `next_action` returns a recommendation with `readiness=ready` and a non-empty
    `explanation.message` (selection rule: `readiness_ordered_skeleton`).
-4. Action recording returns `task_status=completed`, `transition_applied=true`, and a
+7. Action recording returns `task_status=completed`, `transition_applied=true`, and a
    non-empty `log_id` — confirming the Task transitioned and an append-only Log event
    was admitted.
-5. Second `next_action` (post-complete) returns `recommendation=null` and a non-empty
+8. Second `next_action` (post-complete) returns `recommendation=null` and a non-empty
    `diagnostics` array whose first entry has a known bounded code (UBU-D0210): one of
    `no_admitted_tasks`, `no_active_tasks`,
    `all_candidates_blocked_on_unmet_dependencies`,
    `all_candidates_blocked_on_preconditions`, or `no_ready_task`.
-6. Projection preview returns a managed-label-only operation with an accepted
+9. Projection preview returns a managed-label-only operation with an accepted
    policy summary; approval returns a `projection_result` with `status=applied`,
    exactly one mock worker write, and a `compartment_boundary_decided` Log entry.
-7. Reconciliation against a mock observed-label set returns `missing` or `drifted`,
+10. Reconciliation against a mock observed-label set returns `missing` or `drifted`,
    surfaces a `projection_conflict`, persists the reconciliation, and performs no
    silent overwrite.
-8. The deny path sets `no_external_export`; the approved preview returns a failed
+11. The deny path sets `no_external_export`; the approved preview returns a failed
    `projection_result`, records `projection_denied`, writes no mock
    `github-label-write`, and records a `compartment_boundary_decided` denial Log.
-9. Affect legitimization fixture requests
+12. Affect legitimization fixture requests
    (`fixtures/demo/affect-legitimization-cases.json`) assert:
    `feasible-enforce` returns `result=passed`, `affect_feasible=true`, and no
    `violated_dimensions`; `infeasible-enforce` returns no admitted Plan, no selected
@@ -75,9 +96,9 @@ exercised; all state flows through `ubu_store`.
    `infeasible-warn-only` records `result=failed`, `affect_feasible=false`,
    `violated_dimensions=["energy"]`, and a negative margin without failing Plan
    admission.
-10. The fixture import (`fixtures/demo/planning-candidates.json`) admits at least three
+13. The fixture import (`fixtures/demo/planning-candidates.json`) admits at least three
    active Tasks (`admitted_to_store >= 3`) without any outbound HTTP.
-11. After seeding a Compact Calendar window in the throwaway store, `/planning/generate`
+14. After seeding a Compact Calendar window in the throwaway store, `/planning/generate`
     returns a canonical timed Plan (`schema_version=planning-kernel-contract/0.1`,
     `status=admitted`, contiguous step indexes, non-empty summaries, valid intervals)
     whose placements all fall **inside the Calendar window** and do not overlap;
@@ -87,14 +108,14 @@ exercised; all state flows through `ubu_store`.
     bootstrap default affect values, marks `stale_affect_warning`, and does **not**
     expose the stale observation as current measured state. (The Phase A
     `NotYetImplemented` Legitimizer advisories are tolerated; they are not failures.)
-12. Completing a Task and firing `/planning/recalculate` with `task_completed` returns a
+15. Completing a Task and firing `/planning/recalculate` with `task_completed` returns a
     repair-mode Plan whose `supersedes_plan_id` is the prior Plan id; the prior Plan is
     persisted as `superseded`; and the completed Task keeps its exact prior placement —
     it is **not re-placed**.
-13. Applying a `user_override` placement (authority_source `user_override`) and firing a
+16. Applying a `user_override` placement (authority_source `user_override`) and firing a
     second `/planning/recalculate` leaves the overridden Task's placement **unchanged and
     not clobbered**; the previously completed Task likewise stays frozen.
-14. The scoring fixture (`fixtures/demo/scoring-selection-cases.json`) asserts that an
+17. The scoring fixture (`fixtures/demo/scoring-selection-cases.json`) asserts that an
     abundant-slack request produces more than one and at most sixteen scored candidates;
     every candidate has a `candidate_role`, `score_summary`, and numeric `total_score`;
     ranks are ordered by descending composite score; and the admitted Plan and Compact
@@ -102,7 +123,7 @@ exercised; all state flows through `ubu_store`.
     fixed-seed workload select different rank-1 candidates. A static-anchor case records
     sixteen generated candidates and asserts that the two `reject_obvious` candidates
     are absent from the fourteen-candidate scored set.
-15. The stochastic fixture (`fixtures/demo/stochastic-rollout-cases.json`) sends
+18. The stochastic fixture (`fixtures/demo/stochastic-rollout-cases.json`) sends
     `shifted_lognormal_p95` duration estimates through `/planning/generate`. It asserts
     `full` probability quality, a bounded nonzero-width Wilson interval, numeric p10
     robustness, and byte-equivalent candidate projections on a repeated fixed-seed run.
@@ -113,7 +134,7 @@ exercised; all state flows through `ubu_store`.
     in the frozen direction (`shared > independent`), proving the correlation loadings
     affect rollout sampling. Setting `n_rollouts=0` exposes the C-1 proxy with no
     fabricated probability.
-16. The derived-report fixture (`fixtures/demo/risk-plan-quality-cases.json`)
+19. The derived-report fixture (`fixtures/demo/risk-plan-quality-cases.json`)
     asserts `deadline_risk`, blocking `destructive_pressure` beside
     `affect_margin`, and a blocking recommendation-path `skeleton_failure`. Its
     clean case has `level=low` and no blocking findings. The near-limit and clean
@@ -122,7 +143,7 @@ exercised; all state flows through `ubu_store`.
     the model-cause enum (`wrong_estimates`), never user-directed text. Each
     blocking case appends a `recalculation_requested` Log, and admitted blocking
     Plans make `/calendar/current` stale; the clean Plan is not stale (UBU-D0240).
-17. The UniverseState fixture (`fixtures/demo/universe-state-semantics.json`)
+20. The UniverseState fixture (`fixtures/demo/universe-state-semantics.json`)
     admits a populated four-collection `UniverseState` through `ubu_store`, reads it
     back, and asserts deep equality. It applies a mutation list covering
     `set_fact`, `clear_fact`, `increment_numeric`, `decrement_numeric`,
@@ -132,7 +153,7 @@ exercised; all state flows through `ubu_store`.
     list, evaluates an `all_of`/`any_of` precondition tree over `equals`,
     `member_of`, and `absent`, treats unknown targets as absent, and rejects a
     malformed numeric membership predicate as an error (UBU-D0241).
-18. The precondition planning fixture
+21. The precondition planning fixture
     (`fixtures/demo/precondition-planning-cases.json`) seeds a populated
     `UniverseState` and five active Tasks directly into the throwaway store,
     then posts to `/planning/generate`. It asserts that a Task with no
@@ -141,7 +162,7 @@ exercised; all state flows through `ubu_store`.
     that a failed precondition is excluded and surfaced in `blocked_tasks`; and
     that a malformed precondition is excluded and surfaced separately in
     `invalid_tasks`, with distinct diagnostics (`UBU-D0242`).
-19. The intrinsic-affect/effects fixture
+22. The intrinsic-affect/effects fixture
     (`fixtures/demo/intrinsic-affect-mode-cases.json`) drives two D16 checks
     (`UBU-D0242`, Wiring-B). An offline `ubu-core` smoke (17a) asserts that
     `organization_mode` and `worker_mode` reject a precondition targeting an
@@ -151,7 +172,7 @@ exercised; all state flows through `ubu_store`.
     orchestrator is fixed to `user_mode` (`MVP_INSTANCE_MODE`), so the
     organization/worker rejection is asserted directly against the canonical
     `validate_precondition_for_mode`/`validate_mutations_for_mode` validators.
-20. The same fixture seeds a current `UniverseState` and three Tasks with
+23. The same fixture seeds a current `UniverseState` and three Tasks with
     `effects` into the throwaway store, then drives completion through
     `/task/{id}/action` (17b). Completing a Task with effects applies every
     mutation to the current `UniverseState` — read back and deep-checked,
@@ -233,6 +254,12 @@ SQLite store removed on exit.
 The precondition planning case seeds only synthetic `UniverseState` and Task rows
 in the throwaway orchestrator store, posts to loopback `/planning/generate`, and
 retires those fixture Tasks before the bootstrap-to-act loop continues.
+After `/bootstrap/seed`, the D17 block reads the bootstrap-created `UniverseState`
+back from the same throwaway store, asserts the exact `UBU-D0243` fact mapping,
+asserts the re-seed guard, then seeds temporary Tasks that prove planning
+preconditions and completion effects run against those bootstrap facts
+(`UBU-D0242`). Those D17 Tasks and their temporary Plan are retired before the
+main `next_action` loop continues.
 
 ## Prerequisites
 
@@ -259,3 +286,4 @@ retires those fixture Tasks before the bootstrap-to-act loop continues.
 | **UBU-D0240** | Derived risk findings and human-complete plan-quality signals; blocking findings request recalculation and mark the admitted Calendar stale |
 | **UBU-D0241** | `UniverseState` four-collection facts container, mutation applicator, and precondition evaluator |
 | **UBU-D0242** | Task `preconditions` partition planning into eligible, blocked, and invalid against `UniverseState`; and (Wiring-B) completed Task `effects` mutate the current `UniverseState` under the completing authority, with intrinsic-affect targets rejected in `organization_mode`/`worker_mode` and permitted in `user_mode` |
+| **UBU-D0243** | Bootstrap answer mapping into initial `UniverseState` facts and numeric values |
