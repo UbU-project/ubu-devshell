@@ -5,8 +5,9 @@
 # override-safe recalculation, precondition-gated planning, and affect legitimization against the
 # store-backed orchestrator (O5: token
 # intake and bootstrap/seed; O6: readiness next_action with explanation, action
-# recording, and bounded diagnostic; O7: projection preview, approval, gated
-# mock write, reconciliation, and gate-deny path; S9/P3/P4/O9: canonical timed
+# recording, and bounded diagnostic; O7/O19: projection preview, approval,
+# recording-fake managed-label write, reconciliation, and gate-deny path;
+# S9/P3/P4/O9: canonical timed
 # Plan, Compact Calendar, and repair-mode recalculation with override-safety).
 # Creates a throwaway SQLite store under a temp directory; removed on exit,
 # including on failure. Requires no live GitHub and no network egress.
@@ -15,7 +16,8 @@
 #   O4: MemoryState removed; all state through ubu_store (UBU_DB_PATH throwaway store)
 #   O5: desktop token intake (/desktop/session/github-token) + bootstrap/seed endpoint
 #   O6: readiness next_action with explanation; action recording; bounded diagnostics (UBU-D0210)
-#   O7: gated managed-label projection loop, mock write, reconciliation, deny path
+#   O7/O19: gated managed-label projection loop through the adapter recording
+#              fake, reconciliation, deny path
 #   S9/P3/P4/O9: canonical timed Plan (/planning/generate), Compact Calendar
 #               (/calendar/current), and repair-mode recalculation
 #               (/planning/recalculate) that supersedes the prior Plan
@@ -43,10 +45,11 @@
 #   UBU-D0230: policy-summary guardrails and compartment_boundary_decided log vocabulary
 #
 # import_live is a Phase 1 stub (source=github_live_stub) that admits Tasks locally
-# without any outbound HTTP. The fixture/dev token satisfies the token-availability
-# check and is never sent to GitHub. Plan generation and recalculation are
-# fixture-driven and offline: the planner adapter is the in-process CPU strategy
-# and the Compact Calendar window is seeded directly into the throwaway store.
+# without any outbound HTTP. The fixture/dev token satisfies the session-token
+# availability check and is never sent to GitHub because live projection mode is
+# forbidden here. Plan generation and recalculation are fixture-driven and
+# offline: the planner adapter is the in-process CPU strategy and the Compact
+# Calendar window is seeded directly into the throwaway store.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -67,6 +70,7 @@ PRECONDITION_PLANNING_FIXTURE="$ROOT_DIR/fixtures/demo/precondition-planning-cas
 MODE_EFFECTS_FIXTURE="$ROOT_DIR/fixtures/demo/intrinsic-affect-mode-cases.json"
 DEMO_PORT="${DEMO_PORT:-17878}"
 DEMO_BASE="http://127.0.0.1:$DEMO_PORT"
+export CARGO_NET_OFFLINE=true
 export NO_PROXY="127.0.0.1,localhost"
 export no_proxy="$NO_PROXY"
 
@@ -117,11 +121,20 @@ command -v cargo   >/dev/null 2>&1 || fail_missing "cargo not found"
 command -v curl    >/dev/null 2>&1 || fail_missing "curl not found"
 command -v python3 >/dev/null 2>&1 || fail_missing "python3 not found"
 
+if [[ "${UBU_GITHUB_PROJECTION_EXPORT_MODE:-}" == "live" ]]; then
+  echo "error: fixture demo is offline-only; unset UBU_GITHUB_PROJECTION_EXPORT_MODE or use a non-live value" >&2
+  exit 1
+fi
+if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+  echo "error: fixture demo is offline-only; run without GITHUB_TOKEN in the environment" >&2
+  exit 1
+fi
+
 echo "=== Fixture Demo: full bootstrap-to-act loop, store-backed ==="
 echo "  O4: throwaway UBU_DB_PATH store"
 echo "  O5: token intake + bootstrap/seed"
 echo "  O6: readiness next_action, action recording, bounded diagnostic (UBU-D0210)"
-echo "  O7: gated projection preview/approval/write/reconcile loop with deny path"
+echo "  O7/O19: gated projection preview/approval/write/reconcile loop through recording fake"
 echo "  S9/P3/P4/O9: canonical timed Plan, Compact Calendar, override-safe recalculation"
 echo "  S10/P5/O10: affect legitimization feasible/enforce/warn_only/stale paths"
 echo "  C-1/P7/P8/O12: bounded candidates, Stage 3 scoring, pruning, composite selection"
@@ -138,6 +151,7 @@ echo "store:        $STORE_DIR"
 echo "manifest:     $MANIFEST"
 echo "preconditions: $PRECONDITION_PLANNING_FIXTURE"
 echo "port:         $DEMO_PORT"
+echo "github mode:  offline mock/fake path (live mode off, no GITHUB_TOKEN env)"
 echo ""
 
 # --- Temp dir and cleanup ---
@@ -1144,7 +1158,7 @@ print(f"  message: {diags[0].get('message', '')}")
 PYEOF
 
 echo ""
-echo "Step 6: projection preview + approval (O7) — gated mock managed-label write"
+echo "Step 6: projection preview + approval (O7/O19) — gated recording-fake managed-label write"
 PREVIEW_SCHEMA="ubu.orchestrator.projection_preview.v1"
 APPROVAL_SCHEMA="ubu.orchestrator.projection_approval.v1"
 RESULT_SCHEMA="ubu.orchestrator.projection_result.v1"
@@ -1173,12 +1187,13 @@ assert d.get("policy_summary", {}).get("legitimization") == "accepted", d
 assert d.get("policy_summary", {}).get("no_external_export") is False, d
 ops = d.get("operations", [])
 assert ops, f"projection preview: expected at least one managed-label operation, got: {d}"
+assert len(ops) == 1, f"projection preview: expected exactly one managed-label add op, got: {ops}"
 for op in ops:
     assert op.get("kind") == "label", f"projection preview: expected label-only operation, got: {op}"
+    assert op.get("target", {}).get("issue_number") == 7, op
     payload = op.get("payload", {})
-    if payload.get("type") == "label":
-        label = payload.get("label")
-        assert label in {"ubu", "ubu-managed"}, f"unexpected label write: {label}"
+    assert payload.get("type") == "label", f"projection preview: expected issue label op, got: {payload}"
+    assert payload.get("label") == "ubu-managed", f"unexpected label write: {payload}"
 print(d["preview_id"])
 PYEOF
 )"
@@ -1189,14 +1204,15 @@ import sqlite3, sys
 db = sys.argv[1]
 con = sqlite3.connect(db)
 cur = con.cursor()
-for table in ("projection_worker_writes", "projection_approvals", "logs"):
+for table in ("projection_worker_writes", "projection_approvals", "projection_results", "logs"):
     cur.execute(f"SELECT COUNT(*) FROM {table}")
     print(cur.fetchone()[0])
 PYEOF
 )"
 WRITES_BEFORE="$(printf '%s\n' "$COUNTS_BEFORE_APPROVE" | sed -n '1p')"
 APPROVALS_BEFORE="$(printf '%s\n' "$COUNTS_BEFORE_APPROVE" | sed -n '2p')"
-LOGS_BEFORE="$(printf '%s\n' "$COUNTS_BEFORE_APPROVE" | sed -n '3p')"
+RESULTS_BEFORE="$(printf '%s\n' "$COUNTS_BEFORE_APPROVE" | sed -n '3p')"
+LOGS_BEFORE="$(printf '%s\n' "$COUNTS_BEFORE_APPROVE" | sed -n '4p')"
 
 PROJECTION_RESULT_RESP="$(curl -sf -X POST "$DEMO_BASE/projection/approve" \
   -H "content-type: application/json" \
@@ -1217,27 +1233,29 @@ assert d.get("preview_id") == preview_id, d
 assert d.get("status") == "applied", f"projection result: expected applied, got: {d}"
 assert not d.get("diagnostics"), f"projection result: expected no diagnostics, got: {d}"
 results = d.get("operation_results", [])
-assert results, f"projection result: expected operation results, got: {d}"
-for result in results:
-    assert result.get("status") == "applied", result
-    assert result.get("authority_source") == "automation_worker", result
+assert len(results) == 1, f"projection result: expected one operation result, got: {results}"
+result = results[0]
+assert result.get("status") == "applied", result
+assert result.get("authority_source") == "automation_worker", result
+assert "ubu-managed" in (result.get("message") or ""), result
 print("  PASS projection result: status=applied  authority_source=automation_worker")
 PYEOF
 
-python3 - "$DEMO_DB" "$WRITES_BEFORE" "$APPROVALS_BEFORE" "$LOGS_BEFORE" <<'PYEOF'
+python3 - "$DEMO_DB" "$WRITES_BEFORE" "$APPROVALS_BEFORE" "$RESULTS_BEFORE" "$LOGS_BEFORE" <<'PYEOF'
 import json, sqlite3, sys
 
-db, writes_before, approvals_before, logs_before = sys.argv[1:5]
+db, writes_before, approvals_before, results_before, logs_before = sys.argv[1:6]
 writes_before = int(writes_before)
 approvals_before = int(approvals_before)
+results_before = int(results_before)
 logs_before = int(logs_before)
 con = sqlite3.connect(db)
 cur = con.cursor()
 
 cur.execute("SELECT COUNT(*) FROM projection_worker_writes")
 writes_after = cur.fetchone()[0]
-assert writes_after == writes_before + 1, (
-    f"mock github-label-write: expected exactly one new worker write, "
+assert writes_after == writes_before, (
+    f"recording fake path: legacy projection_worker_writes changed unexpectedly, "
     f"before={writes_before} after={writes_after}"
 )
 
@@ -1248,24 +1266,24 @@ assert approvals_after == approvals_before + 1, (
     f"after={approvals_after}"
 )
 
+cur.execute("SELECT COUNT(*) FROM projection_results")
+results_after = cur.fetchone()[0]
+assert results_after == results_before + 1, (
+    f"projection result: expected one new persisted result, before={results_before} "
+    f"after={results_after}"
+)
+
 cur.execute(
-    "SELECT payload_json FROM projection_worker_writes ORDER BY created_at DESC LIMIT 1"
+    "SELECT payload_json FROM projection_results ORDER BY created_at DESC LIMIT 1"
 )
 payload = json.loads(cur.fetchone()[0])
-operation = payload.get("operation", {})
+result = payload.get("result", {})
 assert payload.get("schema_version") == "ubu.orchestrator.projection_result.v1", payload
-assert payload.get("authority_source") == "automation_worker", payload
-assert operation.get("kind") in {"apply_label", "managed_label_preflight"}, operation
-op_payload = operation.get("payload", {})
-labels = []
-if op_payload.get("type") == "label":
-    labels.append(op_payload.get("label"))
-if op_payload.get("type") == "managed_label_preflight":
-    labels.extend(op_payload.get("missing_labels", []))
-assert labels, f"mock github-label-write: no managed labels found in payload: {payload}"
-assert all(label in {"ubu", "ubu-managed"} for label in labels), (
-    f"mock github-label-write: unmanaged label reached mock: {labels}"
-)
+assert payload.get("diagnostics") == [], payload
+op_results = result.get("operation_results", [])
+assert len(op_results) == 1, payload
+assert op_results[0].get("status") == "applied", payload
+assert "ubu-managed" in (op_results[0].get("message") or ""), payload
 
 cur.execute(
     """
@@ -1285,12 +1303,13 @@ assert logs_after >= logs_before + 1, (
 assert log_payload.get("adjudication_result") == "accepted", log_payload
 assert log_payload.get("member_evaluated") == "no_external_export", log_payload
 assert log_payload.get("authority_source") == "automation_worker", log_payload
-print("  PASS mock write: exactly one managed-label write recorded")
+print("  PASS projection result: exactly one managed-label add applied through the fake-backed path")
+print("  PASS legacy mock table: no projection_worker_writes rows were created")
 print("  PASS boundary log: compartment_boundary_decided accepted")
 PYEOF
 
 echo ""
-echo "Step 7: projection reconciliation (O7) — mock reports managed-label drift"
+echo "Step 7: projection reconciliation (O7/O19) — seeded fake observation reports managed-label drift"
 WRITES_BEFORE_RECONCILE="$(python3 - "$DEMO_DB" <<'PYEOF'
 import sqlite3, sys
 con = sqlite3.connect(sys.argv[1])
@@ -1332,7 +1351,7 @@ assert writes_after == writes_before, (
 )
 cur.execute("SELECT COUNT(*) FROM projection_reconciliations WHERE status IN ('drifted', 'missing')")
 assert cur.fetchone()[0] >= 1, "reconciliation: expected persisted drifted/missing record"
-print("  PASS reconciliation: conflict persisted and no mock write occurred")
+print("  PASS reconciliation: conflict persisted and no extra fake write occurred")
 PYEOF
 
 echo ""
@@ -1406,7 +1425,7 @@ cur = con.cursor()
 cur.execute("SELECT COUNT(*) FROM projection_worker_writes")
 writes_after = cur.fetchone()[0]
 assert writes_after == writes_before, (
-    f"deny path: github-label-write reached mock unexpectedly, "
+    f"deny path: legacy projection_worker_writes changed unexpectedly, "
     f"before={writes_before} after={writes_after}"
 )
 cur.execute(
@@ -1422,7 +1441,7 @@ assert log_payload.get("adjudication_result") == "rejected", log_payload
 assert log_payload.get("member_evaluated") == "no_external_export", log_payload
 reason = log_payload.get("reason", "")
 assert "no_external_export" in reason or "forbids external export" in reason, log_payload
-print("  PASS deny path: no mock write and compartment_boundary_decided rejected")
+print("  PASS deny path: no fake write and compartment_boundary_decided rejected")
 PYEOF
 
 echo ""

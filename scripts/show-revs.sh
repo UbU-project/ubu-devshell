@@ -77,6 +77,8 @@ tree_state() {
 
 mismatch=0
 
+printf 'Recorded R_* baseline: post-O19 R_orchestrator, post-GA1 R_adapter, post-S17 R_schemas, post-C12 R_core, post-ST7 R_store\n'
+printf '\n'
 printf '%-24s %-14s %-9s %-19s %-6s %-9s %s\n' \
   "REPO" "BRANCH" "HEAD" "SIG" "TREE" "PINNED" "STATUS"
 printf '%-24s %-14s %-9s %-19s %-6s %-9s %s\n' \
