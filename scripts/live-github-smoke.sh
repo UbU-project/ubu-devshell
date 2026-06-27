@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# Manual live GitHub managed-label smoke for UBU-D0244.
+# Manual recursive live GitHub smoke for UBU-D0244/UBU-D0245.
 #
 # This script is deliberately not called by check-all.sh, test-all.sh, or the
-# fixture demo. It starts a throwaway local orchestrator in server-side live
-# projection mode, submits the runtime token through the desktop session token
-# endpoint, previews exactly one managed-label add, requires a second explicit
-# confirmation, approves the add, verifies by live reconciliation, then removes
-# the managed label and verifies cleanup.
+# fixture demo. It starts a throwaway local orchestrator with live ingest and
+# live projection modes explicitly enabled, submits the runtime token through
+# the desktop session token endpoint, imports throwaway issues, runs planning to
+# a next Task, previews exactly one managed-label add, requires a second
+# explicit confirmation, approves the add, verifies by live reconciliation, then
+# removes the managed label and verifies cleanup.
 set +x
 set -euo pipefail
 
@@ -26,6 +27,7 @@ PREVIEW_SCHEMA="ubu.orchestrator.projection_preview.v1"
 APPROVAL_SCHEMA="ubu.orchestrator.projection_approval.v1"
 RECONCILE_SCHEMA="ubu.orchestrator.projection_reconciliation.v1"
 DESKTOP_SCHEMA="ubu.orchestrator.desktop_session.v1"
+NEXT_SCHEMA="ubu.orchestrator.next_action.v1"
 MANAGED_LABEL="ubu-managed"
 
 fail() {
@@ -58,6 +60,19 @@ post_json() {
     --data-binary @-
 }
 
+import_body() {
+  python3 - "$UBU_LIVE_GITHUB_OWNER" "$UBU_LIVE_GITHUB_REPO" <<'PYEOF'
+import json
+import sys
+
+owner, repo = sys.argv[1:3]
+print(json.dumps({
+    "owner": owner,
+    "repo": repo,
+}))
+PYEOF
+}
+
 preview_body() {
   local observed_json="$1"
   local desired_json="$2"
@@ -75,7 +90,7 @@ print(json.dumps({
     "observed_labels": json.loads(observed_json),
     "desired_labels": json.loads(desired_json),
     "existing_repository_labels": ["ubu", "ubu-managed"],
-    "reason": "manual UBU-D0244 live GitHub smoke"
+    "reason": "manual UBU-D0244/UBU-D0245 recursive live GitHub smoke"
 }))
 PYEOF
 }
@@ -165,6 +180,97 @@ assert expected_text in (result.get("message") or ""), result
 PYEOF
 }
 
+assert_import_admitted_target() {
+  local response="$1"
+  python3 - "$response" "$SMOKE_DB" "$UBU_LIVE_GITHUB_OWNER" "$UBU_LIVE_GITHUB_REPO" \
+    "$UBU_LIVE_GITHUB_ISSUE_NUMBER" <<'PYEOF'
+import json
+import sqlite3
+import sys
+
+response, db, owner, repo, issue_number = sys.argv[1:6]
+d = json.loads(response)
+target_source_id = f"{owner}/{repo}#{issue_number}"
+assert d.get("imported", 0) >= 1, f"expected at least one imported issue, got: {d}"
+assert d.get("admitted_to_store", 0) >= 2, (
+    "expected at least one Task plus one External Reference admitted, got: "
+    f"{d}"
+)
+con = sqlite3.connect(db)
+task_rows = con.execute(
+    "SELECT id, payload_json FROM objects WHERE object_type = 'Task' AND status = 'active'"
+).fetchall()
+external_rows = con.execute(
+    "SELECT source_type, source_id, url, payload_json FROM external_references"
+).fetchall()
+matched_task = None
+for task_id, payload_json in task_rows:
+    payload = json.loads(payload_json)
+    source_refs = payload.get("provenance", {}).get("source_refs")
+    if not source_refs:
+        source = payload.get("provenance", {}).get("source", {})
+        source_refs = [source]
+    for ref in source_refs:
+        if ref.get("source_kind") == "github_issue" and ref.get("source_id") == target_source_id:
+            matched_task = task_id
+            break
+    if matched_task:
+        break
+
+matched_external = [
+    row for row in external_rows
+    if row[0] == "github_issue" and row[1] == target_source_id
+]
+assert matched_task, (
+    f"target issue {target_source_id} was not admitted as an active Task; "
+    f"active task count={len(task_rows)}"
+)
+assert len(matched_external) == 1, (
+    f"expected exactly one External Reference for {target_source_id}, "
+    f"got {len(matched_external)}"
+)
+print(f"  import admitted target Task={matched_task}")
+print(f"  import admitted External Reference source_id={target_source_id}")
+PYEOF
+}
+
+assert_plan_and_next_target() {
+  local plan_response="$1"
+  local next_response="$2"
+  python3 - "$plan_response" "$next_response" "$UBU_LIVE_GITHUB_OWNER" "$UBU_LIVE_GITHUB_REPO" \
+    "$UBU_LIVE_GITHUB_ISSUE_NUMBER" <<'PYEOF'
+import json
+import sys
+
+plan_response, next_response, owner, repo, issue_number = sys.argv[1:6]
+plan_body = json.loads(plan_response)
+next_body = json.loads(next_response)
+plan = plan_body.get("plan")
+assert plan and plan.get("id"), f"planning did not return a plan id: {plan_body}"
+steps = plan.get("steps") or []
+assert steps, f"planning returned no steps: {plan_body}"
+
+rec = next_body.get("recommendation")
+assert rec is not None, f"next-action returned diagnostics only: {next_body}"
+assert rec.get("readiness") == "ready", f"next-action was not ready: {rec}"
+task_id = rec.get("task_id")
+step_task_ids = {step.get("task_id") for step in steps}
+assert task_id in step_task_ids, (
+    f"next-action task {task_id} was not in the generated plan steps {step_task_ids}"
+)
+
+target_source_id = f"{owner}/{repo}#{issue_number}"
+source_refs = rec.get("source_refs") or []
+assert any(
+    ref.get("source_kind") == "github_issue" and ref.get("source_id") == target_source_id
+    for ref in source_refs
+), f"next-action task does not target {target_source_id}: {rec}"
+
+print(f"  plan_id={plan['id']} steps={len(steps)}")
+print(f"  next_task={task_id} source_id={target_source_id}")
+PYEOF
+}
+
 assert_reconcile_matched() {
   local response="$1"
   local phase="$2"
@@ -183,6 +289,9 @@ PYEOF
 if [[ "${UBU_LIVE_GITHUB_SMOKE:-}" != "1" ]]; then
   fail "set UBU_LIVE_GITHUB_SMOKE=1 to opt in to the manual live smoke"
 fi
+if [[ "${UBU_GITHUB_INGEST_MODE:-}" != "live" ]]; then
+  fail "set UBU_GITHUB_INGEST_MODE=live so the live ingest path is explicit"
+fi
 if [[ "${UBU_GITHUB_PROJECTION_EXPORT_MODE:-}" != "live" ]]; then
   fail "set UBU_GITHUB_PROJECTION_EXPORT_MODE=live so the server-side live path is explicit"
 fi
@@ -198,10 +307,10 @@ command -v cargo >/dev/null 2>&1 || fail "cargo not found"
 command -v curl >/dev/null 2>&1 || fail "curl not found"
 command -v python3 >/dev/null 2>&1 || fail "python3 not found"
 
-echo "=== UBU-D0244 live GitHub smoke ==="
+echo "=== UBU-D0244/UBU-D0245 recursive live GitHub smoke ==="
 echo "target: ${UBU_LIVE_GITHUB_OWNER}/${UBU_LIVE_GITHUB_REPO}#${UBU_LIVE_GITHUB_ISSUE_NUMBER}"
 echo "token: supplied from GITHUB_TOKEN at runtime; raw token is not printed or stored"
-echo "mode:  UBU_GITHUB_PROJECTION_EXPORT_MODE=live"
+echo "mode:  UBU_GITHUB_INGEST_MODE=live  UBU_GITHUB_PROJECTION_EXPORT_MODE=live"
 echo ""
 
 echo "Building orchestrator offline from local checkout"
@@ -215,6 +324,7 @@ ORCH_LOG="$SMOKE_TMPDIR/orchestrator.log"
 
 echo "Starting local orchestrator on $SMOKE_BASE with a throwaway SQLite store"
 env -u GITHUB_TOKEN \
+  UBU_GITHUB_INGEST_MODE=live \
   UBU_GITHUB_PROJECTION_EXPORT_MODE=live \
   UBU_ORCHESTRATOR_PORT="$SMOKE_PORT" \
   UBU_DB_PATH="$SMOKE_DB" \
@@ -248,6 +358,18 @@ print(json.dumps({
 }))
 PYEOF
 echo "  token accepted into process memory"
+
+echo ""
+echo "Import: live GitHub issues from throwaway repository"
+IMPORT_RESP="$(import_body | post_json "/github/import/live")"
+echo "  response: $IMPORT_RESP"
+assert_import_admitted_target "$IMPORT_RESP"
+
+echo ""
+echo "Planning: generate plan and select next Task from imported issue"
+PLAN_RESP="$(printf '{}' | post_json "/planning/generate")"
+NEXT_RESP="$(curl -sf "$SMOKE_BASE/next-action?schema_version=$NEXT_SCHEMA")"
+assert_plan_and_next_target "$PLAN_RESP" "$NEXT_RESP"
 
 echo ""
 echo "Dry run: preview exactly one managed-label add"

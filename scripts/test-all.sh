@@ -45,8 +45,12 @@ require_repo() {
 }
 
 assert_offline_github_env() {
-  echo "=== Offline GitHub projection guard ==="
+  echo "=== Offline GitHub ingest/projection guard ==="
   echo ""
+  if [[ "${UBU_GITHUB_INGEST_MODE:-}" == "live" ]]; then
+    echo "error: default tests must run with UBU_GITHUB_INGEST_MODE unset or non-live" >&2
+    exit 1
+  fi
   if [[ "${UBU_GITHUB_PROJECTION_EXPORT_MODE:-}" == "live" ]]; then
     echo "error: default tests must run with UBU_GITHUB_PROJECTION_EXPORT_MODE unset or non-live" >&2
     exit 1
@@ -55,7 +59,7 @@ assert_offline_github_env() {
     echo "error: default tests must run without GITHUB_TOKEN in the environment" >&2
     exit 1
   fi
-  echo "PASS live projection mode is off and no GitHub token is present"
+  echo "PASS live ingest/projection modes are off and no GitHub token is present"
   echo ""
 }
 
@@ -152,6 +156,21 @@ run_fake_github_adapter_diagnostics() {
   echo ""
 }
 
+run_fake_github_import_diagnostics() {
+  local orchestrator_dir
+  orchestrator_dir="$(require_repo ubu_orchestrator)"
+
+  echo "=== Recording fake GitHub import diagnostics ==="
+  echo ""
+  echo "orchestrator fake ingest: /github/import/live admits one Task and one External Reference without token"
+  (cd "$orchestrator_dir" && cargo test --test github_import default_mock_import_uses_recording_api_without_token)
+
+  echo "orchestrator bootstrap fake ingest: selected repo import admits Tasks and External References through the adapter"
+  (cd "$orchestrator_dir" && cargo test --test bootstrap seed_admits_bootstrap_state_and_imports_selected_repo_tasks)
+  echo "PASS fake-backed live-ingest diagnostics"
+  echo ""
+}
+
 assert_offline_github_env
 
 echo "Running tests under $REPOS_DIR"
@@ -185,6 +204,7 @@ while read -r name; do
 done < <(repo_names)
 
 run_static_bypass_guard
+run_fake_github_import_diagnostics
 run_fake_github_adapter_diagnostics
 run_hard_boundary_diagnostics
 

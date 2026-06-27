@@ -195,14 +195,15 @@ therefore positive-definite by construction and Cholesky cannot fail. P10 verifi
 degraded and strict branches at kernel unit level using raw injected matrices. The API
 does not expose, and this demo does not add, a raw-matrix or force-degrade input.
 
-## Offline operation and import stub
+## Offline operation and fake import
 
-The demo is fully offline. `bootstrap/seed` internally calls `import_live`, which is a
-Phase 1 stub (`source=github_live_stub`) that creates Tasks locally without making any
-outbound HTTP request to GitHub. The projection loop uses the orchestrator's mock
-managed-label write table and reconciliation request payloads; it does not call live
-GitHub. The fixture/dev token (`"fixture-dev-token-ubu-demo"`) satisfies the
-token-availability check and is never sent to the network.
+The demo is fully offline. `bootstrap/seed` internally calls `import_live` in default
+mock ingest mode, so the orchestrator selects the adapter recording fake seeded from a
+raw GitHub issue fixture. That path admits Tasks and External References locally
+without making any outbound HTTP request to GitHub. The projection loop uses the
+orchestrator's mock managed-label write table and reconciliation request payloads; it
+does not call live GitHub. The fixture/dev token (`"fixture-dev-token-ubu-demo"`)
+satisfies the token-availability check and is never sent to the network.
 
 The demo fails clearly if a required fixture or prerequisite (orchestrator repo,
 `cargo`, `curl`, `python3`, or cached Cargo dependencies) is missing. The orchestrator
@@ -236,9 +237,10 @@ No real or user store is ever touched.
 - `fixtures/demo/intrinsic-affect-mode-cases.json`
 
 These fixtures are validated at startup (checked for existence and parseability). The
-bootstrap/seed step uses `"UbU-project/ubu-design"` as the fixture repo; its single Task
-is admitted via the `import_live` stub, not from the JSON fixture files. The Plan /
-Calendar / recalculation steps admit their active Tasks from
+bootstrap/seed step uses `"UbU-project/ubu-design"` as the fixture repo; its single
+GitHub issue is admitted as a Task and External Reference through the recording fake,
+not from the devshell JSON fixture files. The Plan / Calendar / recalculation steps
+admit their active Tasks from
 `fixtures/demo/planning-candidates.json` via `/github/import/fixture` (offline; no
 outbound HTTP). The affect legitimization cases are posted directly to the loopback
 orchestrator API from `fixtures/demo/affect-legitimization-cases.json`; they do not use

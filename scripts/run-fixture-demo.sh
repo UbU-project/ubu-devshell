@@ -44,12 +44,14 @@
 #              drives which Tasks are frozen and not re-placed on recalculation
 #   UBU-D0230: policy-summary guardrails and compartment_boundary_decided log vocabulary
 #
-# import_live is a Phase 1 stub (source=github_live_stub) that admits Tasks locally
-# without any outbound HTTP. The fixture/dev token satisfies the session-token
-# availability check and is never sent to GitHub because live projection mode is
-# forbidden here. Plan generation and recalculation are fixture-driven and
-# offline: the planner adapter is the in-process CPU strategy and the Compact
-# Calendar window is seeded directly into the throwaway store.
+# import_live runs in default mock ingest mode against the adapter recording fake
+# seeded from a raw GitHub issue fixture. It admits Tasks and External References
+# locally without any outbound HTTP. The fixture/dev token satisfies the
+# session-token availability check and is never sent to GitHub because live
+# ingest/projection modes are forbidden here. Plan generation and recalculation
+# are fixture-driven and offline: the planner adapter is the in-process CPU
+# strategy and the Compact Calendar window is seeded directly into the
+# throwaway store.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -773,7 +775,7 @@ PYEOF
 
 echo ""
 echo "Step 2: bootstrap/seed (O5/O6) — admit Objective, Preferences, and Tasks"
-echo "  (import_live stub: creates Task locally, no outbound HTTP)"
+echo "  (mock import_live: recording fake seeded from raw issue fixture; no outbound HTTP)"
 SEED_RESP="$(curl -sf -X POST "$DEMO_BASE/bootstrap/seed" \
   -H "content-type: application/json" \
   -d '{
