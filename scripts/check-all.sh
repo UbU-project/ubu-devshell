@@ -216,6 +216,7 @@ assert_no_committed_patch_overrides() {
 echo "=== Git state ==="
 echo ""
 assert_offline_github_env
+"$SCRIPT_DIR/test-patch-config.sh"
 
 while read -r name; do
   dir="$REPOS_DIR/$(repo_dir_name "$name")"
