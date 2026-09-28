@@ -8,7 +8,7 @@ ORCHESTRATOR_DIR="${ORCHESTRATOR_DIR:-$REPOS_DIR/ubu-orchestrator}"
 UI_DIR="${UI_DIR:-$REPOS_DIR/ubu-ui}"
 SOURCE="${OPENAPI_SOURCE:-$ORCHESTRATOR_DIR/openapi/openapi.generated.json}"
 DEST_DIR="${UI_API_GENERATED_DIR:-$UI_DIR/src/api/generated}"
-ORCHESTRATOR_URL="${ORCHESTRATOR_URL:-http://127.0.0.1:8080}"
+ORCHESTRATOR_URL="${ORCHESTRATOR_URL:-http://127.0.0.1:7878}"
 
 usage() {
   cat <<'USAGE'
@@ -22,7 +22,7 @@ Default (no flag):
 
 --from-server:
   Fetches /openapi.json from a running orchestrator instead.
-  Requires curl. Uses $ORCHESTRATOR_URL (default: http://127.0.0.1:8080).
+  Requires curl. Uses $ORCHESTRATOR_URL (default: http://127.0.0.1:7878).
   Start the orchestrator first: ./scripts/run-orchestrator.sh
 
 No network fetch is used in the default mode.

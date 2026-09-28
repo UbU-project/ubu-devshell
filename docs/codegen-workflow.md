@@ -60,7 +60,7 @@ If `ubu-orchestrator` is running locally, you can fetch the live spec instead:
 ```
 
 This fetches `$ORCHESTRATOR_URL/openapi.json` (default:
-`http://127.0.0.1:8080`). Requires `curl`. Override the base URL with:
+`http://127.0.0.1:7878`). Requires `curl`. Override the base URL with:
 
 ```sh
 ORCHESTRATOR_URL=http://127.0.0.1:9090 ./scripts/generate-ui-api-client.sh --from-server
@@ -75,7 +75,7 @@ ORCHESTRATOR_URL=http://127.0.0.1:9090 ./scripts/generate-ui-api-client.sh --fro
 | `UI_DIR` | `$REPOS_DIR/ubu-ui` | Path to UI checkout |
 | `OPENAPI_SOURCE` | `$ORCHESTRATOR_DIR/openapi/openapi.generated.json` | Pinned source file |
 | `UI_API_GENERATED_DIR` | `$UI_DIR/src/api/generated` | Destination directory |
-| `ORCHESTRATOR_URL` | `http://127.0.0.1:8080` | Base URL for `--from-server` |
+| `ORCHESTRATOR_URL` | `http://127.0.0.1:7878` | Base URL for `--from-server` |
 
 ## UI Schema Types
 
