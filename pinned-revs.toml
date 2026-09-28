@@ -14,10 +14,10 @@
 # show-revs.sh compares these against local checkout HEADs.
 
 [pinned]
-ubu_schemas         = "bb10953dd7e51ae658d3b453ee1734b6d0578628"  # R_schemas (post-S17 intrinsic-affect mode schema)
-ubu_core            = "2444b76e8eed75040e5a5791d1dce2579f0fe006"  # R_core (post-C12 InstanceMode validators + TaskEffect)
-ubu_store           = "2132c22fc05b163fdb3d8963a07a704b4b42c62f"  # R_store (post-ST7 persist_universe_state)
-ubu_planning_kernel = "62c6d7a2f71078d141f7a4b9c91bd78193ee3314"  # R_planning (post-P9_fix/P10 regeneration)
-ubu_github_adapter  = "4dce0887f0929584654e032992ed10fe5281a5cc"  # R_adapter (post-GA2 live/fake ingest adapter)
-ubu_orchestrator    = "6c3f216a6802f065f8d74d97dcee3a0a41f07646"  # R_orchestrator (post-O20 live/fake ingest selection)
-ubu_ui              = "7c1007eb2131dae7dd4997b8054a924974eb5086"  # R_ui (post-U15 risk and plan-quality views)
+ubu_schemas         = "4974166aeaf344c43fed5c8ab10dfa1c9139bb7d"  # R_schemas (P1B-37a A: decomposition Container schemas, schema reference bundling fixed)
+ubu_core            = "c77c0a2d1c3e206b8c18c023bb8b4ee0d06eb2d0"  # R_core (P1B-37a B: validated Containers, derived segments and completion)
+ubu_store           = "7b24cd82d78b70eea9c49f8816778a10b320b8ed"  # R_store (P1B-37a F: Container admission, required limits recorded)
+ubu_planning_kernel = "84b6d0d9b621ca9a9df10034a8f8dc660baaca5d"  # R_planning (P1B-37a E: pinned to the published Container core revision)
+ubu_github_adapter  = "4c7e3b6d31008a3bd64f28c303b8aa01bca3e2a0"  # R_adapter (P1B-37a E: pinned to the published Container core revision)
+ubu_orchestrator    = "df8f4006c09616b3dfadff18f4d177a85bfed3b6"  # R_orchestrator (P1B-38 D: Task reads, Objective and routine authoring, 49-path OpenAPI)
+ubu_ui              = "7c1007eb2131dae7dd4997b8054a924974eb5086"  # R_ui (risk and plan-quality report views; precedes the P1B-38 handoff refresh and Tasks surface)
