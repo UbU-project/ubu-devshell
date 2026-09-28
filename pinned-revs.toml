@@ -20,4 +20,4 @@ ubu_store           = "7b24cd82d78b70eea9c49f8816778a10b320b8ed"  # R_store (P1B
 ubu_planning_kernel = "84b6d0d9b621ca9a9df10034a8f8dc660baaca5d"  # R_planning (P1B-37a E: pinned to the published Container core revision)
 ubu_github_adapter  = "4c7e3b6d31008a3bd64f28c303b8aa01bca3e2a0"  # R_adapter (P1B-37a E: pinned to the published Container core revision)
 ubu_orchestrator    = "d047149b09a78d01f748f3b6f40bf597cc1f9b2f"  # R_orchestrator (P1B-39 C: routine overlap rejected at write time, native routines named in the import rejection)
-ubu_ui              = "7046687e6db419c9643843324dd61454f10efe1b"  # R_ui (P1B-39 H: Tauri HTTP plugin transport with a loopback-only capability; operator acceptance outstanding)
+ubu_ui              = "f37fe95e6b322be7928cb7a076a72ebe1787ec6f"  # R_ui (P1B-40 H: opens on Today, six-screen navigation, Priorities and Setup, default port 7878; rendering awaits the operator)
