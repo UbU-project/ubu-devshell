@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# check-ui-contract.sh: does ubu-ui's idea of the orchestrator match the orchestrator?
+# check-ui-contract.sh: does ubu-ui's idea of the orchestrator match the
+# orchestrator, and does the daily loop work over HTTP?
 #
-# Builds the real ubu-orchestrator, starts it on an ephemeral loopback port with
-# a temporary store, and drives it with the path and schema-version constants
-# imported from ubu-ui/src/api/endpoints.ts. See docs/CONTRACT_CHECK.md.
+# Builds the real ubu-orchestrator and walks thirteen scenarios against it. Each
+# scenario gets its own temporary store and its own orchestrator on an ephemeral
+# loopback port, driven with the path and schema-version constants imported from
+# ubu-ui/src/api/endpoints.ts. See docs/CONTRACT_CHECK.md.
 #
 # What this does NOT cover, and cannot:
 #   - the Tauri HTTP plugin transport. Requests here are made by Node's fetch,
@@ -12,9 +14,10 @@
 #   - anything rendered. No webview, no React, no screen is involved.
 # Those three remain the operator's acceptance surface in `npm run tauri:dev`.
 #
-# Nothing here leaves the machine: the build is offline, the orchestrator binds
-# 127.0.0.1, runs in mock GitHub modes with no credentials in its environment,
-# and the Node script refuses any base URL that is not 127.0.0.1.
+# Nothing here leaves the machine: the build is offline, each orchestrator binds
+# 127.0.0.1 and runs in mock modes with no credentials in its environment, and
+# the Node script refuses any address that is not 127.0.0.1 on a port this run
+# opened.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -28,9 +31,10 @@ usage() {
   cat <<'USAGE'
 Usage: check-ui-contract.sh
 
-Builds ubu-orchestrator, runs it on an ephemeral loopback port with a temporary
-store, and checks ubu-ui's endpoints.ts against it. Prints one PASS or FAIL
-line and exits non-zero on failure.
+Builds ubu-orchestrator and walks thirteen scenarios against it, each with its
+own temporary store and its own orchestrator on an ephemeral loopback port.
+Prints one PASS or FAIL line per scenario, stops at the first failure with the
+request, the status and the body, and exits non-zero on failure.
 
 Does not cover the Tauri plugin transport, the capability scope or anything
 rendered.
@@ -40,6 +44,9 @@ Environment overrides:
   ORCHESTRATOR_DIR         path to ubu-orchestrator checkout
   UI_DIR                   path to ubu-ui checkout
   STARTUP_TIMEOUT_SECONDS  how long to wait for /health (default: 60)
+  UBU_CHECK_VERBOSE=1      also print every request and its status
+  UBU_CHECK_ONLY=7,8       walk only these scenarios; the result says it is partial
+
 USAGE
 }
 
@@ -61,7 +68,6 @@ node_major="$(node -p 'process.versions.node.split(".")[0]')"
 [[ "$node_major" -ge 22 ]] || fail "node 22 or newer is required, found $(node --version)"
 
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/ubu-contract-check.XXXXXX")"
-ORCHESTRATOR_PID=""
 CHECK_PID=""
 
 # Runs on every exit path: success, failure, Ctrl-C and SIGTERM.
@@ -69,13 +75,19 @@ cleanup() {
   local status=$?
   trap - EXIT INT TERM
   if [[ -n "$CHECK_PID" ]] && kill -0 "$CHECK_PID" 2>/dev/null; then
+    # The Node script stops its own orchestrators and stub when it is told to stop.
     kill "$CHECK_PID" 2>/dev/null || true
     wait "$CHECK_PID" 2>/dev/null || true
   fi
-  if [[ -n "$ORCHESTRATOR_PID" ]] && kill -0 "$ORCHESTRATOR_PID" 2>/dev/null; then
-    kill "$ORCHESTRATOR_PID" 2>/dev/null || true
-    wait "$ORCHESTRATOR_PID" 2>/dev/null || true
-    echo "stopped: orchestrator pid $ORCHESTRATOR_PID"
+  # A backstop: any orchestrator the Node script started and did not stop. A pid
+  # is only signalled while it is still a process running from the temp directory.
+  if [[ -f "$WORK_DIR/pids" ]]; then
+    while read -r pid; do
+      if [[ -n "$pid" && "$(readlink "/proc/$pid/cwd" 2>/dev/null || true)" == "$WORK_DIR"/* ]]; then
+        kill "$pid" 2>/dev/null || true
+        echo "stopped: orchestrator pid $pid"
+      fi
+    done <"$WORK_DIR/pids"
   fi
   rm -rf "$WORK_DIR"
   echo "removed: $WORK_DIR"
@@ -97,47 +109,18 @@ BINARY="$(node -e '
 [[ -x "$BINARY" ]] || fail "the build produced no orchestrator binary"
 echo "built: $BINARY"
 
-PORT="$(node -e '
-  const server = require("net").createServer();
-  server.listen(0, "127.0.0.1", () => {
-    const { port } = server.address();
-    server.close(() => process.stdout.write(String(port)));
-  });
-')"
-echo "start: orchestrator on ephemeral port $PORT, store in $WORK_DIR"
-
-# A scrubbed environment: no token, no Google credential and no operator store
-# can reach this process, and HOME is the temp directory.
-(
-  cd "$WORK_DIR"
-  exec env -i \
-    PATH="$PATH" \
-    HOME="$WORK_DIR" \
-    UBU_ORCHESTRATOR_PORT="$PORT" \
-    UBU_DB_PATH="$WORK_DIR/contract-check.db" \
-    UBU_DEVICE_REGISTRATION="$WORK_DIR/device-registration.json" \
-    UBU_GITHUB_INGEST_MODE=mock \
-    UBU_GITHUB_PROJECTION_EXPORT_MODE=mock \
-    "$BINARY"
-) >"$WORK_DIR/orchestrator.log" 2>&1 &
-ORCHESTRATOR_PID=$!
+echo "walk: every scenario gets its own store and orchestrator under $WORK_DIR"
 
 # In the background and waited on, so a signal is handled at once rather than
-# after the check has finished.
+# after the walk has finished.
 status=0
 node --experimental-strip-types --no-warnings "$SCRIPT_DIR/check-ui-contract.mjs" \
   --endpoints "$UI_DIR/src/api/endpoints.ts" \
   --config "$ORCHESTRATOR_DIR/src/config.rs" \
-  --base-url "http://127.0.0.1:$PORT" \
-  --pid "$ORCHESTRATOR_PID" \
+  --binary "$BINARY" \
+  --work-dir "$WORK_DIR" \
   --startup-timeout "$STARTUP_TIMEOUT_SECONDS" &
 CHECK_PID=$!
 wait "$CHECK_PID" || status=$?
 CHECK_PID=""
-
-if [[ "$status" -ne 0 ]]; then
-  echo "--- orchestrator log (last 40 lines) ---"
-  tail -n 40 "$WORK_DIR/orchestrator.log" || true
-  echo "--- end of orchestrator log ---"
-fi
 exit "$status"

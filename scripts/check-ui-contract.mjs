@@ -1,16 +1,26 @@
-// check-ui-contract.mjs: the assertions behind check-ui-contract.sh.
+// check-ui-contract.mjs: the scenario walk behind check-ui-contract.sh.
 //
-// Run by that script, which owns the orchestrator process. Node 22 or newer,
-// built-in fetch only, no dependency.
+// Run by that script, which builds the orchestrator and owns the temp
+// directory. Node 22 or newer, built-in fetch only, no dependency.
 //
 // What this does NOT cover: the Tauri HTTP plugin transport, the capability
 // scope, and anything rendered. Those remain the operator's acceptance surface.
 //
+// Every scenario gets its own store and its own orchestrator on its own
+// ephemeral port. Nothing is carried from one scenario to the next.
+//
 // The path and schema-version constants are imported from ubu-ui's
-// endpoints.ts, never copied. The request bodies are the shapes ubu-ui's
-// client.ts sends; client.ts itself cannot be imported here because it imports
-// the Tauri plugin.
-import { readFileSync } from "node:fs";
+// endpoints.ts, never copied, wherever ubu-ui has one. The request bodies are
+// the shapes ubu-ui's client.ts sends; client.ts itself cannot be imported here
+// because it imports the Tauri plugin. Routes ubu-ui has no constant for are
+// named in ROUTES_WITHOUT_A_UI_CONSTANT below.
+//
+// Nothing here leaves the machine. Every request goes through `call`, which
+// refuses any address that is not 127.0.0.1 on a port this run opened itself.
+import { spawn } from "node:child_process";
+import { appendFileSync, mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs";
+import net from "node:net";
+import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 function option(name) {
@@ -23,21 +33,80 @@ function option(name) {
 
 class CheckFailure extends Error {}
 
-function check(condition, message) {
-  if (!condition) {
-    throw new CheckFailure(message);
-  }
-}
-
 const endpointsPath = option("endpoints");
 const configPath = option("config");
-const baseUrl = option("base-url");
-const orchestratorPid = Number(option("pid"));
+const binary = option("binary");
+const workDir = option("work-dir");
 const startupTimeoutMs = Number(option("startup-timeout")) * 1000;
+const verbose = process.env.UBU_CHECK_VERBOSE === "1";
+// For working on one scenario: UBU_CHECK_ONLY=7,8. A partial walk says so and is not a pass of the whole.
+const only = process.env.UBU_CHECK_ONLY
+  ? new Set(process.env.UBU_CHECK_ONLY.split(",").map((number) => Number(number.trim())))
+  : null;
 
+const endpoints = await import(pathToFileURL(endpointsPath).href);
+
+// ubu-ui names no constant for these; they are orchestrator routes all the same.
+const ROUTES_WITHOUT_A_UI_CONSTANT = {
+  OPENAPI: "/openapi.json",
+  DECOMPOSE: "/task/{task_id}/decompose",
+  CONTAINER_UNDO: "/container/{container_id}/undo",
+  CONTAINER_LIST: "/containers"
+};
+const CONTAINER_SCHEMA_VERSION = "ubu.orchestrator.container.v1";
+
+// ---------------------------------------------------------------- plumbing
+
+const ownPorts = new Set();
+const running = new Set();
+let lastRequest = null;
 let requestCount = 0;
 
-async function call(method, url, body) {
+function freePort() {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.on("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const { port } = server.address();
+      server.close(() => resolve(port));
+    });
+  });
+}
+
+function ok(condition, description) {
+  if (!condition) {
+    throw new CheckFailure(`assertion failed: ${description}`);
+  }
+  console.log(`  ok: ${description}`);
+}
+
+// Objects are compared by content: key order is the serializer's, not a fact.
+function canonical(value) {
+  if (Array.isArray(value)) {
+    return value.map(canonical);
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonical(value[key])]));
+  }
+  return value;
+}
+
+function same(actual, expected, description) {
+  const a = JSON.stringify(canonical(actual));
+  const e = JSON.stringify(canonical(expected));
+  if (a !== e) {
+    throw new CheckFailure(`assertion failed: ${description}\n  expected: ${e}\n  actual:   ${a}`);
+  }
+  console.log(`  ok: ${description}: ${a}`);
+}
+
+/// Every request of the run. `expect` is the status the scenario requires.
+async function call(base, method, path, body, expect = 200) {
+  const url = `${base}${path}`;
+  const target = new URL(url);
+  if (target.hostname !== "127.0.0.1" || !ownPorts.has(Number(target.port))) {
+    throw new CheckFailure(`refusing ${url}: this run only talks to 127.0.0.1 on ports it opened itself`);
+  }
   const init = { method, headers: { Accept: "application/json" } };
   if (body !== undefined) {
     init.headers["Content-Type"] = "application/json";
@@ -46,137 +115,639 @@ async function call(method, url, body) {
   const response = await fetch(url, init);
   const text = await response.text();
   requestCount += 1;
-  console.log(`  ${response.status} ${method} ${url}`);
-  if (!response.ok) {
-    throw new CheckFailure(`${method} ${url} returned ${response.status}\n  body: ${text}`);
+  lastRequest = { method, url, sent: body, status: response.status, body: text };
+  if (verbose) {
+    console.log(`  ${response.status} ${method} ${url}`);
+  }
+  const accepted = Array.isArray(expect) ? expect : [expect];
+  if (!accepted.includes(response.status)) {
+    throw new CheckFailure(`${method} ${url} returned ${response.status}, expected ${accepted.join(" or ")}`);
+  }
+  if (!text) {
+    return null;
   }
   try {
-    return text ? JSON.parse(text) : null;
+    return JSON.parse(text);
   } catch {
-    throw new CheckFailure(`${method} ${url} returned ${response.status} with a body that is not JSON\n  body: ${text}`);
+    throw new CheckFailure(`${method} ${url} returned ${response.status} with a body that is not JSON`);
   }
 }
 
-function orchestratorIsRunning() {
-  try {
-    process.kill(orchestratorPid, 0);
-    return true;
-  } catch {
-    return false;
-  }
+function fill(path, values) {
+  return Object.entries(values).reduce(
+    (filled, [name, value]) => filled.replace(`{${name}}`, encodeURIComponent(value)),
+    path
+  );
 }
 
-async function waitForHealth(url) {
+/// A scrubbed environment: no token, no Google credential and no operator
+/// store can reach the process, and HOME is its own temp directory.
+async function startOrchestrator(dir, extraEnv = {}) {
+  mkdirSync(dir, { recursive: true });
+  const port = await freePort();
+  ownPorts.add(port);
+  const log = openSync(join(dir, "orchestrator.log"), "a");
+  const child = spawn(binary, [], {
+    cwd: dir,
+    env: {
+      PATH: process.env.PATH,
+      HOME: dir,
+      UBU_ORCHESTRATOR_PORT: String(port),
+      UBU_DB_PATH: join(dir, "store.db"),
+      UBU_DEVICE_REGISTRATION: join(dir, "device-registration.json"),
+      UBU_GITHUB_INGEST_MODE: "mock",
+      UBU_GITHUB_PROJECTION_EXPORT_MODE: "mock",
+      NO_COLOR: "1",
+      ...extraEnv
+    },
+    stdio: ["ignore", log, log]
+  });
+  // The shell script kills anything listed here that outlives this process.
+  appendFileSync(join(workDir, "pids"), `${child.pid}\n`);
+  const exited = new Promise((resolve) => child.once("exit", resolve));
+  let alive = true;
+  exited.then(() => {
+    alive = false;
+  });
+  const orchestrator = {
+    base: `http://127.0.0.1:${port}`,
+    dir,
+    async stop() {
+      running.delete(orchestrator);
+      if (alive) {
+        child.kill("SIGTERM");
+        await exited;
+      }
+    }
+  };
+  running.add(orchestrator);
+
   const deadline = Date.now() + startupTimeoutMs;
-  while (Date.now() < deadline) {
-    check(orchestratorIsRunning(), "the orchestrator exited before it answered /health");
+  for (;;) {
+    if (!alive) {
+      const tail = readFileSync(join(dir, "orchestrator.log"), "utf8").split("\n").slice(-12).join("\n");
+      throw new CheckFailure(`the orchestrator exited before it answered /health\n${tail}`);
+    }
     try {
-      const response = await fetch(url);
+      const response = await fetch(`${orchestrator.base}${endpoints.HEALTH_PATH}`);
       await response.arrayBuffer();
-      return;
+      return orchestrator;
     } catch {
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      if (Date.now() > deadline) {
+        throw new CheckFailure(`the orchestrator did not answer /health within ${startupTimeoutMs / 1000}s`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
   }
-  throw new CheckFailure(`the orchestrator did not answer ${url} within ${startupTimeoutMs / 1000}s`);
 }
 
-async function run() {
-  check(new URL(baseUrl).hostname === "127.0.0.1", `refusing base URL ${baseUrl}: this check only talks to 127.0.0.1`);
+async function stopEverything() {
+  await Promise.all([...running].map((orchestrator) => orchestrator.stop()));
+  await Promise.all([...stubs].map((stub) => stub.close()));
+}
 
-  const endpoints = await import(pathToFileURL(endpointsPath).href);
+// ---------------------------------------------------------------- fixtures
 
-  console.log("defaults:");
-  const uiDefault = endpoints.DEFAULT_ORCHESTRATOR_PORT;
-  check(typeof uiDefault === "string", `DEFAULT_ORCHESTRATOR_PORT is not exported by ${endpointsPath}`);
-  const config = readFileSync(configPath, "utf8");
-  const match = config.match(/env::var\("UBU_ORCHESTRATOR_PORT"\)[\s\S]*?\.unwrap_or\((\d+)\)/);
-  check(match !== null, `could not find the UBU_ORCHESTRATOR_PORT unwrap_or(...) default in ${configPath}`);
-  const orchestratorDefault = match[1];
-  console.log(`  ubu-ui            DEFAULT_ORCHESTRATOR_PORT = ${uiDefault}`);
-  console.log(`  ubu-orchestrator  UBU_ORCHESTRATOR_PORT unwrap_or = ${orchestratorDefault}`);
-  check(
-    uiDefault === orchestratorDefault,
-    `DEFAULT PORTS DIFFER: ubu-ui defaults to ${uiDefault} but ubu-orchestrator defaults to ${orchestratorDefault}. ` +
-      "With no override the app would call a port nothing is listening on."
-  );
-  console.log("  the two defaults agree");
+// Whole seconds, as the orchestrator stores them.
+const iso = (date) => date.toISOString().replace(/\.\d{3}Z$/, "Z");
+const thisHour = Math.floor(Date.now() / 3_600_000) * 3_600_000;
+/// A time `hours` from the top of this hour. Every window is in the near future,
+/// inside the default planning horizon.
+const at = (hours, minutes = 0) => iso(new Date(thisHour + hours * 3_600_000 + minutes * 60_000));
+const timeOfDay = (hours, minutes = 0) => at(hours, minutes).slice(11, 19);
 
-  console.log(`requests against ${baseUrl}:`);
-  await waitForHealth(`${baseUrl}${endpoints.HEALTH_PATH}`);
+const fixed = (minutes) => ({ type: "fixed", seconds: minutes * 60 });
 
-  const health = await call("GET", `${baseUrl}${endpoints.HEALTH_PATH}`);
-  check(typeof health?.status === "string", `/health returned no status: ${JSON.stringify(health)}`);
+async function captureTask(o, fields) {
+  return call(o.base, "POST", endpoints.TASK_CAPTURE_PATH, { schema_version: endpoints.TASK_CAPTURE_SCHEMA_VERSION, ...fields }, 201);
+}
 
-  const title = "Synthetic contract-check Task";
-  const captured = await call("POST", `${baseUrl}${endpoints.TASK_CAPTURE_PATH}`, {
-    schema_version: endpoints.TASK_CAPTURE_SCHEMA_VERSION,
-    title,
-    duration_estimate: { type: "fixed", seconds: 1500 }
-  });
-  check(typeof captured?.task_id === "string", `capture returned no task_id: ${JSON.stringify(captured)}`);
-  check(
-    captured.schema_version === endpoints.TASK_CAPTURE_SCHEMA_VERSION,
-    `capture answered schema_version ${captured.schema_version}, ubu-ui expects ${endpoints.TASK_CAPTURE_SCHEMA_VERSION}`
-  );
+async function listTasks(o, status = "active") {
+  const query = new URLSearchParams({ schema_version: endpoints.TASK_READ_SCHEMA_VERSION, status });
+  return (await call(o.base, "GET", `${endpoints.TASK_LIST_PATH}?${query}`)).tasks;
+}
 
-  const listQuery = new URLSearchParams({ schema_version: endpoints.TASK_READ_SCHEMA_VERSION, status: "active" });
-  const listed = await call("GET", `${baseUrl}${endpoints.TASK_LIST_PATH}?${listQuery}`);
-  const row = listed?.tasks?.find((task) => task.task_id === captured.task_id);
-  check(row !== undefined, `the captured Task ${captured.task_id} is not in GET ${endpoints.TASK_LIST_PATH}`);
-  check(row.title === title, `the listed Task has title ${JSON.stringify(row.title)}, expected ${JSON.stringify(title)}`);
+async function readTask(o, taskId) {
+  const query = new URLSearchParams({ schema_version: endpoints.TASK_READ_SCHEMA_VERSION });
+  return call(o.base, "GET", `${fill(endpoints.TASK_PATH, { task_id: taskId })}?${query}`);
+}
 
-  const editedTitle = "Synthetic contract-check Task, edited";
-  const taskUrl = `${baseUrl}${endpoints.TASK_PATH.replace("{task_id}", encodeURIComponent(captured.task_id))}`;
-  const edited = await call("PATCH", taskUrl, {
-    schema_version: endpoints.TASK_CAPTURE_SCHEMA_VERSION,
-    expected_version: row.version,
-    title: editedTitle
-  });
-  check(edited?.version > row.version, `the edit did not advance the version: ${JSON.stringify(edited)}`);
-
-  const planned = await call("POST", `${baseUrl}${endpoints.PLANNING_GENERATE_PATH}`, {
+async function generatePlan(o) {
+  const planned = await call(o.base, "POST", endpoints.PLANNING_GENERATE_PATH, {
     schema_version: endpoints.PLANNING_SCHEMA_VERSION,
     request: null
   });
-  check(
-    planned?.schema_version === endpoints.PLANNING_SCHEMA_VERSION,
-    `planning answered schema_version ${planned?.schema_version}, ubu-ui expects ${endpoints.PLANNING_SCHEMA_VERSION}`
+  if (!planned?.plan) {
+    throw new CheckFailure(`planning produced no Plan: ${JSON.stringify(planned?.diagnostics)}`);
+  }
+  return planned.plan;
+}
+
+const preview = (o) => call(o.base, "GET", endpoints.CALENDAR_PREVIEW_PATH);
+
+// The body ubu-ui's approveCalendar sends, in Mock.
+const approve = (o, previewId, expect = 200) =>
+  call(
+    o.base,
+    "POST",
+    endpoints.CALENDAR_APPROVE_PATH,
+    { schema_version: endpoints.CALENDAR_APPROVAL_SCHEMA_VERSION, preview_id: previewId, authority_source: "user", export_mode: "mock" },
+    expect
   );
 
-  const nextQuery = new URLSearchParams({ schema_version: endpoints.NEXT_ACTION_SCHEMA_VERSION });
-  const next = await call("GET", `${baseUrl}${endpoints.NEXT_ACTION_PATH}?${nextQuery}`);
-  check(
-    next?.schema_version === endpoints.NEXT_ACTION_SCHEMA_VERSION,
-    `next-action answered schema_version ${next?.schema_version}, ubu-ui expects ${endpoints.NEXT_ACTION_SCHEMA_VERSION}`
-  );
+const capture = (o) =>
+  call(o.base, "POST", endpoints.CALENDAR_CAPTURE_PATH, { schema_version: endpoints.CALENDAR_CAPTURE_SCHEMA_VERSION, export_mode: "mock" });
 
-  console.log("paths in the live /openapi.json:");
-  const spec = await call("GET", `${baseUrl}/openapi.json`);
-  const live = new Set(Object.keys(spec?.paths ?? {}));
-  const constants = Object.entries(endpoints).filter(([name]) => name.endsWith("_PATH"));
-  check(constants.length > 0, `${endpointsPath} exports no *_PATH constant`);
-  const missing = [];
-  for (const [name, path] of constants) {
-    const present = live.has(path);
-    console.log(`  ${present ? "ok     " : "MISSING"} ${name} = ${path}`);
-    if (!present) {
-      missing.push(`${name} = ${path}`);
+const reconcile = (o) =>
+  call(o.base, "POST", endpoints.CALENDAR_RECONCILE_PATH, {
+    schema_version: endpoints.CALENDAR_RECONCILIATION_SCHEMA_VERSION,
+    export_mode: "mock"
+  });
+
+const repair = (o, reconciliationId) =>
+  call(o.base, "POST", fill(endpoints.CALENDAR_REPAIR_PATH, { reconciliation_id: reconciliationId }), {
+    schema_version: endpoints.CALENDAR_REPAIR_SCHEMA_VERSION
+  });
+
+const putSetting = (o, name, value, expect = 200) =>
+  call(o.base, "PUT", fill(endpoints.SETTING_PUT_PATH, { name }), { schema_version: endpoints.SETTING_SCHEMA_VERSION, value }, expect);
+
+/// One Static and one Dynamic Task, planned and applied in Mock with no seed.
+async function appliedDay(o) {
+  const pinned = await captureTask(o, {
+    title: "Synthetic fixed appointment",
+    static_window: { start: at(3), end: at(3, 30) },
+    category_tag: "personal",
+    tags: ["personal"]
+  });
+  const flexible = await captureTask(o, { title: "Synthetic flexible errand", duration_estimate: fixed(30) });
+  await generatePlan(o);
+  const proposed = await preview(o);
+  const result = await approve(o, proposed.preview_id);
+  if (result.status !== "applied") {
+    throw new CheckFailure(`the Mock apply did not apply: ${JSON.stringify(result)}`);
+  }
+  return { pinned: pinned.task_id, flexible: flexible.task_id, applied: result.applied_events };
+}
+
+/// The mock seed is read at startup, so changing it means a restart on the same store.
+async function restartObserving(o, events) {
+  await o.stop();
+  const seed = join(o.dir, "mock-calendar-events.json");
+  writeFileSync(seed, JSON.stringify(events, null, 2));
+  return startOrchestrator(o.dir, { UBU_CALENDAR_MOCK_EVENTS: seed });
+}
+
+// An invented event id in Google's alphabet, and one in the shape Google gives
+// an instance of a recurring event: {base32hex}_{timestamp}.
+const FOREIGN_ID = "5n0q8c9h7g4k2m1p3r6t8v0a2c";
+const RECURRING_ID = `7a1b2c3d4e5f6g7h8i9j0k1l2m_${at(6).replace(/[-:]/g, "")}`;
+const observedEvent = (externalId, summary, hours) => ({
+  external_id: externalId,
+  summary,
+  start_at: at(hours),
+  end_at: at(hours, 30),
+  color_id: null,
+  transparent: false,
+  reminders_minutes: []
+});
+
+const stubs = new Set();
+
+// ---------------------------------------------------------------- scenarios
+
+const scenarios = [
+  {
+    name: "contract",
+    async run(o) {
+      const uiDefault = endpoints.DEFAULT_ORCHESTRATOR_PORT;
+      ok(typeof uiDefault === "string", "ubu-ui exports DEFAULT_ORCHESTRATOR_PORT");
+      const config = readFileSync(configPath, "utf8");
+      const match = config.match(/env::var\("UBU_ORCHESTRATOR_PORT"\)[\s\S]*?\.unwrap_or\((\d+)\)/);
+      ok(match !== null, "ubu-orchestrator's config.rs states its UBU_ORCHESTRATOR_PORT default");
+      console.log(`  ubu-ui            DEFAULT_ORCHESTRATOR_PORT = ${uiDefault}`);
+      console.log(`  ubu-orchestrator  UBU_ORCHESTRATOR_PORT unwrap_or = ${match[1]}`);
+      if (uiDefault !== match[1]) {
+        throw new CheckFailure(
+          `DEFAULT PORTS DIFFER: ubu-ui defaults to ${uiDefault} but ubu-orchestrator defaults to ${match[1]}. ` +
+            "With no override the app would call a port nothing is listening on."
+        );
+      }
+      console.log("  ok: the two defaults agree");
+
+      const health = await call(o.base, "GET", endpoints.HEALTH_PATH);
+      ok(typeof health?.status === "string", `GET ${endpoints.HEALTH_PATH} reports a status`);
+      const planned = await call(o.base, "POST", endpoints.PLANNING_GENERATE_PATH, { schema_version: endpoints.PLANNING_SCHEMA_VERSION, request: null });
+      same(planned?.schema_version, endpoints.PLANNING_SCHEMA_VERSION, "planning answers the schema version ubu-ui sends");
+      const nextQuery = new URLSearchParams({ schema_version: endpoints.NEXT_ACTION_SCHEMA_VERSION });
+      const next = await call(o.base, "GET", `${endpoints.NEXT_ACTION_PATH}?${nextQuery}`);
+      same(next?.schema_version, endpoints.NEXT_ACTION_SCHEMA_VERSION, "next-action answers the schema version ubu-ui sends");
+
+      const spec = await call(o.base, "GET", ROUTES_WITHOUT_A_UI_CONSTANT.OPENAPI);
+      const live = new Set(Object.keys(spec?.paths ?? {}));
+      const constants = Object.entries(endpoints).filter(([name]) => name.endsWith("_PATH"));
+      ok(constants.length > 0, "endpoints.ts exports path constants");
+      const missing = [];
+      for (const [name, path] of constants) {
+        const present = live.has(path);
+        console.log(`  ${present ? "ok     " : "MISSING"} ${name} = ${path}`);
+        if (!present) {
+          missing.push(`${name} = ${path}`);
+        }
+      }
+      if (missing.length > 0) {
+        throw new CheckFailure(`${missing.length} path constant(s) in endpoints.ts are not served by this orchestrator: ${missing.join(", ")}`);
+      }
+      for (const path of Object.values(ROUTES_WITHOUT_A_UI_CONSTANT).slice(1)) {
+        ok(live.has(path), `the orchestrator serves ${path}, which later scenarios use`);
+      }
+      return `defaults agree on ${uiDefault}, ${constants.length} of ${constants.length} path constants are live`;
+    }
+  },
+  {
+    name: "task loop",
+    async run(o) {
+      const title = "Synthetic contract-check Task";
+      const captured = await captureTask(o, { title, duration_estimate: fixed(25) });
+      same(captured.schema_version, endpoints.TASK_CAPTURE_SCHEMA_VERSION, "capture answers the schema version ubu-ui sends");
+      const row = (await listTasks(o)).find((task) => task.task_id === captured.task_id);
+      ok(row !== undefined, "the captured Task is listed as active");
+      same(row.title, title, "it is listed under its title");
+      const path = fill(endpoints.TASK_PATH, { task_id: captured.task_id });
+      const edit = (expectedVersion, newTitle, expect) =>
+        call(o.base, "PATCH", path, { schema_version: endpoints.TASK_CAPTURE_SCHEMA_VERSION, expected_version: expectedVersion, title: newTitle }, expect);
+      const edited = await edit(row.version, "Synthetic contract-check Task, edited", 200);
+      same(edited.version, row.version + 1, "an edit with the listed version advances the version");
+      const stale = await edit(row.version, "Synthetic edit from a stale list", 409);
+      same(stale.diagnostics[0].code, "version_conflict", "an edit with a stale expected_version is refused with 409");
+      same((await readTask(o, captured.task_id)).payload.title, "Synthetic contract-check Task, edited", "the refused edit changed nothing");
+      return "capture, list, edit, and a stale expected_version is refused with 409 version_conflict";
+    }
+  },
+  {
+    name: "static window",
+    async run(o) {
+      const captured = await captureTask(o, { title: "Synthetic Task to pin", duration_estimate: fixed(30) });
+      same((await listTasks(o))[0].placement, "planned", "a Task captured without a window is Dynamic");
+      const window = { start: at(4), end: at(4, 45) };
+      await call(o.base, "PATCH", fill(endpoints.TASK_PATH, { task_id: captured.task_id }), {
+        schema_version: endpoints.TASK_CAPTURE_SCHEMA_VERSION,
+        expected_version: 1,
+        static_window: window
+      });
+      same((await readTask(o, captured.task_id)).payload.static_window, window, "PATCH stored the static window");
+      same((await listTasks(o))[0].placement, "static", "the Task is now listed as Static");
+      const step = (await generatePlan(o)).steps.find((candidate) => candidate.task_id === captured.task_id);
+      ok(step !== undefined, "the Task is in the Plan");
+      same(
+        { static_anchor: step.static_anchor, start_at: step.start_at, end_at: step.end_at },
+        { static_anchor: true, start_at: window.start, end_at: window.end },
+        "it plans as a Static anchor at exactly its window"
+      );
+      const backwards = await call(
+        o.base,
+        "PATCH",
+        fill(endpoints.TASK_PATH, { task_id: captured.task_id }),
+        { schema_version: endpoints.TASK_CAPTURE_SCHEMA_VERSION, expected_version: 2, static_window: { start: at(5), end: at(4) } },
+        400
+      );
+      same(backwards.error, "bad request: Task static_window.end must be strictly after start", "a window that ends before it starts is refused");
+      same((await readTask(o, captured.task_id)).payload.static_window, window, "and the stored window is unchanged");
+      return "a static_window set through PATCH makes the Task plan as Static at that window";
+    }
+  },
+  {
+    name: "routines",
+    async run(o) {
+      const routine = (title, start) => ({
+        schema_version: endpoints.OBJECTIVE_SCHEMA_VERSION,
+        mode: "evergreen",
+        title,
+        recurrence: { timezone: "UTC", rule: { kind: "daily" } },
+        routine_instance_template: {
+          title,
+          duration_estimate: fixed(30),
+          nominal_start: start,
+          placement: "static",
+          occupies_capacity: true,
+          tags: [],
+          reminder_minutes: []
+        }
+      });
+      const first = await call(o.base, "POST", endpoints.OBJECTIVE_CREATE_PATH, routine("Synthetic morning review", timeOfDay(3)), 201);
+      const refused = await call(o.base, "POST", endpoints.OBJECTIVE_CREATE_PATH, routine("Synthetic stand-up", timeOfDay(3, 15)), 400);
+      same(refused.diagnostics.length, 1, "the overlapping routine is refused with one diagnostic");
+      const { code, message } = refused.diagnostics[0];
+      same(code, "objective_routine_overlap", "its code");
+      ok(message.includes("(Synthetic stand-up)") && message.includes("(Synthetic morning review)"), "the refusal names both routines");
+      ok(message.includes(`\`${first.objective_id}\``), "it names the existing routine by id");
+      const date = message.match(/first on (\d{4}-\d{2}-\d{2})/);
+      ok(date !== null, `it names the first colliding date: ${date?.[1]}`);
+      const objectives = (await call(o.base, "GET", endpoints.OBJECTIVE_LIST_PATH)).objectives;
+      same(objectives.map((objective) => objective.title), ["Synthetic morning review"], "nothing was written for the refused routine");
+      const occurrence = (await generatePlan(o)).steps.find((step) => step.summary === "Synthetic morning review");
+      ok(occurrence !== undefined, "the generated Plan contains the routine's occurrence");
+      same(
+        { static_anchor: occurrence.static_anchor, time_of_day: occurrence.start_at.slice(11, 19) },
+        { static_anchor: true, time_of_day: timeOfDay(3) },
+        "the occurrence is Static at the routine's nominal start"
+      );
+      const task = (await listTasks(o)).find((candidate) => candidate.task_id === occurrence.task_id);
+      same(task.is_routine_occurrence, true, "the Task behind it is a routine occurrence");
+      return "a Static routine is created, an overlapping one is refused naming both and the date, and the occurrence is planned";
+    }
+  },
+  {
+    name: "colour partition",
+    async run(o) {
+      const pinned = await captureTask(o, {
+        title: "Synthetic fixed appointment",
+        static_window: { start: at(3), end: at(3, 30) },
+        category_tag: "personal",
+        tags: ["personal"]
+      });
+      const flexible = await captureTask(o, { title: "Synthetic flexible errand", duration_estimate: fixed(30), category_tag: "work", tags: ["work"] });
+      await generatePlan(o);
+      const events = (await preview(o)).events;
+      const event = (taskId) => events.find((candidate) => candidate.task_id === taskId);
+      const palette = (await call(o.base, "GET", endpoints.SETTINGS_LIST_PATH)).palette;
+      const colour = (category) => palette.find((entry) => entry.category === category).color_id;
+      same(event(pinned.task_id).color_id, colour("personal"), "the Static event carries its category's colour");
+      same(event(flexible.task_id).color_id, null, "the Dynamic event carries no colour, though its Task has a category");
+      return "in the preview the Static step carries a color_id and the Dynamic step does not";
+    }
+  },
+  {
+    name: "apply",
+    async run(o) {
+      await captureTask(o, { title: "Synthetic fixed appointment", static_window: { start: at(3), end: at(3, 30) } });
+      await captureTask(o, { title: "Synthetic flexible errand", duration_estimate: fixed(30) });
+      await generatePlan(o);
+      const before = await repair(o, (await reconcile(o)).reconciliation_id);
+      same(before.applied_event_count, 0, "before the apply the applied record is empty");
+      const proposed = await preview(o);
+      same(proposed.operations.map((operation) => operation.kind), ["create", "create"], "the preview proposes two creates");
+      const result = await approve(o, proposed.preview_id);
+      same(result.status, "applied", "the Mock approve applies");
+      same(result.applied_events.length, 2, "the applied record grew to two events");
+      const next = await preview(o);
+      same(next.operations, [], "a second preview proposes nothing");
+      const replay = await approve(o, proposed.preview_id, 409);
+      same(replay.diagnostics[0].code, "calendar_projection_conflict", "the superseded preview cannot be applied again");
+      return "a Mock approve grows the applied record from 0 to 2, and a second preview proposes nothing";
+    }
+  },
+  {
+    name: "colour means done",
+    seeded: true,
+    async run(first) {
+      const day = await appliedDay(first);
+      const observed = day.applied.map((event) => (event.task_id === day.flexible ? { ...event, color_id: "10" } : event));
+      const o = await restartObserving(first, observed);
+      same((await listTasks(o)).map((task) => task.task_id).includes(day.flexible), true, "before capture the Dynamic Task is active");
+      const captured = await capture(o);
+      same(
+        { captured: captured.captured, updated: captured.updated, unchanged: captured.unchanged, skipped: captured.skipped },
+        { captured: 0, updated: 1, unchanged: 1, skipped: 0 },
+        "capture changed one Task and left the Static one unchanged"
+      );
+      same((await readTask(o, day.flexible)).status, "completed", "the Dynamic Task whose event was coloured is completed");
+      same((await listTasks(o)).map((task) => task.task_id), [day.pinned], "the Static Task, whose colour is its category, is still active");
+      const again = await capture(o);
+      same({ updated: again.updated, unchanged: again.unchanged }, { updated: 0, unchanged: 2 }, "a second capture of the same calendar completes nothing again");
+      return "a colour on an applied Dynamic event completes its Task at capture, and only that Task";
+    }
+  },
+  {
+    name: "drag means move",
+    seeded: true,
+    async run(first) {
+      const day = await appliedDay(first);
+      const moved = { start: at(5), end: at(5, 30) };
+      const observed = day.applied.map((event) => (event.task_id === day.pinned ? { ...event, start_at: moved.start, end_at: moved.end } : event));
+      same((await readTask(first, day.pinned)).payload.static_window, { start: at(3), end: at(3, 30) }, "before the drag the Static Task's window is as captured");
+      const o = await restartObserving(first, observed);
+      const captured = await capture(o);
+      same({ moved: captured.moved, updated: captured.updated, resized: captured.resized }, { moved: 1, updated: 1, resized: 0 }, "capture reports one move");
+      same((await readTask(o, day.pinned)).payload.static_window, moved, "the Task's static_window followed the event");
+      const step = (await generatePlan(o)).steps.find((candidate) => candidate.task_id === day.pinned);
+      same({ start_at: step.start_at, end_at: step.end_at }, { start_at: moved.start, end_at: moved.end }, "the next Plan places it at the moved window");
+      const back = (await preview(o)).operations.filter((operation) => (operation.event?.task_id ?? operation.task_id) === day.pinned);
+      same(back, [], "the next preview proposes no write to the moved event: the calendar already has it there");
+      return "a moved window on an applied Static event moves the Task's static_window at capture";
+    }
+  },
+  {
+    name: "foreign",
+    seeded: true,
+    async run(first) {
+      const day = await appliedDay(first);
+      const stranger = observedEvent(FOREIGN_ID, "Synthetic foreign meeting", 6);
+      const o = await restartObserving(first, [...day.applied, stranger]);
+      const reconciliation = await reconcile(o);
+      same(reconciliation.status, "observed", "reconcile reports an observation, not drift");
+      same(
+        reconciliation.conflicts.map((conflict) => [conflict.conflict_type, conflict.external_id]),
+        [["foreign", FOREIGN_ID]],
+        "the event UbU never applied is the only conflict, and it is foreign"
+      );
+      same(reconciliation.conflicts[0].message, "this event was not created by UbU and will not be touched", "reconcile says it will not be touched");
+      const repaired = await repair(o, reconciliation.reconciliation_id);
+      same(
+        { dropped_events: repaired.dropped_events, updated_events: repaired.updated_events, applied_event_count: repaired.applied_event_count },
+        { dropped_events: 0, updated_events: 0, applied_event_count: 2 },
+        "repair leaves the applied record at the two events UbU applied"
+      );
+      same((await listTasks(o)).map((task) => task.title).sort(), ["Synthetic fixed appointment", "Synthetic flexible errand"], "repair created no Task for the foreign event");
+      const after = await reconcile(o);
+      same(after.conflicts.map((conflict) => [conflict.conflict_type, conflict.external_id]), [["foreign", FOREIGN_ID]], "after repair the event is still foreign, so repair did not adopt it");
+      same((await preview(o)).operations, [], "and the next preview proposes nothing against it");
+      return "an event UbU never applied reconciles as foreign, and repair neither adopts nor touches it";
+    }
+  },
+  {
+    name: "recurring refusal",
+    seeded: true,
+    async run(first) {
+      const day = await appliedDay(first);
+      ok(/^[0-9a-v]+_\d{8}T\d{6}Z$/.test(RECURRING_ID), `the seeded id has the {base32hex}_{timestamp} shape: ${RECURRING_ID}`);
+      const o = await restartObserving(first, [...day.applied, observedEvent(RECURRING_ID, "Synthetic recurring instance", 6)]);
+      ok(true, "the orchestrator started on the seed, so the event parsed");
+      const refusal = `Calendar event \`${RECURRING_ID}\` cannot be captured: its id cannot be a UbU Task handle, so UbU cannot own it`;
+      const reconciliation = await reconcile(o);
+      same(reconciliation.conflicts.map((conflict) => [conflict.conflict_type, conflict.external_id]), [["foreign", RECURRING_ID]], "reconcile classifies it foreign");
+      same(reconciliation.diagnostics, [{ code: "capture_event_not_ownable", message: refusal }], "reconcile says why it cannot be owned");
+      const captured = await capture(o);
+      same(captured.diagnostics, [{ code: "capture_event_not_ownable", message: refusal }], "capture refuses it with capture_event_not_ownable");
+      same({ captured: captured.captured, skipped: captured.skipped, unchanged: captured.unchanged }, { captured: 0, skipped: 1, unchanged: 2 }, "capture captured nothing and skipped one");
+      same((await listTasks(o)).map((task) => task.title).sort(), ["Synthetic fixed appointment", "Synthetic flexible errand"], "no Task was created for it");
+      const after = await reconcile(o);
+      same(after.conflicts.map((conflict) => [conflict.conflict_type, conflict.external_id]), [["foreign", RECURRING_ID]], "after capture it is still foreign, so it is not in the applied record");
+      same((await repair(o, after.reconciliation_id)).applied_event_count, 2, "the applied record still holds only the two events UbU applied");
+      return "a recurring instance parses, classifies foreign, is refused by capture, creates no Task and is not recorded as applied";
+    }
+  },
+  {
+    name: "preferences",
+    async run(o) {
+      const ids = [];
+      for (const title of ["Synthetic A", "Synthetic B", "Synthetic C"]) {
+        ids.push((await captureTask(o, { title, duration_estimate: fixed(15) })).task_id);
+      }
+      const prefer = (a, b, expect) =>
+        call(o.base, "POST", endpoints.PREFERENCE_CREATE_PATH, { schema_version: endpoints.PREFERENCE_SCHEMA_VERSION, task_a: a, task_b: b, order: "a_preferred_to_b" }, expect);
+      const first = await prefer(ids[0], ids[1], 201);
+      await prefer(ids[1], ids[2], 201);
+      same((await call(o.base, "GET", endpoints.PREFERENCE_LIST_PATH)).preferences.length, 2, "two Preferences are stated");
+      const refused = await prefer(ids[2], ids[0], 400);
+      same(refused.diagnostics[0].code, "preference_cycle_rejected", "the third, which closes a cycle, is refused");
+      same(
+        refused.diagnostics[0].message,
+        `Preference cycle among Tasks [${[ids[0], ids[1], ids[2], ids[0]].join(" -> ")}]; disable or delete a conflicting Preference first`,
+        "the refusal names the members of the cycle in order"
+      );
+      await call(o.base, "DELETE", fill(endpoints.PREFERENCE_PATH, { preference_id: first.preference_id }), undefined, 204);
+      const left = (await call(o.base, "GET", endpoints.PREFERENCE_LIST_PATH)).preferences;
+      same(left.map((preference) => [preference.task_a_title, preference.task_b_title]), [["Synthetic B", "Synthetic C"]], "deleting one leaves the other");
+      await prefer(ids[2], ids[0], 201);
+      ok(true, "with the first deleted, the refused Preference is now accepted");
+      return "two Preferences are created, a cycle is refused naming its members, and one is deleted";
+    }
+  },
+  {
+    name: "decomposition",
+    async run(o) {
+      const origin = await captureTask(o, { title: "Synthetic big job", duration_estimate: fixed(60) });
+      const decomposed = await call(o.base, "POST", fill(ROUTES_WITHOUT_A_UI_CONSTANT.DECOMPOSE, { task_id: origin.task_id }), {
+        schema_version: CONTAINER_SCHEMA_VERSION,
+        expected_version: origin.version,
+        children: [
+          { title: "Synthetic step one", duration_estimate: fixed(20) },
+          { title: "Synthetic step two", duration_estimate: fixed(20), blocked_by: ["child:1"] },
+          { title: "Synthetic step three", duration_estimate: fixed(20), blocked_by: ["child:2"] }
+        ]
+      });
+      same(decomposed.child_task_ids.length, 3, "the Task is decomposed into three children");
+      const containers = (await call(o.base, "GET", ROUTES_WITHOUT_A_UI_CONSTANT.CONTAINER_LIST)).containers;
+      same(containers[0].segments, [{ start: 0, end: 3 }], "the Container holds them as one segment");
+      // A Task that would otherwise be free to sit between the children.
+      await captureTask(o, { title: "Synthetic unrelated errand", duration_estimate: fixed(10) });
+      const steps = (await generatePlan(o)).steps;
+      const children = decomposed.child_task_ids.map((id) => steps.find((step) => step.task_id === id));
+      ok(children.every((step) => step !== undefined), "all three children are in the Plan");
+      ok(!steps.some((step) => step.task_id === origin.task_id), "the decomposed Task itself is not");
+      same(
+        [children[0].end_at === children[1].start_at, children[1].end_at === children[2].start_at],
+        [true, true],
+        "the segment's children are contiguous: each starts when the one before it ends"
+      );
+      const undone = await call(o.base, "POST", fill(ROUTES_WITHOUT_A_UI_CONSTANT.CONTAINER_UNDO, { container_id: decomposed.container_id }), {
+        schema_version: CONTAINER_SCHEMA_VERSION
+      });
+      ok(undone.restored_task_id !== origin.task_id, `undo restores the Task under a new handle: ${undone.restored_task_id}`);
+      same(undone.children_mooted, decomposed.child_task_ids, "undo reports the three children mooted");
+      const active = await listTasks(o, "active");
+      same(active.map((task) => task.title).sort(), ["Synthetic big job", "Synthetic unrelated errand"], "the restored Task is active under the original title");
+      same(active.find((task) => task.title === "Synthetic big job").task_id, undone.restored_task_id, "and it is the new handle");
+      const moot = (await listTasks(o, "moot")).map((task) => task.task_id).sort();
+      same(moot, [origin.task_id, ...decomposed.child_task_ids].sort(), "the children, and the original handle, are moot");
+      return "decomposed children are contiguous in the Plan; undo gives a new Task handle and moots the children";
+    }
+  },
+  {
+    name: "settings reach planning",
+    async run(o) {
+      const pinned = await captureTask(o, {
+        title: "Synthetic fixed appointment",
+        static_window: { start: at(3), end: at(3, 30) },
+        category_tag: "personal",
+        tags: ["personal"]
+      });
+      await generatePlan(o);
+      const colourOf = async () => (await preview(o)).events.find((event) => event.task_id === pinned.task_id).color_id;
+      const before = await colourOf();
+      same(before, "3", "before the Setting the event carries the default colour for personal");
+      await putSetting(o, "calendar.color.personal", "7");
+      const entry = (await call(o.base, "GET", endpoints.SETTINGS_LIST_PATH)).palette.find((candidate) => candidate.category === "personal");
+      same(entry, { category: "personal", color_id: "7", origin: "setting" }, "GET /settings reports the Setting");
+      same(await colourOf(), "7", "the next preview carries it, with no restart and no new Plan");
+      await call(o.base, "DELETE", fill(endpoints.SETTING_DELETE_PATH, { name: "calendar.color.personal" }), undefined, 204);
+      same(await colourOf(), "3", "reverting the Setting returns the default on the next preview");
+      return "a category colour changed through PUT /setting/:name is carried by the next preview with no restart";
     }
   }
-  check(
-    missing.length === 0,
-    `${missing.length} path constant(s) in endpoints.ts are not served by this orchestrator: ${missing.join(", ")}`
-  );
+];
 
-  return `defaults agree on ${uiDefault}, ${requestCount} requests succeeded, ${constants.length} of ${constants.length} path constants are live`;
+// ---------------------------------------------------------------- the walk
+
+function describeFailure(error) {
+  const lines = [error instanceof CheckFailure ? error.message : `unexpected error: ${error?.stack ?? error}`];
+  if (lastRequest) {
+    lines.push(`  last request: ${lastRequest.method} ${lastRequest.url}`);
+    if (lastRequest.sent !== undefined) {
+      lines.push(`  sent:         ${JSON.stringify(lastRequest.sent)}`);
+    }
+    lines.push(`  status:       ${lastRequest.status}`);
+    lines.push(`  body:         ${lastRequest.body}`);
+  }
+  return lines.join("\n");
 }
 
-try {
-  const summary = await run();
-  console.log(`PASS: ubu-ui contract check: ${summary}`);
-} catch (error) {
-  const reason = error instanceof CheckFailure ? error.message : `unexpected error: ${error?.stack ?? error}`;
-  console.log(`FAIL: ubu-ui contract check: ${reason}`);
-  process.exitCode = 1;
+let interrupted = false;
+for (const signal of ["SIGINT", "SIGTERM"]) {
+  process.on(signal, () => {
+    interrupted = true;
+    stopEverything().finally(() => process.exit(130));
+  });
 }
+
+let passed = 0;
+let skipped = 0;
+let failed = null;
+const total = scenarios.length;
+
+for (const [index, scenario] of scenarios.entries()) {
+  const number = index + 1;
+  const label = `${String(number).padStart(2)} ${scenario.name}`;
+  if (only && !only.has(number)) {
+    console.log(`NOT RUN ${label}: excluded by UBU_CHECK_ONLY`);
+    continue;
+  }
+  console.log(`scenario ${number} of ${total}: ${scenario.name}${scenario.seeded ? " (seeded mock calendar)" : ""}`);
+  lastRequest = null;
+  try {
+    const orchestrator = await startOrchestrator(join(workDir, `scenario-${String(number).padStart(2, "0")}`));
+    const checked = await scenario.run(orchestrator);
+    console.log(`PASS ${label}: ${checked}`);
+    passed += 1;
+  } catch (error) {
+    if (!interrupted) {
+      console.log(`FAIL ${label}: ${describeFailure(error)}`);
+      failed = { number, scenario };
+    }
+  } finally {
+    await stopEverything();
+  }
+  if (failed || interrupted) {
+    break;
+  }
+}
+
+if (interrupted) {
+  console.log(`INTERRUPTED: ${passed} of ${total} scenarios had passed; the walk did not finish and is not a pass`);
+  // The signal handler stops everything and exits 130.
+  await new Promise(() => {});
+}
+
+if (failed) {
+  const log = join(workDir, `scenario-${String(failed.number).padStart(2, "0")}`, "orchestrator.log");
+  try {
+    const tail = readFileSync(log, "utf8").split("\n").slice(-20).join("\n");
+    console.log(`--- orchestrator log (last 20 lines) ---\n${tail}\n--- end of orchestrator log ---`);
+  } catch {
+    // The orchestrator never started; the failure above says why.
+  }
+}
+const partial = only ? `, PARTIAL WALK: only ${[...only].join(",")} selected` : "";
+console.log(`RESULT: ${passed} of ${total} scenarios passed, ${failed ? 1 : 0} failed, ${skipped} skipped, ${requestCount} requests, all to 127.0.0.1${partial}`);
+process.exitCode = failed ? 1 : 0;
