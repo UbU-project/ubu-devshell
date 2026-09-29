@@ -2,8 +2,8 @@
 
 `scripts/check-ui-contract.sh` builds the real `ubu-orchestrator` and walks
 the daily loop against it over HTTP, in fourteen scenarios. It needs no
-webview, no Google account and no model. A full walk takes about fifteen
-seconds once the orchestrator is built.
+webview, no Google account and no model. A full walk takes about ten seconds
+once the orchestrator is built.
 
 ## Why it exists
 
