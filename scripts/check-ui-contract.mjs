@@ -1,7 +1,7 @@
 // check-ui-contract.mjs: the scenario walk behind check-ui-contract.sh.
 //
 // Run by that script, which builds the orchestrator and owns the temp
-// directory. Node 22 or newer, built-in fetch only, no dependency.
+// directory. Node 22 or newer, built-in fetch and node:http only, no dependency.
 //
 // What this does NOT cover: the Tauri HTTP plugin transport, the capability
 // scope, and anything rendered. Those remain the operator's acceptance surface.
@@ -19,6 +19,7 @@
 // refuses any address that is not 127.0.0.1 on a port this run opened itself.
 import { spawn } from "node:child_process";
 import { appendFileSync, mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs";
+import http from "node:http";
 import net from "node:net";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -312,7 +313,57 @@ const observedEvent = (externalId, summary, hours) => ({
   reminders_minutes: []
 });
 
+// ------------------------------------------------ the stub model server (§E)
+
 const stubs = new Set();
+
+/// Canned /api/generate answers on an ephemeral loopback port. `mode` selects
+/// the answer: success, not_found, slow or empty.
+async function startModelStub() {
+  const stub = { mode: "success", requests: [], delayMs: 0 };
+  const server = http.createServer((request, response) => {
+    let raw = "";
+    request.on("data", (chunk) => {
+      raw += chunk;
+    });
+    request.on("end", () => {
+      const body = raw ? JSON.parse(raw) : null;
+      stub.requests.push({ method: request.method, url: request.url, body });
+      const answer = (status, payload) => {
+        response.writeHead(status, { "Content-Type": "application/json" });
+        response.end(JSON.stringify(payload));
+      };
+      if (request.method !== "POST" || request.url !== "/api/generate") {
+        answer(404, { error: "the stub serves POST /api/generate only" });
+      } else if (stub.mode === "not_found") {
+        answer(404, { error: `model '${body.model}' not found` });
+      } else if (stub.mode === "empty") {
+        answer(200, { model: body.model, done: true, response: "", thinking: "synthetic thinking that must never be echoed" });
+      } else if (stub.mode === "slow") {
+        const timer = setTimeout(() => answer(200, { model: body.model, done: true, response: '{"proposals":[]}' }), stub.delayMs);
+        response.on("close", () => clearTimeout(timer));
+      } else {
+        const proposals = JSON.parse(body.prompt).map((task) => ({ id: task.id, category_tag: "grocery", confidence: 0.75 }));
+        answer(200, { model: body.model, done: true, response: JSON.stringify({ proposals }) });
+      }
+    });
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address();
+  ownPorts.add(port);
+  stub.endpoint = `http://127.0.0.1:${port}`;
+  stub.close = () =>
+    new Promise((resolve) => {
+      stubs.delete(stub);
+      server.closeAllConnections();
+      server.close(resolve);
+    });
+  stubs.add(stub);
+  return stub;
+}
+
+const runAdvisory = (o) =>
+  call(o.base, "POST", endpoints.ADVISORY_RUN_PATH, { schema_version: endpoints.ADVISORY_RUN_SCHEMA_VERSION, producer: "suggest_tags" });
 
 // ---------------------------------------------------------------- scenarios
 
@@ -675,6 +726,104 @@ const scenarios = [
       same(await colourOf(), "3", "reverting the Setting returns the default on the next preview");
       return "a category colour changed through PUT /setting/:name is carried by the next preview with no restart";
     }
+  },
+  {
+    name: "advisory",
+    async run(o) {
+      const stub = await startModelStub();
+      await captureTask(o, { title: "Synthetic oat milk", duration_estimate: fixed(10) });
+      await captureTask(o, { title: "Synthetic bin bags", duration_estimate: fixed(10) });
+      const rows = async () => (await call(o.base, "GET", endpoints.ADVISORY_QUEUE_PATH)).candidates;
+
+      const unconfigured = await runAdvisory(o);
+      same(unconfigured.status, "unconfigured", "with nothing configured the run reports unconfigured");
+      same(unconfigured.diagnostics.map((diagnostic) => diagnostic.code), ["advisory_unconfigured", "advisory_unconfigured"], "and names both missing Settings");
+      same(stub.requests.length, 0, "without contacting the model");
+
+      await putSetting(o, "advisory.model", "synthetic-model:1");
+      await putSetting(o, "advisory.endpoint", stub.endpoint);
+      await putSetting(o, "advisory.timeout_ms", 5000);
+
+      const expectFailure = async (mode, status, code) => {
+        stub.mode = mode;
+        const asked = stub.requests.length;
+        const failed = await runAdvisory(o);
+        same({ status: failed.status, code: failed.diagnostics[0]?.code, enqueued: failed.candidates_enqueued }, { status, code, enqueued: 0 }, `a ${mode} answer reports ${code} and enqueues nothing`);
+        same(stub.requests.length, asked + 1, "after one request to the model");
+        same((await rows()).length, 0, "and the queue is still empty");
+        return failed.diagnostics[0].message;
+      };
+
+      const notFound = await expectFailure("not_found", "worker_error", "advisory_http_failed");
+      ok(notFound.includes("HTTP 404: model 'synthetic-model:1' not found"), `the server's 404 body reaches the diagnostic: ${notFound}`);
+
+      const empty = await expectFailure("empty", "malformed_result", "advisory_empty_response");
+      ok(empty.includes("thinking_present: true"), "the empty answer reports that thinking was present");
+      ok(!empty.includes("synthetic thinking"), "and none of the thinking itself");
+
+      stub.delayMs = 8000;
+      const started = Date.now();
+      await expectFailure("slow", "timeout", "advisory_timeout");
+      const waited = Date.now() - started;
+      ok(waited >= 4900 && waited < 7900, `the run gave up at its 5000 ms budget, before the answer due at 8000 ms: ${waited} ms`);
+
+      stub.mode = "success";
+      const good = await runAdvisory(o);
+      same({ status: good.status, selected: good.selected.length, enqueued: good.candidates_enqueued }, { status: "ok", selected: 2, enqueued: 2 }, "a good answer enqueues a candidate for each selected Task");
+      const sent = stub.requests.at(-1).body;
+      same({ model: sent.model, stream: sent.stream, think: sent.think }, { model: "synthetic-model:1", stream: false, think: false }, "the request the model received");
+      same(JSON.parse(sent.prompt).map((task) => Object.keys(task)), [["id", "title"], ["id", "title"]], "the prompt carries Task ids and titles only");
+      const queue = await rows();
+      same(queue.length, 2, "both are in the queue");
+      const chosen = queue[0].candidate;
+      const target = chosen.target_refs[0].id;
+      same((await readTask(o, target)).payload.category_tag, undefined, "before admission the Task has no category");
+      await call(o.base, "POST", fill(endpoints.ADVISORY_ADMIT_PATH, { candidate_id: chosen.advisory_candidate_id }), { observed_version: chosen.version });
+      same((await readTask(o, target)).payload.category_tag, "grocery", "admitting the candidate sets the category");
+      const other = queue[1].candidate.target_refs[0].id;
+      same((await readTask(o, other)).payload.category_tag, undefined, "the Task whose candidate was not admitted is unchanged");
+      return "unconfigured, a 404 body, an empty answer, a timeout and a good answer each report as they should, against a stub model";
+    }
+  }
+];
+
+// ----------------------------------------------------- the live flags (§E)
+
+// Off by default. Unset, each is reported as skipped, never as passed, and
+// nothing in this file then reaches past 127.0.0.1 on a port this run opened.
+const liveScenarios = [
+  {
+    name: "live Google Calendar",
+    flag: "UBU_E2E_GOOGLE",
+    needs: ["UBU_GOOGLE_CREDENTIALS_PATH", "UBU_GOOGLE_TOKEN_CACHE_PATH"],
+    passthrough: ["UBU_GOOGLE_CREDENTIALS_PATH", "UBU_GOOGLE_TOKEN_CACHE_PATH", "UBU_GOOGLE_CALENDAR_ID"],
+    // Read-only: one observation of the calendar. Nothing is approved, captured or repaired.
+    async run(o) {
+      await call(o.base, "POST", endpoints.GOOGLE_CALENDAR_SESSION_PATH, { schema_version: endpoints.DESKTOP_SESSION_SCHEMA_VERSION, enabled: true });
+      const observed = await call(o.base, "POST", endpoints.CALENDAR_RECONCILE_PATH, {
+        schema_version: endpoints.CALENDAR_RECONCILIATION_SCHEMA_VERSION,
+        export_mode: "live"
+      });
+      ok(typeof observed.status === "string", `a live reconcile observed the calendar: ${observed.status}, ${observed.conflicts.length} conflict(s)`);
+      return "one read-only live reconcile answered";
+    }
+  },
+  {
+    name: "live ollama",
+    flag: "UBU_E2E_OLLAMA",
+    needs: ["UBU_E2E_OLLAMA_MODEL"],
+    passthrough: [],
+    async run(o) {
+      const endpoint = process.env.UBU_E2E_OLLAMA_ENDPOINT ?? "http://127.0.0.1:11434";
+      await captureTask(o, { title: "Synthetic oat milk", duration_estimate: fixed(10) });
+      await putSetting(o, "advisory.model", process.env.UBU_E2E_OLLAMA_MODEL);
+      await putSetting(o, "advisory.endpoint", endpoint);
+      await putSetting(o, "advisory.timeout_ms", Number(process.env.UBU_E2E_OLLAMA_TIMEOUT_MS ?? 600000));
+      const result = await runAdvisory(o);
+      same(result.diagnostics, [], "the live run reports no diagnostic");
+      same(result.status, "ok", "and its status is ok");
+      return `a live run against ${endpoint} answered ok, ${result.candidates_enqueued} candidate(s)`;
+    }
   }
 ];
 
@@ -733,6 +882,38 @@ for (const [index, scenario] of scenarios.entries()) {
   }
 }
 
+if (!failed && !interrupted && !only) {
+  for (const live of liveScenarios) {
+    if (process.env[live.flag] !== "1") {
+      console.log(`SKIP ${live.name}: ${live.flag} is not set to 1; this scenario did not run and proves nothing`);
+      skipped += 1;
+      continue;
+    }
+    console.log(`live scenario: ${live.name} (${live.flag}=1)`);
+    lastRequest = null;
+    try {
+      const missing = live.needs.filter((name) => !process.env[name]);
+      if (missing.length > 0) {
+        throw new CheckFailure(`${live.flag}=1 also needs ${missing.join(" and ")}`);
+      }
+      const env = Object.fromEntries(live.passthrough.filter((name) => process.env[name]).map((name) => [name, process.env[name]]));
+      const orchestrator = await startOrchestrator(join(workDir, `live-${live.flag.toLowerCase()}`), env);
+      if (live.flag === "UBU_E2E_OLLAMA") {
+        ownPorts.add(Number(new URL(process.env.UBU_E2E_OLLAMA_ENDPOINT ?? "http://127.0.0.1:11434").port));
+      }
+      console.log(`PASS live ${live.name}: ${await live.run(orchestrator)}`);
+    } catch (error) {
+      console.log(`FAIL live ${live.name}: ${describeFailure(error)}`);
+      failed = { number: live.name, scenario: live };
+    } finally {
+      await stopEverything();
+    }
+    if (failed) {
+      break;
+    }
+  }
+}
+
 if (interrupted) {
   console.log(`INTERRUPTED: ${passed} of ${total} scenarios had passed; the walk did not finish and is not a pass`);
   // The signal handler stops everything and exits 130.
@@ -740,7 +921,7 @@ if (interrupted) {
 }
 
 if (failed) {
-  const log = join(workDir, `scenario-${String(failed.number).padStart(2, "0")}`, "orchestrator.log");
+  const log = join(workDir, typeof failed.number === "number" ? `scenario-${String(failed.number).padStart(2, "0")}` : `live-${failed.scenario.flag.toLowerCase()}`, "orchestrator.log");
   try {
     const tail = readFileSync(log, "utf8").split("\n").slice(-20).join("\n");
     console.log(`--- orchestrator log (last 20 lines) ---\n${tail}\n--- end of orchestrator log ---`);

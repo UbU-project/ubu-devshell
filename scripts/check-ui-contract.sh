@@ -2,7 +2,7 @@
 # check-ui-contract.sh: does ubu-ui's idea of the orchestrator match the
 # orchestrator, and does the daily loop work over HTTP?
 #
-# Builds the real ubu-orchestrator and walks thirteen scenarios against it. Each
+# Builds the real ubu-orchestrator and walks fourteen scenarios against it. Each
 # scenario gets its own temporary store and its own orchestrator on an ephemeral
 # loopback port, driven with the path and schema-version constants imported from
 # ubu-ui/src/api/endpoints.ts. See docs/CONTRACT_CHECK.md.
@@ -15,9 +15,12 @@
 # Those three remain the operator's acceptance surface in `npm run tauri:dev`.
 #
 # Nothing here leaves the machine: the build is offline, each orchestrator binds
-# 127.0.0.1 and runs in mock modes with no credentials in its environment, and
-# the Node script refuses any address that is not 127.0.0.1 on a port this run
-# opened.
+# 127.0.0.1 and runs in mock modes with no credentials in its environment, the
+# model is a stub this run starts itself, and the Node script refuses any address
+# that is not 127.0.0.1 on a port this run opened.
+#
+# Two live scenarios are opt-in and off by default: UBU_E2E_GOOGLE=1 and
+# UBU_E2E_OLLAMA=1. Unset, they are reported as skipped, never as passed.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -31,7 +34,7 @@ usage() {
   cat <<'USAGE'
 Usage: check-ui-contract.sh
 
-Builds ubu-orchestrator and walks thirteen scenarios against it, each with its
+Builds ubu-orchestrator and walks fourteen scenarios against it, each with its
 own temporary store and its own orchestrator on an ephemeral loopback port.
 Prints one PASS or FAIL line per scenario, stops at the first failure with the
 request, the status and the body, and exits non-zero on failure.
@@ -47,6 +50,11 @@ Environment overrides:
   UBU_CHECK_VERBOSE=1      also print every request and its status
   UBU_CHECK_ONLY=7,8       walk only these scenarios; the result says it is partial
 
+Live scenarios, off by default and reported as skipped when unset:
+  UBU_E2E_GOOGLE=1         one read-only live reconcile; also needs
+                           UBU_GOOGLE_CREDENTIALS_PATH and UBU_GOOGLE_TOKEN_CACHE_PATH
+  UBU_E2E_OLLAMA=1         one live advisory run; also needs UBU_E2E_OLLAMA_MODEL,
+                           and takes UBU_E2E_OLLAMA_ENDPOINT and UBU_E2E_OLLAMA_TIMEOUT_MS
 USAGE
 }
 
