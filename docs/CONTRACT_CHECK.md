@@ -1,7 +1,7 @@
 # The scenario runner
 
 `scripts/check-ui-contract.sh` builds the real `ubu-orchestrator` and walks
-the daily loop against it over HTTP, in fourteen scenarios. It needs no
+the daily loop against it over HTTP, in sixteen scenarios. It needs no
 webview, no Google account and no model. A full walk takes about ten seconds
 once the orchestrator is built.
 
@@ -46,7 +46,7 @@ at that time:
 
 Those two assertions are still scenario 1, and still run first.
 
-## The fourteen scenarios
+## The sixteen scenarios
 
 Every scenario starts its own orchestrator on its own ephemeral loopback
 port with its own empty store. Nothing is carried from one to the next. All
@@ -68,6 +68,8 @@ calendar requests ask for `export_mode: "mock"`.
 | 12 | decomposition | A Task is decomposed into three children held as one segment. In the Plan each child starts when the one before it ends. Undo restores the Task under a new handle and moots the children. |
 | 13 | settings reach planning | A category colour changed through `PUT /setting/:name` is carried by the next preview, with no restart and no new Plan. Reverting returns the default. |
 | 14 | advisory | Against the stub model: unconfigured names both Settings and asks the model nothing; a 404 body reaches `advisory_http_failed`; an empty answer reports `advisory_empty_response` and whether thinking was present; a slow answer trips `advisory_timeout` at the budget; a good answer enqueues candidates, and admitting one sets the category. |
+| 15 | clarify | Against the stub model: a run with no Task named interviews the Task with no description, and the prompt carries its id, title and round 1 and no description. A second run is refused with `clarify_already_queued` and the model receives no request. Plain Admit is refused with `advisory_answer_required`, and a yes/no answered `maybe` with `clarify_invalid_answer`. A proper answer admits the candidate and the Task's `description` is exactly the expected `Q:`/`A:` text, in question order, with the blank and the inapplicable answer dropped. Round two must name the Task; its prompt carries round 2 and that description; answering it makes the description grow. A third run reports `clarify_no_questions`. |
+| 16 | reopen | A Task is completed. Reopening with another Task's completion id is refused with 409 `reopen_stale_completion`. Reopening with the right id returns it to `active`. Reopening again is refused with 409 `reopen_not_completed`. The Task can be completed again. |
 
 The seeded scenarios first apply a day with no seed, then restart the
 orchestrator on the same store with a fixture built from the events that
@@ -80,10 +82,14 @@ and `/containers`. Scenario 1 asserts the orchestrator serves them.
 
 ### The stub model
 
-Scenario 14 starts a `node:http` server on its own ephemeral loopback port
-and sets `advisory.endpoint` to it. The stub serves `POST /api/generate` with
-one of four canned answers: success, a 404 with an `error` body, a delay
-beyond the budget, and an empty `response`. It can assert the 404, the
+Scenarios 14 and 15 each start a `node:http` server on its own ephemeral
+loopback port and set `advisory.endpoint` to it. The stub serves
+`POST /api/generate` with one of five canned answers: success, a 404 with an
+`error` body, a delay beyond the budget, an empty `response`, and, in
+`clarify` mode, a question set. The clarify answer is made from the request:
+the round the prompt carries picks the questions, and at round 3 the stub says
+it is done. Every request the stub receives is kept, so a scenario asserts
+what the prompt carried. It can assert the 404, the
 timeout and the empty answer every time, which a real model cannot. The
 orchestrator's own transport makes the request, so the real request body is
 checked too.
@@ -154,7 +160,7 @@ Each scenario prints its name, one `ok:` line for each thing it checked with
 the value it saw, and then one `PASS` line saying what was established:
 
 ```text
-scenario 7 of 14: colour means done (seeded mock calendar)
+scenario 7 of 16: colour means done (seeded mock calendar)
   ok: before capture the Dynamic Task is active: true
   ok: capture changed one Task and left the Static one unchanged: {"captured":0,"skipped":0,"unchanged":1,"updated":1}
   ok: the Dynamic Task whose event was coloured is completed: "completed"
@@ -162,10 +168,10 @@ scenario 7 of 14: colour means done (seeded mock calendar)
 PASS  7 colour means done: a colour on an applied Dynamic event completes its Task at capture, and only that Task
 ```
 
-A complete walk ends with fourteen `PASS` lines, two `SKIP` lines and:
+A complete walk ends with sixteen `PASS` lines, two `SKIP` lines and:
 
 ```text
-RESULT: 14 of 14 scenarios passed, 0 failed, 2 skipped, 120 requests, all to 127.0.0.1
+RESULT: 16 of 16 scenarios passed, 0 failed, 2 skipped, 155 requests, all to 127.0.0.1
 ```
 
 The walk stops at the first failure. The `FAIL` line names the scenario and

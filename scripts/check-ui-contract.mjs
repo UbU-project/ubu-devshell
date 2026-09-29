@@ -317,8 +317,19 @@ const observedEvent = (externalId, summary, hours) => ({
 
 const stubs = new Set();
 
+// The question sets the stub asks in clarify mode. Round one has a question that
+// depends on a yes, one that depends on a no, and one that depends on nothing.
+const ROUND_ONE = [
+  { id: "q1", text: "Is there a deadline for the synthetic teapot?", kind: "YesNo" },
+  { id: "q2", text: "What is the synthetic deadline?", kind: "ShortText", depends_on: ["q1", "y"] },
+  { id: "q3", text: "Who is the synthetic teapot for?", kind: "ShortText" },
+  { id: "q4", text: "Why is there no synthetic deadline?", kind: "ShortText", depends_on: ["q1", "n"] }
+];
+const ROUND_TWO = [{ id: "r1", text: "Is the synthetic teapot already bought?", kind: "YesNo" }];
+
 /// Canned /api/generate answers on an ephemeral loopback port. `mode` selects
-/// the answer: success, not_found, slow or empty.
+/// the answer: success, not_found, slow, empty or clarify. In clarify mode the
+/// answer is made from the request: the round the prompt carries picks the questions.
 async function startModelStub() {
   const stub = { mode: "success", requests: [], delayMs: 0 };
   const server = http.createServer((request, response) => {
@@ -342,6 +353,10 @@ async function startModelStub() {
       } else if (stub.mode === "slow") {
         const timer = setTimeout(() => answer(200, { model: body.model, done: true, response: '{"proposals":[]}' }), stub.delayMs);
         response.on("close", () => clearTimeout(timer));
+      } else if (stub.mode === "clarify") {
+        const { round } = JSON.parse(body.prompt);
+        const set = round === 1 ? { questions: ROUND_ONE, done: false } : round === 2 ? { questions: ROUND_TWO, done: false } : { questions: [], done: true };
+        answer(200, { model: body.model, done: true, response: JSON.stringify(set) });
       } else {
         const proposals = JSON.parse(body.prompt).map((task) => ({ id: task.id, category_tag: "grocery", confidence: 0.75 }));
         answer(200, { model: body.model, done: true, response: JSON.stringify({ proposals }) });
@@ -364,6 +379,19 @@ async function startModelStub() {
 
 const runAdvisory = (o) =>
   call(o.base, "POST", endpoints.ADVISORY_RUN_PATH, { schema_version: endpoints.ADVISORY_RUN_SCHEMA_VERSION, producer: "suggest_tags" });
+
+const runClarify = (o, taskId) =>
+  call(o.base, "POST", endpoints.ADVISORY_RUN_PATH, {
+    schema_version: endpoints.ADVISORY_RUN_SCHEMA_VERSION,
+    producer: "clarify",
+    ...(taskId === undefined ? {} : { task_id: taskId })
+  });
+
+const recordAction = (o, taskId, action, expect = 200) =>
+  call(o.base, "POST", fill(endpoints.RECORD_TASK_ACTION_PATH, { task_id: taskId }), { schema_version: endpoints.TASK_ACTION_SCHEMA_VERSION, action }, expect);
+
+const reopenTask = (o, taskId, completionLogId, expect = 200) =>
+  call(o.base, "POST", fill(endpoints.TASK_REOPEN_PATH, { task_id: taskId }), { schema_version: endpoints.TASK_ACTION_SCHEMA_VERSION, completion_log_id: completionLogId }, expect);
 
 // ---------------------------------------------------------------- scenarios
 
@@ -783,6 +811,102 @@ const scenarios = [
       const other = queue[1].candidate.target_refs[0].id;
       same((await readTask(o, other)).payload.category_tag, undefined, "the Task whose candidate was not admitted is unchanged");
       return "unconfigured, a 404 body, an empty answer, a timeout and a good answer each report as they should, against a stub model";
+    }
+  },
+  {
+    name: "clarify",
+    async run(o) {
+      const stub = await startModelStub();
+      stub.mode = "clarify";
+      const captured = await captureTask(o, { title: "Synthetic lunar teapot", duration_estimate: fixed(10) });
+      const task = captured.task_id;
+      same((await readTask(o, task)).payload.description, undefined, "the captured Task has no description");
+      await putSetting(o, "advisory.model", "synthetic-model:1");
+      await putSetting(o, "advisory.endpoint", stub.endpoint);
+      await putSetting(o, "advisory.timeout_ms", 5000);
+      const waiting = async () => (await call(o.base, "GET", endpoints.ADVISORY_QUEUE_PATH)).candidates.map((entry) => entry.candidate);
+      const prompt = (index) => JSON.parse(stub.requests[index].body.prompt);
+      const answer = (candidate, answers, expect = 200) =>
+        call(o.base, "POST", fill(endpoints.ADVISORY_ANSWER_PATH, { candidate_id: candidate.advisory_candidate_id }), { observed_version: candidate.version, answers }, expect);
+
+      const first = await runClarify(o);
+      same({ status: first.status, selected: first.selected, enqueued: first.candidates_enqueued, diagnostics: first.diagnostics }, { status: "ok", selected: [{ id: task, title: "Synthetic lunar teapot" }], enqueued: 1, diagnostics: [] }, "with no Task named, the run selects the Task with no description and enqueues one candidate");
+      same(prompt(0), { id: task, title: "Synthetic lunar teapot", round: 1 }, "the prompt carried the Task's id, title and round 1, and no description");
+      const sent = stub.requests[0].body;
+      same({ model: sent.model, stream: sent.stream, think: sent.think }, { model: "synthetic-model:1", stream: false, think: false }, "the request the model received");
+
+      const again = await runClarify(o);
+      same({ status: again.status, enqueued: again.candidates_enqueued, code: again.diagnostics[0]?.code }, { status: "ok", enqueued: 0, code: "clarify_already_queued" }, "a second run is refused: the Task already has questions waiting");
+      same(stub.requests.length, 1, "and the model received no further request");
+
+      const queue = await waiting();
+      same(queue.map((candidate) => [candidate.candidate_kind, candidate.lifecycle_state, candidate.normalized_proposal.round]), [["clarification_question", "proposed", 1]], "the queue holds one clarification candidate, round 1");
+      same(queue[0].normalized_proposal.questions, ROUND_ONE, "carrying the four questions the model asked");
+      const candidate = queue[0];
+
+      const admitted = await call(o.base, "POST", fill(endpoints.ADVISORY_ADMIT_PATH, { candidate_id: candidate.advisory_candidate_id }), { observed_version: candidate.version }, 400);
+      same(admitted.diagnostics[0].code, "advisory_answer_required", "plain Admit is refused: a clarification is admitted by answering it");
+      const maybe = await answer(candidate, { q1: "maybe" }, 400);
+      same(maybe.diagnostics[0].code, "clarify_invalid_answer", "a yes/no question answered `maybe` is refused");
+      same((await readTask(o, task)).payload.description, undefined, "neither refusal wrote anything to the Task");
+      same((await waiting()).map((waitingCandidate) => [waitingCandidate.lifecycle_state, waitingCandidate.version]), [["proposed", 1]], "and the candidate is still proposed");
+
+      // q1 yes satisfies q2's dependency; q3 is left blank; q4 depends on a no and is answered anyway.
+      const saved = await answer(candidate, { q4: "Synthetic reason that does not apply", q3: "  ", q2: " next synthetic Friday ", q1: "Y" });
+      same(saved.candidate.lifecycle_state, "admitted", "a proper answer admits the candidate");
+      const roundOne = "Q: Is there a deadline for the synthetic teapot?\nA: y\nQ: What is the synthetic deadline?\nA: next synthetic Friday\n";
+      same((await readTask(o, task)).payload.description, roundOne, "the description is the questions answered, in question order, with the blank and the inapplicable answer dropped");
+      same(await waiting(), [], "the queue is empty again");
+
+      const unnamed = await runClarify(o);
+      same(unnamed.diagnostics[0]?.code, "clarify_no_task", "with no Task named there is now nothing to interview: round two must name the Task");
+      same(stub.requests.length, 1, "and the model was not asked");
+      const second = await runClarify(o, task);
+      same({ status: second.status, enqueued: second.candidates_enqueued }, { status: "ok", enqueued: 1 }, "naming the Task runs round two");
+      same(prompt(1), { id: task, title: "Synthetic lunar teapot", description: roundOne, round: 2 }, "the prompt carried round 2 and the description written by round one");
+
+      const next = (await waiting())[0];
+      same(next.normalized_proposal.round, 2, "the new candidate is round 2");
+      await answer(next, { r1: "n" });
+      const both = (await readTask(o, task)).payload.description;
+      same(both, `${roundOne}Q: Is the synthetic teapot already bought?\nA: n\n`, "the description grew by round two's answer");
+      ok(both.startsWith(roundOne) && both.length > roundOne.length, "and round one's answers are still there: appended, not replaced");
+
+      const done = await runClarify(o, task);
+      same({ status: done.status, enqueued: done.candidates_enqueued, code: done.diagnostics[0]?.code }, { status: "ok", enqueued: 0, code: "clarify_no_questions" }, "when the model has nothing left to ask, the run is ok and enqueues nothing");
+      same(prompt(2).round, 3, "having been asked as round 3");
+      same((await readTask(o, task)).payload.description, both, "and the Task is unchanged");
+      console.log(`  the composed description, verbatim: ${JSON.stringify(both)}`);
+      return "an interview runs two rounds: one open at a time, admitted by answering, and its answers accumulate in the Task's description";
+    }
+  },
+  {
+    name: "reopen",
+    async run(o) {
+      const task = (await captureTask(o, { title: "Synthetic Task completed by mistake", duration_estimate: fixed(10) })).task_id;
+      const other = (await captureTask(o, { title: "Synthetic other Task", duration_estimate: fixed(10) })).task_id;
+      const completed = await recordAction(o, task, "complete");
+      same({ status: completed.task_status, applied: completed.transition_applied }, { status: "completed", applied: true }, "completing the Task completes it");
+      same((await readTask(o, task)).status, "completed", "the Task is completed");
+      const elsewhere = await recordAction(o, other, "complete");
+
+      const wrong = await reopenTask(o, task, elsewhere.log_id, 409);
+      same(wrong.diagnostics[0].code, "reopen_stale_completion", "reopening with another Task's completion id is refused with 409");
+      same((await readTask(o, task)).status, "completed", "and the Task is still completed");
+
+      const reopened = await reopenTask(o, task, completed.log_id);
+      same({ status: reopened.task_status, completion: reopened.completion_log_id, diagnostics: reopened.diagnostics }, { status: "active", completion: completed.log_id, diagnostics: [] }, "reopening with the right id undoes the completion");
+      same((await readTask(o, task)).status, "active", "the Task is active");
+      ok((await listTasks(o)).some((listed) => listed.task_id === task), "and is listed among the active Tasks again");
+
+      const twice = await reopenTask(o, task, completed.log_id, 409);
+      same(twice.diagnostics[0].code, "reopen_not_completed", "reopening again is refused with 409: there is nothing to undo");
+
+      const again = await recordAction(o, task, "complete");
+      same({ status: again.task_status, applied: again.transition_applied }, { status: "completed", applied: true }, "the reopened Task can be completed again");
+      ok(again.log_id !== completed.log_id, "as a new completion, with its own id");
+      same((await readTask(o, other)).status, "completed", "the other Task was never touched");
+      return "a completion made by mistake is undone by naming it; a wrong id and a second undo are refused; the Task can be completed again";
     }
   }
 ];
