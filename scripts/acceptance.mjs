@@ -155,6 +155,27 @@ const SEEDS = {
       return `${task.payload.title} (${made.task_id})`;
     }
   },
+  spent: {
+    what: "a Static Task whose window fell yesterday, so the time-by-category report has a row to show",
+    async make() {
+      const yesterday = thisHour - 24 * 3_600_000;
+      return captureTask({
+        title: TITLE("— yesterday's fixed hour"),
+        static_window: { start: iso(new Date(yesterday)), end: iso(new Date(yesterday + 3_600_000)) },
+        category_tag: "personal",
+        tags: ["personal"]
+      });
+    },
+    async check(made) {
+      const task = await readTask(made.task_id);
+      const report = await call("GET", `${endpoints.TIME_BY_CATEGORY_PATH}?${new URLSearchParams({ schema_version: endpoints.TIME_BY_CATEGORY_SCHEMA_VERSION })}`);
+      const row = report.categories.find((candidate) => candidate.category === "personal");
+      if (!row || row.static_seconds < 3_600) {
+        throw new StagingFailure(`the report's personal row does not carry yesterday's hour: ${JSON.stringify(report.categories)}`);
+      }
+      return `${task.payload.title} (${made.task_id}), one hour of personal in the last seven days`;
+    }
+  },
   advisory: {
     what: "advisory.endpoint and advisory.timeout_ms, so only the model name is left to choose",
     async make() {
@@ -185,29 +206,63 @@ const STEPS = [
   {
     needs: [],
     title: "Setup → Run self-check",
-    expect: "Three reads answered, nothing written. This proves the Tauri transport reaches this staged orchestrator."
+    expect: "Three reads answered, nothing written. This proves the Tauri transport reaches this staged orchestrator.",
+    codes: []
   },
   {
     needs: ["interview", "described", "advisory"],
     title: "Review → Clarify → Run, with the selector left on its default",
-    expect: "The selected Task is {interview}, not {described}. A proposal appears with its questions."
+    expect: "The selected Task is {interview}, not {described}. A proposal appears in the queue with its questions.",
+    codes: [
+      "candidates_enqueued: 1 and no diagnostic: the run happened and there is a proposal to answer",
+      "clarify_already_queued: a proposal for it is already waiting below; answer that one, this run did not ask the model",
+      "advisory_unconfigured or advisory_endpoint_invalid: the model is not configured; set advisory.model in Setup, the run did not happen",
+      "advisory_http_failed, advisory_timeout, advisory_empty_response or advisory_connection_failed: the model was asked and failed; the diagnostic says what to change"
+    ]
   },
   {
     needs: ["interview"],
-    title: "Answer that proposal",
-    expect:
-      "Answering a yes/no question Yes reveals any question that depends on Yes; changing it to No hides it again. Save, then open {interview} in Tasks and read its description: it holds the Q:/A: pairs in the order asked."
+    title: "Answer that proposal: fill in the questions and Save answers",
+    expect: "The card leaves the queue and the run result says the answers were saved. Which questions appear, and whether one depends on another, is the model's choice and is not checked here; that a dependent question shows only when its dependency is answered is asserted by the runner's clarify scenario and ubu-ui test 66.",
+    codes: [
+      "advisory_answer_required: Save was pressed with nothing answered; answer at least one question",
+      "clarify_invalid_answer: a yes/no question was answered with something else; use Yes or No",
+      "clarify_description_too_large: the interview has outgrown the Task's notes; nothing was written"
+    ]
+  },
+  {
+    needs: ["interview"],
+    title: "Tasks → expand “Notes for {interview}”",
+    expect: "The notes hold the Q:/A: pairs you just answered, in the order asked, whole and readable. Edit the Task: the same text is in the Notes field. Cancel without saving.",
+    codes: []
   },
   {
     needs: ["interview", "advisory"],
     title: "Review → Clarify → Run again, with the selector set to {interview}",
-    expect:
-      "Either a second round of questions that does not repeat the first, or the model says it is done. Both are correct; report which, and the model name."
+    expect: "One of three outcomes, and each is a result to report, not a defect: a second round of questions; the model is done; or the run did not happen because the selector was not set.",
+    codes: [
+      "candidates_enqueued: 1: a second round, a new question set that does not repeat the first",
+      "clarify_no_questions with candidates_enqueued: 0: the model has nothing more to ask, the interview is finished",
+      "clarify_no_task: THE RUN DID NOT HAPPEN. The selector was left on its default, and on its default Clarify takes only a Task with no description; set the selector to {interview} and run again"
+    ]
   },
   {
     needs: ["completable"],
     title: "Next Task → Complete, then Undo completion",
-    expect: "The Task is active again and comes back as a recommendation."
+    expect: "{completable} is completed, then active again, and comes back as the recommendation.",
+    codes: [
+      "reopen_not_completed: Undo was pressed twice; there is nothing left to undo",
+      "reopen_stale_completion: the app named a completion that is not the latest; reload Next Task and try once"
+    ]
+  },
+  {
+    needs: ["spent", "completable"],
+    title: "Today → Time by category → Show report",
+    expect: "The range reads as the last 7 days. A row for personal carries at least 1 h, from {spent}. {completable} appears in no row: it was completed and then reopened, and a reopened Task contributes nothing. Change the days to 1 and reload: the personal row is still there, since yesterday's hour is inside one day.",
+    codes: [
+      "no code: an empty report says there is no recorded time in the range, and is not an error",
+      "time_by_category_invalid_range: from is after to; the app never sends that, so report it as a defect"
+    ]
   }
 ];
 
@@ -298,7 +353,12 @@ async function main() {
   console.log("\nsteps: run these in the app, in order.\n");
   STEPS.forEach((step, index) => {
     console.log(`  ${index + 1}. ${title(step.title)}`);
-    console.log(`     expect: ${title(step.expect)}\n`);
+    console.log(`     expect: ${title(step.expect)}`);
+    // The diagnostic codes a step can meet, each with what it means, so an outcome is never
+    // misread: in particular the one that means the run did not happen.
+    console.log(step.codes.length === 0 ? "     codes:  none; this step has no diagnostic to meet" : `     codes:  ${title(step.codes[0])}`);
+    for (const code of step.codes.slice(1)) console.log(`             ${title(code)}`);
+    console.log("");
   });
   // --stage-only proves the staging and the preconditions without waiting for a
   // human. It is how these steps are checked before they are ever handed over.

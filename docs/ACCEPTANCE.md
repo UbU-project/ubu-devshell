@@ -67,11 +67,17 @@ A **step** names the seeds it needs and interpolates them:
 {
   needs: ["interview", "described", "advisory"],
   title: "Review → Clarify → Run, with the selector left on its default",
-  expect: "The selected Task is {interview}, not {described}. A proposal appears with its questions."
+  expect: "The selected Task is {interview}, not {described}. A proposal appears with its questions.",
+  codes: [
+    "candidates_enqueued: 1 and no diagnostic: the run happened and there is a proposal to answer",
+    "clarify_already_queued: a proposal for it is already waiting below; answer that one, this run did not ask the model"
+  ]
 }
 ```
 
-`{interview}` is replaced by what the seed's `check` returned. A step with
+`{interview}` is replaced by what the seed's `check` returned. `codes` lists
+every diagnostic the step can meet, each with what it means and whether the
+run happened; it is printed under `expect:`. A step with
 `needs: []` is one whose precondition is genuinely the empty store or the
 app alone.
 
@@ -87,18 +93,43 @@ that Clarify's default picks the interview Task re-implements the selection
 predicate, first active non-occurrence Task with a blank description ordered
 by id, rather than trusting that creating it first made it first.
 
+## Whether a step belongs in the list at all
+
+From P1B-50, three rules decide it. A step that fails any one of them is
+not written; it is either moved to the runner or dropped.
+
+1. **A manual step may not verify what the runner or a `ubu-ui` test already
+   asserts.** P1B-48's dependent-question check broke this rule: that a
+   dependent question shows only when its dependency is answered is asserted
+   by the runner's clarify scenario and by `ubu-ui` test 66, so it is gone.
+2. **A step's expected outcomes must name the diagnostic codes, and must
+   include the "it did not run" outcome.** Every step carries a `codes`
+   field, one line per code with what it means, and the harness prints them
+   under `expect:`. P1B-48's second-round step broke this rule: it did not
+   say that `clarify_no_task` means the selector was left on its default and
+   the run did not happen, and that outcome was read as a result of a run.
+3. **A step must not depend on what a model chooses to emit.** If a behaviour
+   is deterministic given a question set, it belongs in the runner against
+   the stub model. A real-model step may only check that a real model
+   answers at all, and every one of its outcomes is a result to report.
+
+A step with no diagnostic to meet says so: its `codes` is `[]` and the
+harness prints `none`.
+
 ## How to add a step
 
-1. Write the step in `STEPS`, in order, with `needs` naming every seed it
-   relies on. If the precondition does not exist yet, write the seed in
-   `SEEDS` with a `what`, a `make` and a `check`.
-2. Make the `check` assert the thing the step actually depends on. If the
+1. Check the step against the three rules above.
+2. Write the step in `STEPS`, in order, with `needs` naming every seed it
+   relies on and `codes` naming every diagnostic it can meet. If the
+   precondition does not exist yet, write the seed in `SEEDS` with a `what`,
+   a `make` and a `check`.
+3. Make the `check` assert the thing the step actually depends on. If the
    step depends on what Next Task recommends, the check asks `/next-action`.
    If it depends on which Task Clarify picks, the check computes the pick.
-3. Run `./scripts/acceptance.sh --stage-only` until every seed prints `OK`
+4. Run `./scripts/acceptance.sh --stage-only` until every seed prints `OK`
    and every step prints with its objects named. A `FAIL` names the seed
    and the reason.
-4. Only then hand the steps over. The operator runs the same command
+5. Only then hand the steps over. The operator runs the same command
    without `--stage-only` and follows what it prints.
 
 One step list at a time. A ticket replaces the list; git history keeps the

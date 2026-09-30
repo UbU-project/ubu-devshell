@@ -908,6 +908,105 @@ const scenarios = [
       same((await readTask(o, other)).status, "completed", "the other Task was never touched");
       return "a completion made by mistake is undone by naming it; a wrong id and a second undo are refused; the Task can be completed again";
     }
+  },
+  {
+    name: "description",
+    async run(o) {
+      // The interview's own shape: a leading blank line, Q:/A: pairs, a blank line between rounds, trailing newlines.
+      const roundOne = "\n\nQ: Is there a deadline for the synthetic teapot?\nA: y\nQ: What is the synthetic deadline?\nA: friday\n\nQ: Who is the synthetic teapot for?\nA: the synthetic neighbour\n\n";
+      const captured = await captureTask(o, { title: "Synthetic teapot", description: roundOne, duration_estimate: fixed(20) });
+      same((await readTask(o, captured.task_id)).payload.description, roundOne, "the captured description reads back byte for byte, newlines and blank lines included");
+      console.log(`  description as read back: ${JSON.stringify((await readTask(o, captured.task_id)).payload.description)}`);
+      const path = fill(endpoints.TASK_PATH, { task_id: captured.task_id });
+      const roundTwo = `${roundOne}Q: Is the synthetic teapot already bought?\nA: n\n`;
+      const grown = await call(o.base, "PATCH", path, { schema_version: endpoints.TASK_CAPTURE_SCHEMA_VERSION, expected_version: captured.version, description: roundTwo });
+      same((await readTask(o, captured.task_id)).payload.description, roundTwo, "PATCHed to a longer narrative, it reads back as that narrative, byte for byte");
+      const other = await readTask(o, captured.task_id);
+      same({ title: other.payload.title, estimate: other.payload.duration_estimate }, { title: "Synthetic teapot", estimate: fixed(20) }, "and the fields the PATCH did not name are as they were");
+      await call(o.base, "PATCH", path, { schema_version: endpoints.TASK_CAPTURE_SCHEMA_VERSION, expected_version: grown.version, description: null });
+      same((await readTask(o, captured.task_id)).payload.description, undefined, "PATCHed to null, the description is gone: absent, not empty");
+      // Capture must accept what the interview writes: long, many-lined, punctuated, non-ASCII.
+      const awkward = "Q: Does the synthetic teapot need a lid — or not?\nA: yes: it's the \"blue\" one, 2 × 3 cm\n\n\n" + "Q: Repeated line?\nA: y\n".repeat(40);
+      const accepted = await captureTask(o, { title: "Synthetic awkward notes", description: awkward, duration_estimate: fixed(5) });
+      same((await readTask(o, accepted.task_id)).payload.description, awkward, "a long, punctuated, non-ASCII description is accepted and reads back whole");
+      const blank = await captureTask(o, { title: "Synthetic no notes", duration_estimate: fixed(5) });
+      same((await readTask(o, blank.task_id)).payload.description, undefined, "a Task captured without a description has none");
+      return "a multi-line Q:/A: description round-trips byte for byte through capture, PATCH and null";
+    }
+  },
+  {
+    name: "time by category",
+    async run(o) {
+      const report = async (orchestrator, query = {}, expect = 200) =>
+        call(orchestrator.base, "GET", `${endpoints.TIME_BY_CATEGORY_PATH}?${new URLSearchParams({ schema_version: endpoints.TIME_BY_CATEGORY_SCHEMA_VERSION, ...query })}`, undefined, expect);
+      const rows = (body) => body.categories.map((row) => [row.category, row.seconds, row.static_seconds, row.completed_seconds, row.task_count]);
+      // The range: seven days back from the top of this hour, ending three hours ahead, so every window and
+      // every completion made during this scenario is inside it by construction.
+      const to = at(3);
+      const from = iso(new Date(thisHour - 7 * 86_400_000));
+      const range = { from, to };
+
+      // A Static Task straddling the range's start: an hour before, an hour after. Only the hour inside counts.
+      await captureTask(o, { title: "Synthetic overnight shift", static_window: { start: iso(new Date(thisHour - 7 * 86_400_000 - 3_600_000)), end: iso(new Date(thisHour - 7 * 86_400_000 + 3_600_000)) }, category_tag: "work", tags: ["work"] });
+      // A completed Dynamic Task with an observed window: it arrives through the Calendar, so it is completed by a coloured event.
+      const observed = (await captureTask(o, { title: "Synthetic observed errand", duration_estimate: fixed(25), category_tag: "grocery", tags: ["grocery"] })).task_id;
+      // A completed Dynamic Task with a fixed estimate and no observed window.
+      const estimated = (await captureTask(o, { title: "Synthetic estimated errand", duration_estimate: fixed(10), category_tag: "grocery", tags: ["grocery"] })).task_id;
+      // A completed Dynamic Task with a stochastic estimate: the mode counts, never the p95.
+      const skewed = (await captureTask(o, { title: "Synthetic skewed job", duration_estimate: { type: "shifted_lognormal_p95", min_seconds: 600, mode_seconds: 1_200, p95_seconds: 7_200 }, category_tag: "work", tags: ["work"] })).task_id;
+      // A completed Dynamic Task with neither: named, not counted.
+      const unmeasured = (await captureTask(o, { title: "Synthetic phone call", category_tag: "work", tags: ["work"] })).task_id;
+      // An uncategorised Task, Static so that it counts without a completion.
+      await captureTask(o, { title: "Synthetic uncategorised block", static_window: { start: at(1), end: at(1, 45) } });
+      const completions = {};
+      for (const task of [estimated, skewed, unmeasured]) {
+        completions[task] = await recordAction(o, task, "complete");
+      }
+      // The observed window comes from the calendar: apply the Plan, then observe the Dynamic event coloured.
+      await generatePlan(o);
+      const proposed = await preview(o);
+      const applied = await approve(o, proposed.preview_id);
+      same(applied.status, "applied", "the Plan's events are applied in Mock");
+      const event = applied.applied_events.find((candidate) => candidate.task_id === observed);
+      ok(event !== undefined, "the observed errand has an applied event");
+      const seen = { ...event, color_id: "10", start_at: at(2), end_at: at(2, 50) };
+      const restarted = await restartObserving(o, applied.applied_events.map((candidate) => (candidate.task_id === observed ? seen : candidate)));
+      const captured = await capture(restarted);
+      same({ updated: captured.updated }, { updated: 1 }, "capture completes it from the coloured event, with the window observed there");
+      same((await readTask(restarted, observed)).status, "completed", "the observed errand is completed");
+
+      const body = await report(restarted, range);
+      console.log(`  time-by-category response: ${JSON.stringify(body)}`);
+      same(
+        rows(body),
+        [["work", 4_800, 3_600, 1_200, 2], ["grocery", 3_600, 0, 3_600, 2], ["Uncategorized", 2_700, 2_700, 0, 1]],
+        "every row: work is the overnight overlap plus the skewed mode, grocery the observed window plus the fixed estimate, Uncategorized the block"
+      );
+      same(body.unmeasured, [{ task_id: unmeasured, title: "Synthetic phone call", reason: "completed with no observed window and no duration estimate; the time it took is not recorded" }], "the Task with neither window nor estimate is named as unmeasured, with the reason");
+      same(body.total_seconds, 11_100, "the total is the sum of the rows");
+      same(rows(body).map((row) => row[0]), ["work", "grocery", "Uncategorized"], "rows are ordered by seconds descending");
+      same({ from: body.from, to: body.to, schema: body.schema_version }, { from, to, schema: endpoints.TIME_BY_CATEGORY_SCHEMA_VERSION }, "the response states the range it covered");
+
+      const defaulted = await report(restarted);
+      // `to` is now, to the nanosecond; `from` is seven whole days before it.
+      ok(Math.abs((new Date(defaulted.to) - new Date(defaulted.from)) / 1000 - 7 * 86_400) < 1, `with no bounds the range is the last seven days: ${defaulted.from} to ${defaulted.to}`);
+      ok(Date.now() - new Date(defaulted.to).getTime() < 60_000, "ending now");
+      const refused = await report(restarted, { from: to, to: from }, 400);
+      same(refused.diagnostics[0].code, "time_by_category_invalid_range", "from after to is refused with 400");
+
+      // Judgment call 4: complete, reopen, complete again, and the Task counts once.
+      const grocery = async () => (await report(restarted, range)).categories.find((row) => row.category === "grocery").completed_seconds;
+      same(await grocery(), 3_600, "before the undo, grocery counts the observed window and the fixed estimate");
+      const reopened = await reopenTask(restarted, estimated, completions[estimated].log_id);
+      same({ status: reopened.task_status, stored: (await readTask(restarted, estimated)).status }, { status: "active", stored: "active" }, "the estimated errand is reopened and active");
+      same(await grocery(), 3_000, "reopened and left active, it contributes nothing: grocery drops by its 600 seconds");
+      const again = await recordAction(restarted, estimated, "complete");
+      ok(again.log_id !== completions[estimated].log_id, "completed again, with a new completion id");
+      same(await grocery(), 3_600, "and it counts once: 600 seconds, not 1200, although two completion logs now exist");
+      const final = await report(restarted, range);
+      same(final.total_seconds, 11_100, "the total is back to what it was, not 600 more");
+      return "six staged Tasks give the expected rows, the unmeasured entry, the order and the total; the default is seven days; a backwards range is refused; a Task completed, reopened and completed again counts once";
+    }
   }
 ];
 
