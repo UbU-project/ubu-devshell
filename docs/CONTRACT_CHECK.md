@@ -190,6 +190,23 @@ is not a pass.
 | `assertion failed: …` | The orchestrator answered, and the answer is not what the daily loop needs. | The expected and actual values on the next two lines. |
 | `the orchestrator exited before it answered /health` | It did not start. | The orchestrator log printed below the line. |
 
+## The runner and the acceptance harness
+
+Two scripts, one boundary.
+
+| | `check-ui-contract.sh` | `acceptance.sh` |
+|---|---|---|
+| Covers | The HTTP layer: what the orchestrator does with a request. | The rendered layer: what a human sees in the app. |
+| Asserts | Everything it checks, in sixteen scenarios, each on its own store. | Nothing about behaviour. It stages a store and prints steps. |
+| Store | Sixteen throwaway stores on ephemeral ports. | One throwaway store on the app's default port, held until Ctrl-C. |
+| Preconditions | Each scenario stages exactly what it asserts. | Each step declares the seeds it needs; each seed checks itself over HTTP. |
+| A human | Reads PASS and FAIL lines. | Opens the app and follows the steps. |
+
+The boundary: **anything assertable over HTTP is a scenario here, never a
+manual step there.** The harness exists for what only a human at a webview
+can see, and it makes sure the store that human looks at holds what the
+steps assume. See [the acceptance harness](ACCEPTANCE.md).
+
 ## Acceptance from here
 
 **An operator acceptance step is reserved for what only a human at a webview
