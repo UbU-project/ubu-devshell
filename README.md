@@ -45,6 +45,13 @@ Run local apps when the target repositories exist:
 ./scripts/run-ui.sh
 ```
 
+`run-orchestrator.sh` starts the orchestrator with no Google variables, so it
+cannot reach a calendar. To run it against your own store with Google
+Calendar reachable, use `./scripts/run-live.sh`, which says what it is about
+to open and waits for a typed confirmation. See
+[the live rehearsal](docs/LIVE_REHEARSAL.md); `./scripts/run-live.sh --help`
+states what it opens and what reaches the real calendar.
+
 ## Manual Recursive Live GitHub Smoke
 
 Default devshell checks are offline and egress-free. `scripts/check-all.sh`,

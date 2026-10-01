@@ -319,3 +319,7 @@ scenario, in the ticket that adds the behaviour.
 So an acceptance list is short. It says: run the runner; press the
 self-check; and look at whatever this ticket put on a screen. A step that
 could have been a scenario is a scenario that was not written.
+
+After the scripted checks and the staged acceptance steps comes the one thing
+no script here does: [the live rehearsal](LIVE_REHEARSAL.md), against the
+operator's own store and real calendar, started with `scripts/run-live.sh`.
