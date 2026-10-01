@@ -102,19 +102,19 @@ run_hard_boundary_diagnostics() {
   echo ""
 
   echo "core export gate: deny-by-default matrix + worker-authority"
-  (cd "$core_dir" && ubu_cargo_env && cargo \1 --lib export_gate_denies_by_default_and_only_permits_worker_accepted_adjudication)
+  (cd "$core_dir" && ubu_cargo_env && cargo test --lib export_gate_denies_by_default_and_only_permits_worker_accepted_adjudication)
 
   echo "core export gate: redaction-identity export-boundary"
-  (cd "$core_dir" && ubu_cargo_env && cargo \1 --lib denied_export_path_does_not_leak_compartment_names_or_labels)
+  (cd "$core_dir" && ubu_cargo_env && cargo test --lib denied_export_path_does_not_leak_compartment_names_or_labels)
 
   echo "orchestrator export gate: user-authority bypass resistance"
-  (cd "$orchestrator_dir" && ubu_cargo_env && cargo \1 --lib user_authority_export_context_is_rejected_without_permit)
+  (cd "$orchestrator_dir" && ubu_cargo_env && cargo test --lib user_authority_export_context_is_rejected_without_permit)
 
   echo "orchestrator export gate: deny path writes no worker export"
-  (cd "$orchestrator_dir" && ubu_cargo_env && cargo \1 --test projection_preview rejected_projection_is_logged_and_not_written)
+  (cd "$orchestrator_dir" && ubu_cargo_env && cargo test --test projection_preview rejected_projection_is_logged_and_not_written)
 
   echo "orchestrator export gate: accepted path uses automation_worker authority"
-  (cd "$orchestrator_dir" && ubu_cargo_env && cargo \1 --test projection_preview reconciliation_surfaces_conflict_and_accepts_external_change)
+  (cd "$orchestrator_dir" && ubu_cargo_env && cargo test --test projection_preview reconciliation_surfaces_conflict_and_accepts_external_change)
 }
 
 run_static_bypass_guard() {
@@ -178,10 +178,10 @@ run_fake_github_adapter_diagnostics() {
   echo "=== Recording fake managed-label diagnostics ==="
   echo ""
   echo "adapter fake: exact managed-label write/read operations"
-  (cd "$adapter_dir" && ubu_cargo_env && cargo \1 --test managed_label_write)
+  (cd "$adapter_dir" && ubu_cargo_env && cargo test --test managed_label_write)
 
   echo "orchestrator fake path: preview -> approve -> reconcile over managed labels"
-  (cd "$orchestrator_dir" && ubu_cargo_env && cargo \1 --test projection_preview)
+  (cd "$orchestrator_dir" && ubu_cargo_env && cargo test --test projection_preview)
   echo "PASS fake-backed managed-label projection diagnostics"
   echo ""
 }
@@ -193,10 +193,10 @@ run_fake_github_import_diagnostics() {
   echo "=== Recording fake GitHub import diagnostics ==="
   echo ""
   echo "orchestrator fake ingest: /github/import/live admits one Task and one External Reference without token"
-  (cd "$orchestrator_dir" && ubu_cargo_env && cargo \1 --test github_import default_mock_import_uses_recording_api_without_token)
+  (cd "$orchestrator_dir" && ubu_cargo_env && cargo test --test github_import default_mock_import_uses_recording_api_without_token)
 
   echo "orchestrator bootstrap fake ingest: selected repo import admits Tasks and External References through the adapter"
-  (cd "$orchestrator_dir" && ubu_cargo_env && cargo \1 --test bootstrap seed_admits_bootstrap_state_and_imports_selected_repo_tasks)
+  (cd "$orchestrator_dir" && ubu_cargo_env && cargo test --test bootstrap seed_admits_bootstrap_state_and_imports_selected_repo_tasks)
   echo "PASS fake-backed live-ingest diagnostics"
   echo ""
 }
@@ -283,7 +283,7 @@ while read -r name; do
   ran=0
   if [[ -f "$dir/Cargo.toml" ]]; then
     echo "cargo check: $dir"
-    (cd "$dir" && ubu_cargo_env && cargo \1 --all-targets)
+    (cd "$dir" && ubu_cargo_env && cargo check --all-targets)
     ran=1
   fi
   if [[ -f "$dir/package.json" ]]; then

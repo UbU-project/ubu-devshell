@@ -38,7 +38,7 @@ while read -r name; do
   ran=0
   if [[ -f "$dir/Cargo.toml" ]]; then
     echo "cargo fmt: $dir"
-    (cd "$dir" && ubu_cargo_env && cargo \1 --all)
+    (cd "$dir" && ubu_cargo_env && cargo fmt --all)
     ran=1
   fi
   if [[ -f "$dir/package.json" ]]; then
