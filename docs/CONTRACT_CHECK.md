@@ -115,10 +115,10 @@ realistic and every title is obviously synthetic:
 | recurring commitment | seven daily instances at 14:00 local, a week of it, ids shaped `{invented base32hex}_{timestamp}`, coloured for `work` |
 | one-off events | two with ids UbU can own: one at 16:00 coloured for `personal`, one at 18:00 with colour 1, which the Settings leave mapped to nothing |
 | routine | one daily Static routine of half an hour at noon, category `personal` |
-| night | an **Asleep** routine: daily, 23:00 local, 480 minutes, Static, occupying capacity, no category |
+| night | an **Asleep** routine: daily, 23:00 local, 480 minutes, Static, occupying capacity, category `sleep` |
 | backlog | six Dynamic Tasks across `work`, `grocery` and `personal`, three Fixed and two stochastic, and one Fixed at thirty hours that cannot fit any free interval |
 | Preference | one, ordering two of the backlog |
-| Settings | `calendar.color.*` for the three categories used, and one that moves `entertainment` off colour 1 |
+| Settings | `calendar.color.*` for the three categories used, and one that moves `entertainment` off colour 1. `calendar.color.sleep` is not among them: the scenario sets and removes it |
 
 The last Setting is there because every one of Google's eleven colours is
 mapped to a category by default. A colour is only ever unmapped after the
@@ -152,36 +152,51 @@ instance beyond the horizon is not seen until the horizon reaches it.
    occupies capacity, the unowned ones included.
    **The night**: Asleep materialises once for each day of the horizon; each
    occurrence is Static, occupies capacity, begins at 23:00 local, lasts
-   eight hours and spans midnight; **no Dynamic placement falls inside any
+   eight hours, spans midnight and is in the `sleep` category; **no Dynamic placement falls inside any
    Asleep window**; and at least one placement waits for the morning,
    beginning no earlier than 07:00.
 4. **preview**: the desired set holds both events UbU can own, every placed
    Task and every routine occurrence, and no unowned Task; no operation names
-   an unowned event. **Each Asleep occurrence is created as an event with no
-   colour and `transparent: false`**, a Busy block. That export is a decision
-   on record, see [availability](AVAILABILITY.md), and is asserted so that it
-   is not a surprise.
+   an unowned event. **Each Asleep occurrence is created as an event with
+   `transparent: false`**, a Busy block. That export is a decision on record,
+   see [availability](AVAILABILITY.md), and is asserted so that it is not a
+   surprise. Each create says what its placement is: `static_anchor` is true
+   for a night, though it has no colour, and false for a placed backlog Task.
+   **Sleep's colour is the operator's own Setting.** With
+   `calendar.color.sleep` unset the nights export with no colour. Set to `8`
+   they export in it, and the Settings inverse table reports colour `8` as a
+   `collision` with `location`, which has it by default. Removed, the colour
+   is none again.
 5. **approve in Mock**: applied, with no operation result and no applied event
    naming an unowned event or its Task.
+   **A second Plan at once**: the Plan starts on a whole minute, so a Plan
+   generated again in the same minute has identical Dynamic windows and the
+   preview between the two proposes no operations. If the clock crossed a
+   minute between them the windows moved, and the scenario asserts updates
+   only.
 6. **reconcile**: the only conflicts are the unowned instances, each
    `foreign`; the status is `observed`, not `drifted`.
 7. **next action, then complete**: the recommendation is a placed backlog
    Task, and completing it transitions it.
 8. **report**: `time-by-category` is the Static windows plus the one
-   completion. `Uncategorized` is the unmapped-colour Task and eight hours
-   for every night, because Asleep has no category.
+   completion. The `sleep` row carries eight hours for every night, and
+   `Uncategorized` is only the unmapped-colour Task.
 9. **repeat**: a second full pass. Capture admits nothing, the same Tasks are
-   placed and left out, the preview creates nothing and names no unowned
-   event, a preview straight after the approve proposes nothing, reconcile is
-   unchanged and the report is unchanged.
+   placed and left out, the preview creates nothing, deletes nothing and
+   names no unowned event, a preview straight after the approve proposes
+   nothing, reconcile is unchanged and the report is unchanged. **The
+   completed Task's event is frozen**: it is in no operation, the preview
+   says so once with `calendar_event_retained`, and it is still in the
+   applied record after the approve.
 
 The mock Calendar observes a file read at startup, so the scenario restarts
 the orchestrator on the same store after each approve, observing the
 operator's events and what UbU applied. That is what a calendar holds after
 an approve.
 
-**Two horizons.** `UBU_PLANNING_HORIZON_SECONDS` defaults to 86400, one day,
-and may be up to 2678400. The walk runs at 86400 and at 604800, each on its
+**Two horizons.** `UBU_PLANNING_HORIZON_SECONDS` defaults to 604800, one
+week, from P1B-53; it was 86400, one day, and may be up to 2678400. Both are
+set explicitly here, so neither depends on the default. The walk runs at 86400 and at 604800, each on its
 own store. Where the two legitimately differ, the difference is asserted and
 not the value: one day sees one instance of the recurring commitment and one
 week sees all seven; one day holds one night and one week holds seven; one
@@ -190,7 +205,8 @@ that fits nowhere is left out for a different stated reason at each. At
 both, the same five Tasks are placed, three before the night and two the
 next morning.
 
-The scenario prints, for each horizon, the capture diagnostics, the Plan, the
+The scenario prints, for each horizon, how long `POST /planning/generate`
+took, the capture diagnostics, the Plan, the
 placements in the week's local time with each night marked `ASLEEP`, the
 unplaced Tasks, the planning diagnostics, the risk report, the preview
 diagnostics, the reconcile conflicts and the time-by-category response, and
@@ -274,7 +290,7 @@ PASS  7 colour means done: a colour on an applied Dynamic event completes its Ta
 A complete walk ends with nineteen `PASS` lines, two `SKIP` lines and:
 
 ```text
-RESULT: 19 of 19 scenarios passed, 0 failed, 2 skipped, 286 requests, all to 127.0.0.1
+RESULT: 19 of 19 scenarios passed, 0 failed, 2 skipped, 306 requests, all to 127.0.0.1
 ```
 
 The walk stops at the first failure. The `FAIL` line names the scenario and

@@ -179,7 +179,8 @@ what the operator looks at. Every title in it is invented and says so.
 | `week_colours` | `calendar.color.*` for the three categories the week uses, and one colour left mapped to nothing | each is a Setting, and colour 1 maps to no category |
 | `week_calendar` | the week's calendar, captured in Mock | every event inside the horizon is one Static Task with its colour's category; the unowned instances were reported once, as one `capture_occupancy_only`; a second capture admits nothing |
 | `week_routine` | one daily routine, at noon | it is listed |
-| `week_night` | the **Asleep** routine: daily, 23:00, 480 minutes | read back from the store: this computer's timezone, daily, `nominal_start` 23:00:00, 28800 seconds, Static, occupying capacity, no category |
+| `week_night` | the **Asleep** routine: daily, 23:00, 480 minutes, category `sleep` | read back from the store: this computer's timezone, daily, `nominal_start` 23:00:00, 28800 seconds, Static, occupying capacity, category `sleep` |
+| `week_sleep_colour` | `calendar.color.sleep = "8"`, the operator's own Setting | the palette has it as a Setting, and the inverse table reports colour 8 as a `collision` between `location` and `sleep` |
 | `week_backlog` | six Dynamic Tasks, one too long to fit anywhere, and a Preference | all six are active and Dynamic, and the Preference is listed |
 
 The week's calendar is a file the mock Calendar observes, written before the
@@ -187,11 +188,11 @@ orchestrator starts and named by `UBU_CALENDAR_MOCK_EVENTS`. With that set, a
 Live calendar request is refused before any client exists, so the app cannot
 reach a real calendar from the staged orchestrator.
 
-**The horizon** is the orchestrator's default of one day. Export
-`UBU_PLANNING_HORIZON_SECONDS=604800` before running the harness to stage one
-week; the harness passes it through and prints which horizon is staged. At
-one day, one of the seven recurring instances is inside the horizon; at one
-week, all seven are.
+**The horizon** is the orchestrator's default, which from P1B-53 is one week.
+Export `UBU_PLANNING_HORIZON_SECONDS=86400` before running the harness to
+stage one day; the harness passes it through and prints which horizon is
+staged. At one week, all seven recurring instances are inside the horizon; at
+one day, one of them is.
 
 **Each instance is its own Task.** Capture records occupied time; it does
 not reconstruct recurrence. The staged calendar holds one recurring

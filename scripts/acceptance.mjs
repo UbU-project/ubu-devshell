@@ -86,8 +86,8 @@ const TITLE = (what) => `Acceptance ${what}`;
 // The switch rehearsal's week, the same one check-ui-contract.mjs walks and
 // asserts. Its calendar is what the mock Calendar observes, so it is written
 // to a file before the orchestrator starts. The horizon is the orchestrator's
-// own default of one day unless UBU_PLANNING_HORIZON_SECONDS says otherwise:
-// which of the two the switch runs on is a decision this harness does not make.
+// own default, one week from P1B-53, unless UBU_PLANNING_HORIZON_SECONDS says
+// otherwise: export 86400 to stage the one-day horizon instead.
 // The week lives in a timezone, because it has a night in it. Here it is this
 // computer's own zone, so the night on screen is the operator's night.
 const ZONE = localZone();
@@ -98,7 +98,7 @@ const local = (instant) => {
   const p = localParts(ZONE, Date.parse(instant));
   return `${WEEKDAYS[new Date(Date.UTC(p.year, p.month - 1, p.day)).getUTCDay()]} ${String(p.hour).padStart(2, "0")}:${String(p.minute).padStart(2, "0")}`;
 };
-const HORIZON_SECONDS = Number(process.env.UBU_PLANNING_HORIZON_SECONDS ?? 86_400);
+const HORIZON_SECONDS = Number(process.env.UBU_PLANNING_HORIZON_SECONDS ?? 604_800);
 const HORIZON = HORIZON_SECONDS % 86_400 === 0 ? `${HORIZON_SECONDS / 86_400}-day` : `${HORIZON_SECONDS}-second`;
 const inHorizon = (event) => Date.parse(event.start_at) < Date.now() + HORIZON_SECONDS * 1000;
 const captureCalendar = () =>
@@ -299,7 +299,7 @@ const SEEDS = {
     }
   },
   week_night: {
-    what: "the night: an Asleep routine, which is how UbU is told when no work may be placed",
+    what: "the night: an Asleep routine in the sleep category, which is how UbU is told when no work may be placed",
     async make() {
       return call("POST", endpoints.OBJECTIVE_CREATE_PATH, routineBody(week, week.asleep, endpoints.OBJECTIVE_SCHEMA_VERSION), 201);
     },
@@ -317,11 +317,31 @@ const SEEDS = {
         occupies_capacity: template?.occupies_capacity ?? true,
         category_tag: template?.category_tag ?? null
       };
-      const wanted = { timezone: ZONE, rule: "daily", nominal_start: week.asleep.nominalStart, seconds: week.asleep.seconds, placement: "static", occupies_capacity: true, category_tag: null };
+      const wanted = { timezone: ZONE, rule: "daily", nominal_start: week.asleep.nominalStart, seconds: week.asleep.seconds, placement: "static", occupies_capacity: true, category_tag: week.asleep.category };
       if (JSON.stringify(recipe) !== JSON.stringify(wanted)) {
         throw new StagingFailure(`the Asleep routine was not stored as staged: ${JSON.stringify(recipe)}`);
       }
-      return `${week.asleep.title} (${made.objective_id}), daily from 23:00 to 07:00 ${ZONE} time, Static and occupying capacity`;
+      return `${week.asleep.title} (${made.objective_id}), daily from 23:00 to 07:00 ${ZONE} time, Static, occupying capacity, category ${week.asleep.category}`;
+    }
+  },
+  week_sleep_colour: {
+    what: "calendar.color.sleep, the operator's own Setting: Graphite for the night, which the default palette already gives to location",
+    async make() {
+      return putSetting(week.sleepColour.setting, week.sleepColour.colour);
+    },
+    async check() {
+      const listed = await call("GET", endpoints.SETTINGS_LIST_PATH);
+      const entry = listed.palette.find((candidate) => candidate.category === week.asleep.category);
+      if (entry?.color_id !== week.sleepColour.colour || entry?.origin !== "setting") {
+        throw new StagingFailure(`${week.sleepColour.setting} is not the Setting that was staged: ${JSON.stringify(entry)}`);
+      }
+      // Judgment call 1, on record: the colour is shared, so it is a collision, and the inverse table says so.
+      const inverse = listed.inverse.find((candidate) => candidate.color_id === week.sleepColour.colour);
+      const shared = [week.sleepColour.sharedWith, week.asleep.category].sort().join();
+      if (inverse?.status !== "collision" || [...inverse.categories].sort().join() !== shared) {
+        throw new StagingFailure(`colour ${week.sleepColour.colour} is not reported as a collision between ${shared}: ${JSON.stringify(inverse)}`);
+      }
+      return `${week.asleep.category} on colour ${week.sleepColour.colour}, Graphite; that colour is now a collision with ${week.sleepColour.sharedWith}`;
     }
   },
   week_backlog: {
@@ -400,14 +420,14 @@ const STEPS = [
     title: "Today → Generate Plan",
     expect: "This should read as a Plan with one Task that did not fit, not as an error. Timed placements shows the staged week: {week_calendar}; {week_routine}; {week_night}; {week_backlog}. The Static anchors are the captured events, the routine and the night. No Skeleton placement sits over a Static anchor, and none falls between 23:00 and 07:00: the night block is why work that does not fit today starts in the morning and not at midnight. Below the placements, “Not in this Plan” names “Invented: paint the whole imaginary fence” by its title, says it is longer than any free interval in the planning horizon, and says in words what can be done. Nothing on the screen is red.",
     codes: [
-      "task_unplaceable: expected at the one-day horizon, shown quietly as a status with the sentence first and the code after it. It is not an error",
-      "no diagnostic: expected at a longer horizon. “Not in this Plan” still names the Task"
+      "no diagnostic: expected at the one-week horizon, which is the default. “Not in this Plan” still names the Task",
+      "task_unplaceable: expected at the one-day horizon, shown quietly as a status with the sentence first and the code after it. It is not an error"
     ]
   },
   {
-    needs: ["week_calendar", "week_colours"],
+    needs: ["week_calendar", "week_colours", "week_sleep_colour"],
     title: "Calendar → Take preview",
-    expect: "Creates only: one for each placed Task, one for each routine occurrence and one for each night. Asleep is exported: each night is an event with no colour that shows as Busy, which is deliberate. Nothing is proposed for “Invented standing marmot council” and it is not among the desired events: UbU does not own it and never writes to it. Nothing is proposed for the two one-off events either: capture already recorded them as applied. The palette is {week_colours}. Approve, Capture and Reconcile are not part of this step: in the app they are Live, and this staged orchestrator refuses a Live calendar request.",
+    expect: "Creates only: one for each placed Task, one for each routine occurrence and one for each night. Asleep is exported: each night is a Busy event, which is deliberate, and it is Graphite because {week_sleep_colour}. Each night reads Placement: Static. Nothing is proposed for “Invented standing marmot council” and it is not among the desired events: UbU does not own it and never writes to it. Nothing is proposed for the two one-off events either: capture already recorded them as applied. The palette is {week_colours}. Approve, Capture and Reconcile are not part of this step: in the app they are Live, and this staged orchestrator refuses a Live calendar request.",
     codes: [
       "calendar_event_id_unmappable: expected, once for each instance of “Invented standing marmot council” inside the horizon, shown quietly as a status. It is the exclusion working, not a fault, and it names the occupied-time Task by id",
       "calendar_mock_seed_with_live_export: Approve, Capture or Reconcile was pressed. THE REQUEST DID NOT RUN: this staged orchestrator refuses a Live calendar request, and nothing was written"
@@ -518,7 +538,7 @@ async function main() {
   await startOrchestrator(workDir);
   console.log(`up:    ${BASE}\n`);
 
-  console.log(`horizon: ${HORIZON}${process.env.UBU_PLANNING_HORIZON_SECONDS ? "" : ", the orchestrator's default; UBU_PLANNING_HORIZON_SECONDS=604800 stages one week"}\n`);
+  console.log(`horizon: ${HORIZON}${process.env.UBU_PLANNING_HORIZON_SECONDS ? "" : ", the orchestrator's default; UBU_PLANNING_HORIZON_SECONDS=86400 stages one day"}\n`);
 
   console.log("staging:");
   // Every seed is made before any is checked, so a check sees the whole staged

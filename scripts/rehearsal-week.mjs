@@ -116,13 +116,19 @@ export function rehearsalWeek(nowMs, zone) {
     /// calendar.color.* for each category the week uses, stated as Settings
     /// rather than left to the defaults. The fourth frees a colour: every one of
     /// Google's eleven is mapped by default, so a colour is only ever unmapped
-    /// after the operator has moved a category off it.
+    /// after the operator has moved a category off it. It moves onto 5, not 8:
+    /// colour 8 is kept as the default palette has it, with `location` alone,
+    /// so that what `sleepColour` does to it can be seen.
     settings: [
       ["calendar.color.work", "9"],
       ["calendar.color.personal", "3"],
       ["calendar.color.grocery", "2"],
-      ["calendar.color.entertainment", "8"]
+      ["calendar.color.entertainment", "5"]
     ],
+    /// Graphite. Not one of the week's Settings: `sleep` is a category of its
+    /// own, and its colour is the operator's choice. The default palette gives
+    /// colour 8 to `location`, so setting this makes Graphite a collision.
+    sleepColour: { setting: "calendar.color.sleep", colour: "8", sharedWith: "location" },
     categoryOfColour: { 9: "work", 3: "personal", 2: "grocery" },
     unmappedColour: "1",
 
@@ -135,13 +141,16 @@ export function rehearsalWeek(nowMs, zone) {
     },
 
     /// The night. UbU has no working-hours setting: unavailability is a
-    /// capacity-occupying Static routine. Daily, 23:00 local, 480 minutes, no
-    /// category. The planner places no Dynamic work inside it, and the preview
-    /// exports each occurrence as a Busy event. See docs/AVAILABILITY.md.
+    /// capacity-occupying Static routine. Daily, 23:00 local, 480 minutes, in a
+    /// category of its own, `sleep`, so that the night is reported as sleep and
+    /// not as Uncategorized time. The planner places no Dynamic work inside it,
+    /// and the preview exports each occurrence as a Busy event. See
+    /// docs/AVAILABILITY.md.
     asleep: {
       title: "Asleep",
       nominalStart: "23:00:00",
-      seconds: 28_800
+      seconds: 28_800,
+      category: "sleep"
     },
 
     /// Six Dynamic Tasks across three categories: Fixed and stochastic

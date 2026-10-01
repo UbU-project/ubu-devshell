@@ -1138,7 +1138,10 @@ const scenarios = [
           same([...placed, ...unplaced].sort(), [...backlogKeys].sort(), `${tag} placed and unplaced together account for the whole backlog, each Task once`);
           return { placed, unplaced };
         };
+        const startedAt = performance.now();
         const planned = await generate();
+        const generateMs = Math.round(performance.now() - startedAt);
+        say("POST /planning/generate took", `${generateMs} ms, for a Plan of ${planned.plan.steps.length} placements`);
         const steps = planned.plan.steps;
         say("plan", { status: planned.status, steps: steps.map((step) => [step.start_at, step.end_at, step.static_anchor ? "static" : "dynamic", step.summary]) });
         // The same placements as the operator would read them: local to the week's zone, with the nights marked.
@@ -1166,8 +1169,8 @@ const scenarios = [
         same(nights.length, horizonSeconds / 86_400, `${tag} Asleep materialises once for each day of the horizon`);
         same(
           nights.map((night) => [night.static_anchor, night.occupies_capacity, clock(night.start), night.end - night.start, night.category_tag ?? null]),
-          nights.map(() => [true, true, "23:00", week.asleep.seconds, null]),
-          `${tag} each is Static, occupies capacity, begins at 23:00 local, lasts eight hours and has no category`
+          nights.map(() => [true, true, "23:00", week.asleep.seconds, week.asleep.category]),
+          `${tag} each is Static, occupies capacity, begins at 23:00 local, lasts eight hours and is in the sleep category`
         );
         ok(nights.every((night) => local(night.start).slice(0, 3) !== local(night.end).slice(0, 3) && clock(night.end) === "07:00"), `${tag} each spans midnight: ${nights.map((night) => `${local(night.start)} to ${local(night.end)}`).join(", ")}`);
         const working = steps.filter((step) => !step.static_anchor);
@@ -1195,13 +1198,17 @@ const scenarios = [
         const desired = proposed.events.map((event) => event.task_id);
         ok(owned.every((id) => desired.includes(id)), `${tag} both events UbU can own are in the desired set`);
         ok(placed.every((key) => desired.includes(ids[key])) && occurrences.every((step) => desired.includes(step.task_id)), `${tag} so is every placed Task and every routine occurrence`);
-        // Judgment call 8: the night is exported, as a Busy block with no colour. On record, not a surprise.
-        const exported = nights.map((night) => proposed.events.find((event) => event.task_id === night.task_id));
+        // The night is exported, as a Busy block. With calendar.color.sleep unset it has no colour. On record, not a surprise.
+        const nightEvents = (previewed) => nights.map((night) => previewed.events.find((event) => event.task_id === night.task_id));
         same(
-          exported.map((event) => [event?.summary, event?.color_id, event?.transparent]),
+          nightEvents(proposed).map((event) => [event?.summary, event?.color_id, event?.transparent]),
           nights.map(() => [week.asleep.title, null, false]),
-          `${tag} each Asleep occurrence is a desired event with no colour and transparent false: a Busy block`
+          `${tag} with calendar.color.sleep unset, each Asleep occurrence is a desired event with no colour and transparent false: a Busy block`
         );
+        // P1B-53: the preview says what the placement is, and does not leave it to the colour.
+        const placementOf = (taskId) => proposed.operations.find((operation) => operation.event?.task_id === taskId)?.static_anchor;
+        same(nights.map((night) => placementOf(night.task_id)), nights.map(() => true), `${tag} each of them is created as Static, though it has no colour`);
+        same(placed.map((key) => placementOf(ids[key])), placed.map(() => false), `${tag} and every placed backlog Task is created as Dynamic`);
         same(
           nights.map((night) => proposed.operations.filter((operation) => operation.kind === "create" && operation.event.task_id === night.task_id).length),
           nights.map(() => 1),
@@ -1218,9 +1225,39 @@ const scenarios = [
           `${tag} the preview reports each unowned step as calendar_event_id_unmappable, and nothing else`
         );
 
+        // ---- sleep is a category; its colour is the operator's own Setting, and Graphite collides
+        const settings = () => call(o.base, "GET", endpoints.SETTINGS_LIST_PATH);
+        const graphite = async () => (await settings()).inverse.find((entry) => entry.color_id === week.sleepColour.colour);
+        same(await graphite(), { color_id: week.sleepColour.colour, categories: [week.sleepColour.sharedWith], status: "mapped" }, `${tag} by default colour ${week.sleepColour.colour} belongs to ${week.sleepColour.sharedWith} alone`);
+        await putSetting(o, week.sleepColour.setting, week.sleepColour.colour);
+        same(nightEvents(await preview(o)).map((event) => event?.color_id), nights.map(() => week.sleepColour.colour), `${tag} with ${week.sleepColour.setting} set, the Asleep events export in that colour`);
+        const collided = await graphite();
+        say(`Settings inverse entry for colour ${week.sleepColour.colour}, with ${week.sleepColour.setting} set`, collided);
+        same(collided, { color_id: week.sleepColour.colour, categories: [week.sleepColour.sharedWith, week.asleep.category], status: "collision" }, `${tag} and the inverse table reports that colour as a collision: a real event of that colour would now capture with no category`);
+        await call(o.base, "DELETE", fill(endpoints.SETTING_DELETE_PATH, { name: week.sleepColour.setting }), undefined, 204);
+        same(nightEvents(await preview(o)).map((event) => event?.color_id), nights.map(() => null), `${tag} with the Setting removed, the colour returns to none`);
+        same((await graphite()).status, "mapped", `${tag} and colour ${week.sleepColour.colour} is ${week.sleepColour.sharedWith}'s alone again`);
+
         // ---- 5. approve in Mock: applied, with no write for an unowned Task
-        const approved = await approve(o, proposed.preview_id);
+        // The previews above stored previews of their own; the one approved is taken now.
+        const approving = await preview(o);
+        same(approving.operations, proposed.operations, `${tag} the preview to approve proposes what the first one did`);
+        const approved = await approve(o, approving.preview_id);
         same(approved.status, "applied", `${tag} the Mock approve applies`);
+
+        // ---- a re-plan inside the same minute writes nothing
+        // The Plan starts on a whole minute, so a second Plan made in that minute has the same Dynamic
+        // windows. If the clock has crossed a minute since, the windows legitimately moved, and say so.
+        const dynamicWindows = (plan) => plan.steps.filter((step) => !step.static_anchor).map((step) => [step.task_id, step.start, step.end]);
+        const again2 = await generate();
+        const between = await preview(o);
+        say("operations between two Plans", { same_minute: JSON.stringify(dynamicWindows(again2.plan)) === JSON.stringify(dynamicWindows(planned.plan)), operations: between.operations.map((operation) => operation.kind) });
+        if (JSON.stringify(dynamicWindows(again2.plan)) === JSON.stringify(dynamicWindows(planned.plan))) {
+          same(between.operations, [], `${tag} a second Plan in the same minute has identical Dynamic windows, and the preview between them proposes no operations`);
+        } else {
+          ok(between.operations.every((operation) => operation.kind === "update"), `${tag} the minute changed between the two Plans, so the Dynamic windows moved: ${between.operations.length} update(s) and nothing else`);
+        }
+        same(Math.min(...dynamicWindows(planned.plan).map(([, start]) => start)) % 60, 0, `${tag} the first Dynamic placement begins on a whole minute`);
         ok(approved.operation_results.every((result) => result.status === "applied"), `${tag} all ${approved.operation_results.length} operations were applied`);
         ok(!mentionsUnowned(approved.operation_results) && !mentionsUnowned(approved.applied_events), `${tag} no operation result and no applied event names an unowned event or its Task`);
         same(approved.applied_events.length, owned.length + placed.length + occurrences.length + nights.length, `${tag} the applied record holds the two owned captures and what was created, and no unowned window`);
@@ -1255,16 +1292,17 @@ const scenarios = [
         const span = (event) => (Date.parse(event.end_at) - Date.parse(event.start_at)) / 1000;
         for (const event of seen) add(week.categoryOfColour[event.color_id] ?? "Uncategorized", span(event), 0);
         for (const _ of occurrences) add(week.routine.category, week.routine.seconds, 0);
-        // The night has no category, so every hour of it is reported as Uncategorized.
-        for (const _ of nights) add("Uncategorized", week.asleep.seconds, 0);
+        // The night is in the sleep category, so its hours are reported as sleep.
+        for (const _ of nights) add(week.asleep.category, week.asleep.seconds, 0);
         add(done.category, 0, done.seconds);
         const rows = Object.values(expected).sort((a, b) => b.seconds - a.seconds || (a.category < b.category ? -1 : 1));
         const body = await report();
         say("time-by-category response", body);
-        same(body.categories, rows, `${tag} the report is the Static windows plus the one completion; the unmapped-colour Task and the nights are in Uncategorized`);
+        same(body.categories, rows, `${tag} the report is the Static windows plus the one completion, with the nights under sleep`);
         same({ total: body.total_seconds, unmeasured: body.unmeasured }, { total: rows.reduce((sum, row) => sum + row.seconds, 0), unmeasured: [] }, `${tag} the total is the sum of the rows and nothing is unmeasured`);
-        const uncategorized = span(week.unmapped) + nights.length * week.asleep.seconds;
-        same(body.categories.find((row) => row.category === "Uncategorized"), { category: "Uncategorized", seconds: uncategorized, static_seconds: uncategorized, completed_seconds: 0, task_count: 1 + nights.length }, `${tag} Uncategorized is the unmapped-colour Task's hour and eight hours for each night`);
+        const slept = nights.length * week.asleep.seconds;
+        same(body.categories.find((row) => row.category === week.asleep.category), { category: week.asleep.category, seconds: slept, static_seconds: slept, completed_seconds: 0, task_count: nights.length }, `${tag} the sleep row carries eight hours for each night`);
+        same(body.categories.find((row) => row.category === "Uncategorized"), { category: "Uncategorized", seconds: span(week.unmapped), static_seconds: span(week.unmapped), completed_seconds: 0, task_count: 1 }, `${tag} and Uncategorized is only the unmapped-colour Task again`);
 
         // ---- 9. repeat: a second full pass over the same store
         const before = (await listTasks(o)).length;
@@ -1278,16 +1316,26 @@ const scenarios = [
         const reproposed = await preview(o);
         say("[repeat] preview operations", reproposed.operations.map((operation) => [operation.kind, operation.event?.summary ?? operation.summary]));
         ok(!mentionsUnowned(reproposed.operations) && !mentionsUnowned(reproposed.events), `${tag} [repeat] the preview still names no unowned event`);
-        ok(reproposed.operations.every((operation) => operation.kind !== "create"), `${tag} [repeat] and creates nothing: every event it needs already exists`);
+        ok(reproposed.operations.every((operation) => operation.kind === "update"), `${tag} [repeat] it creates nothing and deletes nothing: every event it needs already exists`);
+        // P1B-53: the completed Task's event is frozen. It is in no operation, and the preview says why, once.
+        const completedEvent = recommendation.task_id.slice(5);
+        ok(!JSON.stringify(reproposed.operations).includes(completedEvent), `${tag} [repeat] the completed Task's event is in no operation: it is neither updated nor deleted`);
+        say("[repeat] retained-event diagnostic", reproposed.diagnostics.filter((diagnostic) => diagnostic.code === "calendar_event_retained"));
+        same(
+          reproposed.diagnostics.filter((diagnostic) => diagnostic.code === "calendar_event_retained"),
+          [{ code: "calendar_event_retained", message: `Calendar event \`${completedEvent}\` is left as it is: it is the record of a completed Task, and is neither updated nor deleted` }],
+          `${tag} [repeat] and the preview says so, once`
+        );
         const reapproved = await approve(o, reproposed.preview_id);
         same(reapproved.status, "applied", `${tag} [repeat] the second approve applies`);
         ok(!mentionsUnowned(reapproved.operation_results) && !mentionsUnowned(reapproved.applied_events), `${tag} [repeat] with no write for an unowned Task`);
+        ok(reapproved.applied_events.some((event) => event.external_id === completedEvent), `${tag} [repeat] and the completed Task's event is still in the applied record`);
         same((await preview(o)).operations, [], `${tag} [repeat] a preview straight after it proposes nothing`);
         o = await observing(o, reapproved.applied_events);
         same((await reconcile(o)).conflicts.map((conflict) => [conflict.conflict_type, conflict.external_id]), foreignOnly, `${tag} [repeat] reconcile is unchanged: the unowned instances, foreign, and no drift`);
         same((await report()).categories, rows, `${tag} [repeat] the report is unchanged: nothing was counted twice`);
         await o.stop();
-        return { instances: instances.length, captured: seen.length, occurrences: occurrences.length, nights: nights.length, placed, unplaced, reason: fence.reason, planningDiagnostics: planned.diagnostics.map((diagnostic) => diagnostic.code), total: body.total_seconds };
+        return { instances: instances.length, captured: seen.length, occurrences: occurrences.length, nights: nights.length, placed, unplaced, reason: fence.reason, planningDiagnostics: planned.diagnostics.map((diagnostic) => diagnostic.code), generateMs, placements: steps.length, total: body.total_seconds };
       }
 
       const results = {};
