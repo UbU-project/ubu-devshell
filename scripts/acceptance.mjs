@@ -383,79 +383,123 @@ const SEEDS = {
 // last, and no step is a prerequisite of a later one unless it is deterministic.
 // P1B-50's list put a model-dependent step in the middle; the model declined to
 // ask, the step after it had nothing to show, and three steps were abandoned.
+//
+// From P1B-53 every step says exactly what to OPEN, what to CLICK, what to READ
+// and what to COPY BACK, and none asks the operator to infer. "Report" is never
+// used as a verb here: "Report:" has twice been read as the name of a screen.
+const T = {
+  completable: TITLE("— take the bins out"),
+  interview: TITLE("— replace the kettle element"),
+  described: TITLE("— already answered"),
+  fence: week.backlog.find((task) => task.tooLong).title,
+  council: week.recurring[0].summary
+};
 const STEPS = [
   {
     needs: [],
-    title: "Setup → Run self-check",
-    expect: "Three reads answered, nothing written. This proves the Tauri transport reaches this staged orchestrator.",
+    name: "The app reaches this orchestrator",
+    open: "Setup, in the navigation on the left.",
+    click: "The button “Run self-check”, in the card headed “Self-check”.",
+    read: "The badge beside the heading reads “3 of 3 reads answered”. Under the button are three numbered lines, each with the word “answered”, and then the sentence “Three reads were attempted and nothing was written.”",
+    copy: "The badge text and the three numbered lines.",
     codes: []
   },
   {
     needs: ["described"],
-    title: "Tasks → expand “Notes for {described}”",
-    expect: "The notes are two lines, exactly as the harness staged them: “Q: Is this one already clarified?” and “A: y”. Edit that Task: the same text is in the Notes field. Cancel without saving. Nobody has looked at this field in the app yet.",
+    name: "A Task's notes",
+    open: "Tasks, in the navigation.",
+    click: `Under the heading “Backlog”, the line “Notes for ${T.described}”. It opens.`,
+    read: "Two lines appear under it: “Q: Is this one already clarified?” and, on the next line, “A: y”. This is {described}.",
+    copy: "The two lines, exactly as they appear.",
     codes: []
   },
   {
     needs: ["spent"],
-    title: "Today → Time by category → Show report",
-    expect: "Nobody has looked at this panel yet: report how it reads as well as whether it is right. The range reads as the last 7 days. A row for personal carries at least 1 h, from {spent}. Anything more is a window of the staged week that has already begun: the week's events are in the hours ahead, and its nights, which have no category, are counted under Uncategorized once they begin. Change the days to 2 and reload: the range sentence changes and the personal row still carries at least 1 h.",
+    name: "Time by category",
+    open: "Today, in the navigation.",
+    click: "In the panel headed “Time by category”, the button “Show report”.",
+    read: "The sentence under the button begins “Showing the last 7 days:”. In the table, the row “personal” shows “1 h” or more in the column “Time”. That hour is {spent}.",
+    copy: "The sentence that begins “Showing the last 7 days:”, and every row of the table, the row “Total” included.",
     codes: [
-      "no code: an empty report says there is no recorded time in the range, and is not an error",
-      "time_by_category_invalid_range: from is after to; the app never sends that, so report it as a defect"
+      "no code: a line beginning “No recorded time between” means there is no recorded time in the range. It is not an error. Copy that line back instead of the table",
+      "time_by_category_invalid_range: from is after to. The app never sends that. Copy the whole red box back"
     ]
   },
   {
     needs: ["completable"],
-    title: "Next Task → Complete, then Undo completion",
-    expect: "{completable} is completed, then active again, and comes back as the recommendation. This step comes before the Plan is generated on purpose: with a Plan, Next Task recommends the Plan's first placement instead.",
+    name: "Complete, then undo",
+    open: "Next Task, in the navigation.",
+    click: "The button “Complete”, under the recommended Task. Then, in the panel headed “Loop State”, the button “Undo completion”.",
+    read: `Before the first click the recommended Task is “${T.completable}”. After “Complete”, the panel “Loop State” says “complete recorded; Task status is completed.” After “Undo completion”, a line says “The completion was undone. The Task is active again.” and the recommended Task is “${T.completable}” again. This step comes before the Plan is generated on purpose: with a Plan, Next Task recommends the Plan's first placement instead.`,
+    copy: "The title of the recommended Task before the first click, the title after the second click, and the sentence that begins “The completion was undone.”",
     codes: [
-      "reopen_not_completed: Undo was pressed twice; there is nothing left to undo",
-      "reopen_stale_completion: the app named a completion that is not the latest; reload Next Task and try once",
-      "a recommendation that is another Task: a Plan already exists in this store because a later step was run first; complete and undo what is recommended, and report that"
+      "reopen_not_completed: “Undo completion” was clicked twice. There is nothing left to undo. Go on to the next step",
+      "reopen_stale_completion: the app named a completion that is not the latest. Open Next Task again and do this step once more",
+      `a recommended Task that is not “${T.completable}”: a Plan already exists in this store, because a later step was done first. Complete and undo the Task that is recommended, and write down its title`
     ]
   },
   {
     needs: ["week_calendar", "week_routine", "week_night", "week_backlog"],
-    title: "Today → Generate Plan",
-    expect: "This should read as a Plan with one Task that did not fit, not as an error. Timed placements shows the staged week: {week_calendar}; {week_routine}; {week_night}; {week_backlog}. The Static anchors are the captured events, the routine and the night. No Skeleton placement sits over a Static anchor, and none falls between 23:00 and 07:00: the night block is why work that does not fit today starts in the morning and not at midnight. Below the placements, “Not in this Plan” names “Invented: paint the whole imaginary fence” by its title, says it is longer than any free interval in the planning horizon, and says in words what can be done. Nothing on the screen is red.",
+    name: "A Plan with one Task that did not fit",
+    open: "Today, in the navigation.",
+    click: "The button “Generate Plan”.",
+    read: `Under “Timed placements” every placement titled “Asleep” carries the badge “Static anchor”, and every placement whose title begins “Invented:” carries the badge “Skeleton”. Below the placements is a section headed “Not in this Plan”. It names “${T.fence}”, says “It is longer than any free interval in the planning horizon.”, and under “What can be done:” lists sentences, not code words. Nothing on the screen is red. DO NOT READ THE DATES AND TIMES beside the placements: they are wrong on this screen, which is a known defect written down in the P1B-53 report. The true times are in the next step. What is staged: {week_calendar}; {week_routine}; {week_night}; {week_backlog}.`,
+    copy: "The whole section “Not in this Plan”. Any box that appears between the two buttons and the heading “Timed placements”. And the two times printed beside the first placement, exactly as shown, wrong as they are.",
     codes: [
-      "no diagnostic: expected at the one-week horizon, which is the default. “Not in this Plan” still names the Task",
-      "task_unplaceable: expected at the one-day horizon, shown quietly as a status with the sentence first and the code after it. It is not an error"
+      "no box above “Timed placements”: expected at the one-week horizon, which is the default. “Not in this Plan” still names the Task",
+      "task_unplaceable, in a quiet grey box with the sentence first and the code in small print after it: expected at the one-day horizon. It is not an error"
     ]
   },
   {
-    needs: ["week_calendar", "week_colours", "week_sleep_colour"],
-    title: "Calendar → Take preview",
-    expect: "Creates only: one for each placed Task, one for each routine occurrence and one for each night. Asleep is exported: each night is a Busy event, which is deliberate, and it is Graphite because {week_sleep_colour}. Each night reads Placement: Static. Nothing is proposed for “Invented standing marmot council” and it is not among the desired events: UbU does not own it and never writes to it. Nothing is proposed for the two one-off events either: capture already recorded them as applied. The palette is {week_colours}. Approve, Capture and Reconcile are not part of this step: in the app they are Live, and this staged orchestrator refuses a Live calendar request.",
+    needs: ["week_calendar", "week_colours"],
+    name: "The preview, and where the night is",
+    open: "Calendar, in the navigation.",
+    click: "The button “Take preview”, under the heading “1. Preview”.",
+    read: `Every operation is headed “Create:”. Each one headed “Create: Asleep” has four lines: a “Window:” line with two times that are eight hours apart, “Placement: Static”, “Colour means: its category”, and “Window change means: move — the window follows the event”. Each one headed “Create: Invented:” reads “Placement: Dynamic”. The times on the “Window:” lines are true, and are in UTC. No operation is headed “${T.council}”: UbU does not own it and never writes to it. Above the operations is a quiet grey box, not a red one, with one sentence for each instance of “${T.council}”, each ending “cannot produce a valid Calendar event id; step skipped”.`,
+    copy: "The first operation headed “Create: Asleep”, all four of its lines. The first operation headed “Create: Invented:”, all four of its lines. And the whole grey box above the operations.",
     codes: [
-      "calendar_event_id_unmappable: expected, once for each instance of “Invented standing marmot council” inside the horizon, shown quietly as a status. It is the exclusion working, not a fault, and it names the occupied-time Task by id",
-      "calendar_mock_seed_with_live_export: Approve, Capture or Reconcile was pressed. THE REQUEST DID NOT RUN: this staged orchestrator refuses a Live calendar request, and nothing was written"
+      `calendar_event_id_unmappable, in small print in the grey box: expected, once for each instance of “${T.council}” inside the horizon. It is the exclusion working, not a fault`,
+      "calendar_mock_seed_with_live_export, in a red box: “Approve preview”, “Run capture” or “Run reconciliation” was clicked. THE REQUEST DID NOT RUN: this staged orchestrator refuses a Live calendar request, and nothing was written. Go on to the next step"
     ]
+  },
+  {
+    needs: ["week_night", "week_sleep_colour"],
+    name: "Sleep's colour, and what it collides with",
+    open: "Setup, in the navigation.",
+    click: "In the card headed “Colours”, the button “Reload colours”.",
+    read: "In the table “Category colours”, the row “sleep” shows “8” in the column “Colour id” and “setting” in the column “Origin”. In the table “Colour to category at capture”, the row for colour id “8” reads “Collision: location, sleep — no category assigned.” That is {week_sleep_colour}. It is the consequence of the Setting and is expected: with it set, a real Graphite event is captured with no category.",
+    copy: "The row “sleep” from the first table, and the row for colour id “8” from the second.",
+    codes: []
   },
   {
     needs: ["interview", "described", "advisory"],
-    title: "Review → Clarify → Run, with the selector left on its default; answer what it asks",
-    expect: "The selected Task is {interview}, not {described}. If a proposal appears, fill in its questions and Save answers: the card leaves the queue, and Tasks → Notes for that Task then holds the Q:/A: pairs in the order asked. Which questions appear is the model's choice and is not checked. A model that declines to ask is a result to report and not a reason to stop: write down what the screen said and go on.",
+    name: "Clarify, with the selector left alone",
+    open: "Review, in the navigation.",
+    click: "In the panel headed “Clarify”, leave “Task to interview” on “The first Task without a description” and click “Run Clarify”. If a card with questions appears under “Decision queue”, answer each question and click “Save answers”.",
+    read: `Under the button a box appears. Its “Selected Task” is “${T.interview}”, and not “${T.described}”. Which questions appear is the model's choice and is not checked. If the model asks nothing, the box says so in a sentence: that is a result to copy back, and the next step is still done.`,
+    copy: `Everything in the box under the button “Run Clarify”: the lines “Run status” and “Candidates enqueued”, the Selected Task, and every sentence under them. If you saved answers, also open Tasks, click “Notes for ${T.interview}”, and copy the notes.`,
     codes: [
-      "candidates_enqueued: 1 and no diagnostic: the run happened and there is a proposal to answer",
-      "clarify_no_questions on round one: THE MODEL DECLINED TO ASK. The screen says this is a result from the model and not a finished interview, names advisory.model and offers Setup. Report it; there is nothing to answer, and the next step is still run",
-      "clarify_already_queued: a proposal for it is already waiting below; answer that one, this run did not ask the model",
-      "advisory_unconfigured or advisory_endpoint_invalid: the model is not configured; set advisory.model in Setup, the run did not happen",
-      "advisory_http_failed, advisory_timeout, advisory_empty_response or advisory_connection_failed: the model was asked and failed; the diagnostic says what to change",
-      "advisory_answer_required, clarify_invalid_answer or clarify_description_too_large: Save was refused and nothing was written; the message says why"
+      "Candidates enqueued: 1, and no sentence under it: the run happened and there is a proposal to answer",
+      "clarify_no_questions, with a sentence that begins “This is round one”: THE MODEL DECLINED TO ASK. The box says it is a result from the model and not a finished interview, and the button “Open Setup” appears. There is nothing to answer. Copy the box back and go on",
+      "clarify_already_queued: a proposal for this Task is already waiting under “Decision queue”. Answer that one. This run did not ask the model",
+      "advisory_unconfigured or advisory_endpoint_invalid, in a red box: the model is not configured. THE RUN DID NOT HAPPEN. Set advisory.model in Setup and do this step again",
+      "advisory_http_failed, advisory_timeout, advisory_empty_response, advisory_malformed_result or advisory_connection_failed, in a red box: the model was asked and failed. Copy the box back and go on",
+      "advisory_answer_required, clarify_invalid_answer or clarify_description_too_large, after “Save answers”: the answers were refused and nothing was written. Copy the message back"
     ]
   },
   {
     needs: ["interview", "advisory"],
-    title: "Review → Clarify → Run again, with the selector set to {interview}",
-    expect: "This run can be made whatever the last step did. Every outcome below is a result to report, not a defect.",
+    name: "Clarify again, with the Task chosen",
+    open: "Review, in the navigation.",
+    click: `In the panel headed “Clarify”, set “Task to interview” to “${T.interview}” and click “Run Clarify”.`,
+    read: `This run can be made whatever the last step did. The box under the button names “${T.interview}” as the Selected Task. Each outcome listed under “codes” is a result to copy back, and none is a defect.`,
+    copy: "Everything in the box under the button “Run Clarify”.",
     codes: [
-      "candidates_enqueued: 1: a new question set. It is round two if you saved answers in the last step, and round one again if the model declined there",
-      "clarify_no_questions on round one: the model declined again. The screen says it is a result from the model, and offers Setup",
-      "clarify_no_questions on a later round: the interview is finished. The screen says so, names the round, and offers no Setup",
-      "clarify_already_queued: the proposal from the last step is still waiting; answer, defer or reject it, then run again",
-      "a Selected Task that is not {interview}: THE RUN DID NOT INTERVIEW THIS TASK. The selector was left on its default, which takes the first Task with no notes; set the selector and run again"
+      "Candidates enqueued: 1: a new set of questions. It is round two if you saved answers in the last step, and round one again if the model asked nothing there",
+      "clarify_no_questions, with a sentence that begins “This is round one”: the model declined again. The button “Open Setup” appears",
+      "clarify_no_questions, with a sentence that begins “The interview is finished”: it names the round, and no “Open Setup” button appears",
+      "clarify_already_queued: the proposal from the last step is still waiting. Answer, defer or reject it, then do this step again",
+      `a Selected Task that is not “${T.interview}”: THE RUN DID NOT INTERVIEW THIS TASK. “Task to interview” was left on “The first Task without a description”. Set it and click “Run Clarify” again`
     ]
   }
 ];
@@ -560,17 +604,21 @@ async function main() {
   for (const name of unused) console.log(`  --  ${name}: staged but no step names it`);
 
   const title = (text) => text.replace(/\{(\w+)\}/g, (_, name) => staged[name]?.described ?? `{${name}}`);
-  console.log("\nsteps: run these in the app, in order. Deterministic steps come first; the two that depend on a model are last.\n");
+  console.log("\nsteps: do these in the app, in order. Each says what to open, what to click, what to read and what to copy back.");
+  console.log("       The first seven do not depend on a model. The last two do.\n");
   STEPS.forEach((step, index) => {
-    console.log(`  ${index + 1}. ${title(step.title)}`);
-    console.log(`     expect: ${title(step.expect)}`);
+    console.log(`  ${index + 1}. ${title(step.name)}`);
+    console.log(`     OPEN       ${title(step.open)}`);
+    console.log(`     CLICK      ${title(step.click)}`);
+    console.log(`     READ       ${title(step.read)}`);
+    console.log(`     COPY BACK  ${title(step.copy)}`);
     // The diagnostic codes a step can meet, each with what it means, so an outcome is never
     // misread: in particular the one that means the run did not happen.
-    console.log(step.codes.length === 0 ? "     codes:  none; this step has no diagnostic to meet" : `     codes:  ${title(step.codes[0])}`);
-    for (const code of step.codes.slice(1)) console.log(`             ${title(code)}`);
+    console.log(step.codes.length === 0 ? "     codes      none; this step has no diagnostic to meet" : `     codes      ${title(step.codes[0])}`);
+    for (const code of step.codes.slice(1)) console.log(`                ${title(code)}`);
     console.log("");
   });
-  console.log("A step that cannot be completed is reported as such, and the steps after it are still run.\n");
+  console.log("When a step cannot be completed, write down what the screen said and go on to the next step. Every step is done.\n");
   // --stage-only proves the staging and the preconditions without waiting for a
   // human. It is how these steps are checked before they are ever handed over.
   if (process.argv.includes("--stage-only")) {

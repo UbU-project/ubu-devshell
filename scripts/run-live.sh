@@ -53,10 +53,10 @@ Required
 Optional
   UBU_GOOGLE_CALENDAR_ID        the calendar to use (default: primary)
   UBU_PLANNING_HORIZON_SECONDS  how far ahead UbU plans and how much of the
-                                calendar it sees (default: 86400, one day;
-                                at most 2678400). One day of horizon is one
-                                day of calendar: capture takes nothing beyond
-                                it. 604800 is one week.
+                                calendar it sees (default: 604800, one week;
+                                at most 2678400). One week of horizon is one
+                                week of calendar: capture takes nothing
+                                beyond it. 86400 is one day.
   UBU_DB_PATH                   a store other than the default
   UBU_ORCHESTRATOR_PORT         the port (default: 7878, which the app expects)
   ORCHESTRATOR_DIR, REPOS_DIR   where the ubu-orchestrator checkout is
@@ -128,7 +128,7 @@ if [[ -n "$HORIZON" ]]; then
     refuse "UBU_PLANNING_HORIZON_SECONDS must be an integer from 1 to 2678400, not $HORIZON"
   HORIZON_TEXT="$HORIZON seconds, from UBU_PLANNING_HORIZON_SECONDS"
 else
-  HORIZON_TEXT="86400 seconds, one day: the orchestrator's default. Capture will see one day of calendar"
+  HORIZON_TEXT="604800 seconds, one week: the orchestrator's default. Capture will see one week of calendar"
 fi
 
 # ---- the store: the path the orchestrator itself will resolve, made absolute for the eye

@@ -61,23 +61,24 @@ interview: {
   throws when it does not, naming what is wrong. It returns the text that
   names the object in the steps, by title and id.
 
-A **step** names the seeds it needs and interpolates them:
+A **step** names the seeds it needs, and says what to open, click, read and
+copy back:
 
 ```js
 {
-  needs: ["interview", "described", "advisory"],
-  title: "Review → Clarify → Run, with the selector left on its default",
-  expect: "The selected Task is {interview}, not {described}. A proposal appears with its questions.",
-  codes: [
-    "candidates_enqueued: 1 and no diagnostic: the run happened and there is a proposal to answer",
-    "clarify_already_queued: a proposal for it is already waiting below; answer that one, this run did not ask the model"
-  ]
+  needs: ["described"],
+  name: "A Task's notes",
+  open: "Tasks, in the navigation.",
+  click: "Under the heading “Backlog”, the line “Notes for Acceptance — already answered”. It opens.",
+  read: "Two lines appear under it: “Q: Is this one already clarified?” and, on the next line, “A: y”. This is {described}.",
+  copy: "The two lines, exactly as they appear.",
+  codes: []
 }
 ```
 
 `{interview}` is replaced by what the seed's `check` returned. `codes` lists
 every diagnostic the step can meet, each with what it means and whether the
-run happened; it is printed under `expect:`. A step with
+run happened; it is printed under `codes`. A step with
 `needs: []` is one whose precondition is genuinely the empty store or the
 app alone.
 
@@ -95,9 +96,10 @@ by id, rather than trusting that creating it first made it first.
 
 ## Whether a step belongs in the list at all
 
-From P1B-50, three rules decide it, and from P1B-51 a fourth. A step that
-fails any one of them is not written; it is moved to the runner, dropped, or
-moved to where it breaks nothing.
+From P1B-50, three rules decide it, from P1B-51 a fourth, and from P1B-53 a
+fifth. A step that fails any one of them is not written; it is moved to the
+runner, dropped, moved to where it breaks nothing, or rewritten until it
+says exactly what to do.
 
 1. **A manual step may not verify what the runner or a `ubu-ui` test already
    asserts.** P1B-48's dependent-question check broke this rule: that a
@@ -106,7 +108,7 @@ moved to where it breaks nothing.
 2. **A step's expected outcomes must name the diagnostic codes, and must
    include the "it did not run" outcome.** Every step carries a `codes`
    field, one line per code with what it means, and the harness prints them
-   under `expect:`. P1B-48's second-round step broke this rule: it did not
+   under `codes`. P1B-48's second-round step broke this rule: it did not
    say that `clarify_no_task` means the selector was left on its default and
    the run did not happen, and that outcome was read as a result of a run.
 3. **A step must not depend on what a model chooses to emit.** If a behaviour
@@ -130,42 +132,74 @@ moved to where it breaks nothing.
      earlier step that could fail. The notes step reads a description the
      harness staged itself, not one an interview wrote.
 
-A model that declines to ask is a result to report, not a reason to stop.
-The harness prints, under the list: **a step that cannot be completed is
-reported as such, and the steps after it are still run.**
+A model that declines to ask is a result to copy back, not a reason to stop.
+The harness prints, under the list: **when a step cannot be completed, write
+down what the screen said and go on to the next step. Every step is done.**
+
+5. **A step says exactly what to open, exactly what to click, exactly what to
+   read, and exactly what to copy back. It never asks the operator to infer.
+   It never uses "Report" as a verb — "Write down" or "Copy back" instead,
+   because "Report:" has twice been read as the name of a screen. A ticket's
+   acceptance section names the script to run and the document to follow, and
+   contains no steps of its own.**
+
+   The P1B-53 ticket calls this the fourth rule. It is the fifth here only
+   because the P1B-51 ordering rule already holds the fourth place; it is the
+   same rule.
+
+   What it means for a step in `scripts/acceptance.mjs`:
+   - it has four fields, and the harness prints them under those four words:
+     `OPEN`, `CLICK`, `READ` and `COPY BACK`;
+   - `OPEN` names the screen as the navigation names it. `CLICK` names the
+     control by the words on it, in quotation marks, and says which card or
+     heading it is under;
+   - `READ` quotes the words the screen will show. It does not ask whether
+     something "looks right";
+   - `COPY BACK` says which lines, rows or box. "The whole box", not "what
+     you see";
+   - nothing asks the operator to compare two things and draw a conclusion.
+     A comparison that matters is a scenario in the runner.
+
+   What it means for a ticket: its acceptance section says which script to
+   run and which document to follow. The steps live in the harness, which
+   prints them, and in [the live rehearsal](LIVE_REHEARSAL.md), which is the
+   single source for the live sequence. A ticket that restates steps has two
+   copies to keep true, and the operator follows the wrong one.
 
 A step with no diagnostic to meet says so: its `codes` is `[]` and the
 harness prints `none`.
 
-### The list from P1B-51
+### The list from P1B-53
 
 | # | step | depends on a model | staged by |
 |---|---|---|---|
-| 1 | Setup → Run self-check | no | nothing |
-| 2 | Tasks → Notes for the described Task | no | `described` |
-| 3 | Today → Time by category | no | `spent` |
-| 4 | Next Task → Complete, then Undo | no | `completable` |
-| 5 | Today → Generate Plan, over the staged week | no | `week_calendar`, `week_routine`, `week_night`, `week_backlog` |
-| 6 | Calendar → Take preview | no | `week_calendar`, `week_colours` |
-| 7 | Review → Clarify → Run on the default; answer what it asks | **yes** | `interview`, `described`, `advisory` |
-| 8 | Review → Clarify → Run again, selector set | **yes** | `interview`, `advisory` |
+| 1 | The app reaches this orchestrator: Setup, “Run self-check” | no | nothing |
+| 2 | A Task's notes: Tasks, “Notes for …” | no | `described` |
+| 3 | Time by category: Today, “Show report” | no | `spent` |
+| 4 | Complete, then undo: Next Task | no | `completable` |
+| 5 | A Plan with one Task that did not fit: Today, “Generate Plan” | no | `week_calendar`, `week_routine`, `week_night`, `week_backlog` |
+| 6 | The preview, and where the night is: Calendar, “Take preview” | no | `week_calendar`, `week_colours` |
+| 7 | Sleep's colour, and what it collides with: Setup, “Reload colours” | no | `week_night`, `week_sleep_colour` |
+| 8 | Clarify, with the selector left alone: Review, “Run Clarify” | **yes** | `interview`, `described`, `advisory` |
+| 9 | Clarify again, with the Task chosen: Review, “Run Clarify” | **yes** | `interview`, `advisory` |
 
-Steps 2 and 3 are the two parts of P1B-50 that were never looked at, and they
-are now first after the self-check. Step 4 comes before step 5 on purpose:
-both are deterministic, and once a Plan exists Next Task recommends the
-Plan's first placement and not the Task step 4 is staged for. Step 8 can be
-run whatever step 7 did; its codes name the round-one decline, the finished
-interview, and the run that interviewed another Task because the selector
-was left on its default.
+Step 4 comes before step 5 on purpose: both are deterministic, and once a
+Plan exists Next Task recommends the Plan's first placement and not the Task
+step 4 is staged for. Step 9 can be done whatever step 8 did; its codes name
+the round-one decline, the finished interview, and the run that interviewed
+another Task because the selector was left alone.
 
-Steps 5 and 6 check rendering only. That the week's Plan accounts for every
-Task, that nothing overlaps an occupied window and that no preview names an
-event UbU does not own are asserted by the runner's rehearsal scenario. What
-is left for a human is how Today and Calendar show it. From P1B-52 that
-means three things in particular: that Generate Plan reads as a Plan with one
-Task that did not fit and not as an error, with the Task named by title under
-**Not in this Plan**; that no work is placed in the night; and that Take
-preview reports the skipped occupancy window quietly, as a status.
+Steps 5, 6 and 7 are about what the screen shows. That the week's Plan
+accounts for every Task, that nothing overlaps an occupied window, that no
+work is placed in the night and that no preview names an event UbU does not
+own are asserted by the runner's rehearsal scenario. What is left for a human
+is how Today, Calendar and Setup show it.
+
+**Step 5 tells the operator not to read the dates and times on Today.** They
+are wrong on that screen: `ubu-ui` formats a placement's Unix seconds as if
+they were minutes. That is a defect found while writing these steps, written
+down in the P1B-53 report and not fixed there. The true times are on
+Calendar, in each operation's “Window:” line, which step 6 reads.
 
 ## The staged week
 
@@ -223,10 +257,12 @@ not only on the ones made before that seed.
 
 ## How to add a step
 
-1. Check the step against the four rules above, and decide where in the
+1. Check the step against the five rules above, and decide where in the
    order it goes: before the first model-dependent step unless it is one.
 2. Write the step in `STEPS`, in order, with `needs` naming every seed it
-   relies on and `codes` naming every diagnostic it can meet. If the
+   relies on, `open`, `click`, `read` and `copy` in the words the app uses,
+   and `codes` naming every diagnostic it can meet. Take the words from the
+   app's source, not from memory. If the
    precondition does not exist yet, write the seed in `SEEDS` with a `what`,
    a `make` and a `check`.
 3. Make the `check` assert the thing the step actually depends on. If the
