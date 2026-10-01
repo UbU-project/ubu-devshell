@@ -24,7 +24,7 @@ import net from "node:net";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { rehearsalWeek, routineBody } from "./rehearsal-week.mjs";
+import { eveningZone, localParts, rehearsalWeek, routineBody } from "./rehearsal-week.mjs";
 
 function option(name) {
   const index = process.argv.indexOf(`--${name}`);
@@ -1034,9 +1034,21 @@ const scenarios = [
     seeded: true,
     // The switch rehearsal. One invented week, the whole daily loop, walked on its own store at each of two
     // planning horizons. The week is rehearsal-week.mjs; the acceptance harness stages the same one.
+    //
+    // The week lives in a timezone, because it has a night in it. Here that is a fixed-offset zone in which
+    // the top of this hour is 21:00, so every walk is the same evening: two hours before Asleep, with more
+    // work than fits before it. What does not fit tonight has to wait for the morning.
     async run(first) {
       await first.stop();
-      const week = rehearsalWeek(thisHour);
+      const zone = eveningZone(thisHour);
+      const week = rehearsalWeek(thisHour, zone);
+      const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      /// A wall-clock time in the week's zone, as the operator would read it.
+      const local = (seconds) => {
+        const p = localParts(zone, seconds * 1000);
+        const day = WEEKDAYS[new Date(Date.UTC(p.year, p.month - 1, p.day)).getUTCDay()];
+        return `${day} ${String(p.hour).padStart(2, "0")}:${String(p.minute).padStart(2, "0")}`;
+      };
       const HORIZONS = [
         ["one day", 86_400],
         ["one week", 604_800]
@@ -1065,9 +1077,11 @@ const scenarios = [
         const seen = week.calendar.filter(inHorizon);
         ok(seen.length >= 3, `${tag} the horizon holds ${seen.length} of the calendar's ${week.calendar.length} events, ${instances.length} of them instances of the recurring commitment`);
 
-        // ---- the store: colours, the routine, the backlog, the Preference
+        // ---- the store: colours, the routine, the night, the backlog, the Preference
         for (const [name, value] of week.settings) await putSetting(o, name, value);
-        await call(o.base, "POST", endpoints.OBJECTIVE_CREATE_PATH, routineBody(week, endpoints.OBJECTIVE_SCHEMA_VERSION), 201);
+        for (const routine of [week.routine, week.asleep]) {
+          await call(o.base, "POST", endpoints.OBJECTIVE_CREATE_PATH, routineBody(week, routine, endpoints.OBJECTIVE_SCHEMA_VERSION), 201);
+        }
         const ids = {};
         for (const task of week.backlog) {
           ids[task.key] = (await captureTask(o, { title: task.title, duration_estimate: task.duration_estimate, category_tag: task.category, tags: [task.category] })).task_id;
@@ -1076,7 +1090,14 @@ const scenarios = [
         await call(o.base, "POST", endpoints.PREFERENCE_CREATE_PATH, { schema_version: endpoints.PREFERENCE_SCHEMA_VERSION, task_a: ids[week.preference.before], task_b: ids[week.preference.after], order: "a_preferred_to_b" }, 201);
 
         // ---- 1. capture: every event in the horizon is captured or diagnosed
-        const occupancyOnly = (id) => ({ code: "capture_occupancy_only", message: `Calendar event \`${id}\` cannot be owned by UbU, so its time is recorded as an occupied window that UbU will never write back to or export` });
+        // One diagnostic for the whole capture: a single id is named, and of several the first three are named and the rest counted.
+        const occupancyOnly = (events) => {
+          const ids = events.map((event) => `\`${event.external_id}\``);
+          const message = ids.length === 1
+            ? `Calendar event ${ids[0]} cannot be owned by UbU, so its time is recorded as an occupied window that UbU will never write back to or export`
+            : `${ids.length} Calendar events cannot be owned by UbU, so the time of each is recorded as an occupied window that UbU will never write back to or export: ${ids.slice(0, 3).join(", ")}${ids.length > 3 ? ` and ${ids.length - 3} more` : ""}`;
+          return { code: "capture_occupancy_only", message };
+        };
         const captured = await capture(o);
         say("capture diagnostics", captured.diagnostics);
         same({ captured: captured.captured, skipped: captured.skipped }, { captured: seen.length, skipped: 0 }, `${tag} every event inside the horizon is captured and none is skipped`);
@@ -1084,9 +1105,9 @@ const scenarios = [
           captured.diagnostics,
           [
             { code: "capture_colour_unmapped", message: `Calendar event \`${week.unmapped.external_id}\` has unmapped colour \`${week.unmappedColour}\`; no category assigned; map that colour in Settings to assign a category` },
-            ...instances.map((event) => occupancyOnly(event.external_id))
+            occupancyOnly(instances)
           ],
-          `${tag} the unmapped colour is diagnosed, and each recurring instance carries capture_occupancy_only`
+          `${tag} the unmapped colour is diagnosed, and the ${instances.length} unowned instance(s) are reported once, as capture_occupancy_only`
         );
         ok(!JSON.stringify(captured.diagnostics).includes("Invented"), `${tag} no diagnostic carries an event's title`);
         const bySource = {};
@@ -1120,6 +1141,12 @@ const scenarios = [
         const planned = await generate();
         const steps = planned.plan.steps;
         say("plan", { status: planned.status, steps: steps.map((step) => [step.start_at, step.end_at, step.static_anchor ? "static" : "dynamic", step.summary]) });
+        // The same placements as the operator would read them: local to the week's zone, with the nights marked.
+        console.log(`  ${tag} placements, local to ${zone}:`);
+        for (const step of steps) {
+          const kind = step.summary === week.asleep.title ? "ASLEEP " : step.static_anchor ? "static " : "dynamic";
+          console.log(`  ${tag}   ${local(step.start)} to ${local(step.end)}  ${kind}  ${step.summary}`);
+        }
         say("unplaced", planned.unplaced_tasks.map(({ task_id, summary, reason, explanation, safe_alternatives }) => ({ task_id, summary, reason, explanation, alternatives: safe_alternatives.map((alternative) => alternative.action) })));
         say("planning diagnostics", planned.diagnostics);
         say("risk report", { level: planned.risk_report?.level, findings: (planned.risk_report?.findings ?? []).map(({ category, severity, detail }) => ({ category, severity, detail })) });
@@ -1131,7 +1158,29 @@ const scenarios = [
         const start_of = (key) => steps.find((step) => step.task_id === ids[key]).start;
         ok(start_of(week.preference.before) <= start_of(week.preference.after), `${tag} the Preference holds: ${week.preference.before} is placed no later than ${week.preference.after}`);
         const occurrences = steps.filter((step) => step.summary === week.routine.title);
-        ok(occurrences.length >= 1 && occurrences.every((step) => step.static_anchor && step.start_at.slice(11, 19) === week.routine.nominalStart), `${tag} the routine has ${occurrences.length} occurrence(s) in the Plan, each Static at its nominal start`);
+        const clock = (seconds) => local(seconds).slice(4);
+        ok(occurrences.length >= 1 && occurrences.every((step) => step.static_anchor && `${clock(step.start)}:00` === week.routine.nominalStart), `${tag} the routine has ${occurrences.length} occurrence(s) in the Plan, each Static at ${week.routine.nominalStart} local`);
+
+        // ---- the night: Asleep materialises once per horizon day, and no work is placed inside it
+        const nights = steps.filter((step) => step.summary === week.asleep.title);
+        same(nights.length, horizonSeconds / 86_400, `${tag} Asleep materialises once for each day of the horizon`);
+        same(
+          nights.map((night) => [night.static_anchor, night.occupies_capacity, clock(night.start), night.end - night.start, night.category_tag ?? null]),
+          nights.map(() => [true, true, "23:00", week.asleep.seconds, null]),
+          `${tag} each is Static, occupies capacity, begins at 23:00 local, lasts eight hours and has no category`
+        );
+        ok(nights.every((night) => local(night.start).slice(0, 3) !== local(night.end).slice(0, 3) && clock(night.end) === "07:00"), `${tag} each spans midnight: ${nights.map((night) => `${local(night.start)} to ${local(night.end)}`).join(", ")}`);
+        const working = steps.filter((step) => !step.static_anchor);
+        same(
+          working.flatMap((step) => nights.filter((night) => step.start < night.end && step.end > night.start).map(() => `${step.summary} at ${local(step.start)}`)),
+          [],
+          `${tag} no Dynamic placement falls inside any Asleep window`
+        );
+        // Not vacuous: the backlog is longer than the evening, so some of it has to cross the night.
+        const tonight = working.filter((step) => step.end <= nights[0].start);
+        const morning = working.filter((step) => step.start >= nights[0].end);
+        ok(morning.length >= 1 && tonight.length + morning.length === working.length, `${tag} ${tonight.length} placement(s) fit before the night and ${morning.length} wait for the morning; the first of those begins ${local(Math.min(...morning.map((step) => step.start)))}`);
+        ok(morning.every((step) => step.start >= nights[0].end), `${tag} and none of them begins before Asleep ends at ${local(nights[0].end)}`);
 
         // ---- 3. no overlap: no planned Dynamic step runs over any Static window
         const anchors = steps.filter((step) => step.static_anchor && step.occupies_capacity);
@@ -1146,10 +1195,22 @@ const scenarios = [
         const desired = proposed.events.map((event) => event.task_id);
         ok(owned.every((id) => desired.includes(id)), `${tag} both events UbU can own are in the desired set`);
         ok(placed.every((key) => desired.includes(ids[key])) && occurrences.every((step) => desired.includes(step.task_id)), `${tag} so is every placed Task and every routine occurrence`);
+        // Judgment call 8: the night is exported, as a Busy block with no colour. On record, not a surprise.
+        const exported = nights.map((night) => proposed.events.find((event) => event.task_id === night.task_id));
+        same(
+          exported.map((event) => [event?.summary, event?.color_id, event?.transparent]),
+          nights.map(() => [week.asleep.title, null, false]),
+          `${tag} each Asleep occurrence is a desired event with no colour and transparent false: a Busy block`
+        );
+        same(
+          nights.map((night) => proposed.operations.filter((operation) => operation.kind === "create" && operation.event.task_id === night.task_id).length),
+          nights.map(() => 1),
+          `${tag} and the preview creates one event for each of them`
+        );
         same(desired.filter((id) => unowned.includes(id)), [], `${tag} no unowned Task is in the desired set`);
         const mentionsUnowned = (value) => instances.some((event) => JSON.stringify(value).includes(event.external_id)) || unowned.some((id) => JSON.stringify(value).includes(id.slice(5)));
         ok(!mentionsUnowned(proposed.operations) && !mentionsUnowned(proposed.events), `${tag} no operation and no desired event names an unowned event or its Task`);
-        same(proposed.operations.map((operation) => operation.kind), Array(placed.length + occurrences.length).fill("create"), `${tag} the operations are creates for UbU's own work, and nothing against what it captured`);
+        same(proposed.operations.map((operation) => operation.kind), Array(placed.length + occurrences.length + nights.length).fill("create"), `${tag} the operations are creates for UbU's own work, and nothing against what it captured`);
         say("preview diagnostics", proposed.diagnostics);
         same(
           proposed.diagnostics.map((diagnostic) => diagnostic.code),
@@ -1162,7 +1223,7 @@ const scenarios = [
         same(approved.status, "applied", `${tag} the Mock approve applies`);
         ok(approved.operation_results.every((result) => result.status === "applied"), `${tag} all ${approved.operation_results.length} operations were applied`);
         ok(!mentionsUnowned(approved.operation_results) && !mentionsUnowned(approved.applied_events), `${tag} no operation result and no applied event names an unowned event or its Task`);
-        same(approved.applied_events.length, owned.length + placed.length + occurrences.length, `${tag} the applied record holds the two owned captures and what was created, and no unowned window`);
+        same(approved.applied_events.length, owned.length + placed.length + occurrences.length + nights.length, `${tag} the applied record holds the two owned captures and what was created, and no unowned window`);
 
         // ---- 6. reconcile: the unowned events are foreign and nothing else drifts
         o = await observing(o, approved.applied_events);
@@ -1194,19 +1255,22 @@ const scenarios = [
         const span = (event) => (Date.parse(event.end_at) - Date.parse(event.start_at)) / 1000;
         for (const event of seen) add(week.categoryOfColour[event.color_id] ?? "Uncategorized", span(event), 0);
         for (const _ of occurrences) add(week.routine.category, week.routine.seconds, 0);
+        // The night has no category, so every hour of it is reported as Uncategorized.
+        for (const _ of nights) add("Uncategorized", week.asleep.seconds, 0);
         add(done.category, 0, done.seconds);
         const rows = Object.values(expected).sort((a, b) => b.seconds - a.seconds || (a.category < b.category ? -1 : 1));
         const body = await report();
         say("time-by-category response", body);
-        same(body.categories, rows, `${tag} the report is the Static windows plus the one completion, and the unmapped-colour Task is in Uncategorized`);
+        same(body.categories, rows, `${tag} the report is the Static windows plus the one completion; the unmapped-colour Task and the nights are in Uncategorized`);
         same({ total: body.total_seconds, unmeasured: body.unmeasured }, { total: rows.reduce((sum, row) => sum + row.seconds, 0), unmeasured: [] }, `${tag} the total is the sum of the rows and nothing is unmeasured`);
-        same(body.categories.find((row) => row.category === "Uncategorized"), { category: "Uncategorized", seconds: span(week.unmapped), static_seconds: span(week.unmapped), completed_seconds: 0, task_count: 1 }, `${tag} Uncategorized is exactly the unmapped-colour Task's hour`);
+        const uncategorized = span(week.unmapped) + nights.length * week.asleep.seconds;
+        same(body.categories.find((row) => row.category === "Uncategorized"), { category: "Uncategorized", seconds: uncategorized, static_seconds: uncategorized, completed_seconds: 0, task_count: 1 + nights.length }, `${tag} Uncategorized is the unmapped-colour Task's hour and eight hours for each night`);
 
         // ---- 9. repeat: a second full pass over the same store
         const before = (await listTasks(o)).length;
         const recaptured = await capture(o);
         same({ captured: recaptured.captured, skipped: recaptured.skipped }, { captured: 0, skipped: 0 }, `${tag} [repeat] capture admits nothing`);
-        same(recaptured.diagnostics, instances.map((event) => occupancyOnly(event.external_id)), `${tag} [repeat] and still says which events it does not own`);
+        same(recaptured.diagnostics, [occupancyOnly(instances)], `${tag} [repeat] and still says, once, which events it does not own`);
         same((await listTasks(o)).length, before, `${tag} [repeat] no Task was created`);
         const replanned = await generate();
         const second = partition(replanned, week.backlog.map((task) => task.key).filter((key) => key !== done.key));
@@ -1223,7 +1287,7 @@ const scenarios = [
         same((await reconcile(o)).conflicts.map((conflict) => [conflict.conflict_type, conflict.external_id]), foreignOnly, `${tag} [repeat] reconcile is unchanged: the unowned instances, foreign, and no drift`);
         same((await report()).categories, rows, `${tag} [repeat] the report is unchanged: nothing was counted twice`);
         await o.stop();
-        return { instances: instances.length, captured: seen.length, occurrences: occurrences.length, placed, unplaced, reason: fence.reason, planningDiagnostics: planned.diagnostics.map((diagnostic) => diagnostic.code), total: body.total_seconds };
+        return { instances: instances.length, captured: seen.length, occurrences: occurrences.length, nights: nights.length, placed, unplaced, reason: fence.reason, planningDiagnostics: planned.diagnostics.map((diagnostic) => diagnostic.code), total: body.total_seconds };
       }
 
       const results = {};
@@ -1232,8 +1296,9 @@ const scenarios = [
       console.log(`  horizons compared: ${JSON.stringify(results)}`);
       // Judgment call 9: where the two horizons legitimately differ, the difference is what is asserted.
       same({ placed: day.placed, unplaced: day.unplaced }, { placed: sevenDays.placed, unplaced: sevenDays.unplaced }, "at both horizons the same five Tasks are placed and the same one is left out");
-      same([day.instances, sevenDays.instances], [1, week.recurring.length], "one day sees one instance of the recurring commitment; one week sees all three");
+      same([day.instances, sevenDays.instances], [1, week.recurring.length], "one day sees one instance of the recurring commitment; one week sees all seven");
       ok(sevenDays.occurrences > day.occurrences, `one week holds more routine occurrences than one day: ${sevenDays.occurrences} against ${day.occurrences}`);
+      same([day.nights, sevenDays.nights], [1, 7], "one day holds one night and one week holds seven");
       ok(sevenDays.total > day.total, `so one week accounts for more Static time: ${sevenDays.total} seconds against ${day.total}`);
       ok(day.reason !== sevenDays.reason, `the too-long Task is left out for a different stated reason: ${day.reason} at one day, ${sevenDays.reason} at one week`);
       return `the daily loop holds over an invented week at one day and at one week: ${day.captured} and ${sevenDays.captured} events captured, ${day.placed.length} of ${week.backlog.length} backlog Tasks placed at both, the unowned windows never overlapped and never written`;

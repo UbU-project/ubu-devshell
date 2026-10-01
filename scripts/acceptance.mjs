@@ -18,7 +18,7 @@ import net from "node:net";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { rehearsalWeek, routineBody } from "./rehearsal-week.mjs";
+import { localParts, localZone, rehearsalWeek, routineBody } from "./rehearsal-week.mjs";
 
 function option(name, fallback = null) {
   const index = process.argv.indexOf(`--${name}`);
@@ -88,7 +88,16 @@ const TITLE = (what) => `Acceptance ${what}`;
 // to a file before the orchestrator starts. The horizon is the orchestrator's
 // own default of one day unless UBU_PLANNING_HORIZON_SECONDS says otherwise:
 // which of the two the switch runs on is a decision this harness does not make.
-const week = rehearsalWeek(thisHour);
+// The week lives in a timezone, because it has a night in it. Here it is this
+// computer's own zone, so the night on screen is the operator's night.
+const ZONE = localZone();
+const week = rehearsalWeek(Date.now(), ZONE);
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+/// A wall-clock time in that zone, as the app shows it.
+const local = (instant) => {
+  const p = localParts(ZONE, Date.parse(instant));
+  return `${WEEKDAYS[new Date(Date.UTC(p.year, p.month - 1, p.day)).getUTCDay()]} ${String(p.hour).padStart(2, "0")}:${String(p.minute).padStart(2, "0")}`;
+};
 const HORIZON_SECONDS = Number(process.env.UBU_PLANNING_HORIZON_SECONDS ?? 86_400);
 const HORIZON = HORIZON_SECONDS % 86_400 === 0 ? `${HORIZON_SECONDS / 86_400}-day` : `${HORIZON_SECONDS}-second`;
 const inHorizon = (event) => Date.parse(event.start_at) < Date.now() + HORIZON_SECONDS * 1000;
@@ -235,7 +244,7 @@ const SEEDS = {
     }
   },
   week_calendar: {
-    what: "the week's calendar, captured in Mock: a recurring commitment UbU cannot own and two one-off events it can",
+    what: "the week's calendar, captured in Mock: seven instances of one recurring commitment, which UbU cannot own, and two one-off events it can",
     async make() {
       return captureCalendar();
     },
@@ -259,30 +268,60 @@ const SEEDS = {
           throw new StagingFailure(`the Task captured from ${event.external_id} has category ${task.category_tag ?? "none"}, not ${category ?? "none"}`);
         }
       }
-      for (const event of instances) {
-        if (!made.diagnostics.some((diagnostic) => diagnostic.code === "capture_occupancy_only" && diagnostic.message.includes(event.external_id))) {
-          throw new StagingFailure(`capture did not report ${event.external_id} as capture_occupancy_only`);
-        }
+      // One diagnostic for the whole capture: it names a single id, or the count and the first three.
+      const occupancy = made.diagnostics.filter((diagnostic) => diagnostic.code === "capture_occupancy_only");
+      const named = instances.slice(0, 3).every((event) => occupancy[0]?.message.includes(event.external_id));
+      const counted = instances.length === 1 || occupancy[0]?.message.startsWith(`${instances.length} Calendar events`);
+      if (occupancy.length !== 1 || !named || !counted) {
+        throw new StagingFailure(`capture did not report the ${instances.length} unowned instance(s) once, as capture_occupancy_only: ${JSON.stringify(occupancy)}`);
       }
       const again = await captureCalendar();
       if (again.captured !== 0) throw new StagingFailure(`a second capture admitted ${again.captured} more Task(s)`);
       return (
         `${seen.length} of its ${week.calendar.length} events are inside the ${HORIZON} horizon and are Static Tasks; ` +
-        `${instances.length} of them ${instances.length === 1 ? "is an instance" : "are instances"} of “${week.recurring[0].summary}”, occupied time UbU does not own`
+        `${instances.length} of them ${instances.length === 1 ? "is an instance" : "are instances"} of “${week.recurring[0].summary}”, ` +
+        `the first at ${local(instances[0].start_at)}, each captured as its own Static Task of occupied time that UbU does not own; ` +
+        `nothing in UbU knows they are one commitment`
       );
     }
   },
   week_routine: {
     what: "one daily routine, so the week has occurrences UbU made itself",
     async make() {
-      return call("POST", endpoints.OBJECTIVE_CREATE_PATH, routineBody(week, endpoints.OBJECTIVE_SCHEMA_VERSION), 201);
+      return call("POST", endpoints.OBJECTIVE_CREATE_PATH, routineBody(week, week.routine, endpoints.OBJECTIVE_SCHEMA_VERSION), 201);
     },
     async check(made) {
       const objectives = (await call("GET", endpoints.OBJECTIVE_LIST_PATH)).objectives;
       if (!objectives.some((objective) => objective.title === week.routine.title)) {
         throw new StagingFailure(`the routine ${week.routine.title} is not listed`);
       }
-      return `${week.routine.title} (${made.objective_id}), daily at ${week.routine.nominalStart} UTC`;
+      return `${week.routine.title} (${made.objective_id}), daily at ${week.routine.nominalStart.slice(0, 5)} ${ZONE} time`;
+    }
+  },
+  week_night: {
+    what: "the night: an Asleep routine, which is how UbU is told when no work may be placed",
+    async make() {
+      return call("POST", endpoints.OBJECTIVE_CREATE_PATH, routineBody(week, week.asleep, endpoints.OBJECTIVE_SCHEMA_VERSION), 201);
+    },
+    async check(made) {
+      // Read back what was stored: these five values are the whole recipe in docs/AVAILABILITY.md.
+      const stored = (await call("GET", fill(endpoints.OBJECTIVE_READ_PATH, { objective_id: made.objective_id }))).payload;
+      const template = stored.routine_instance_template;
+      const recipe = {
+        timezone: stored.recurrence?.timezone,
+        rule: stored.recurrence?.rule?.kind,
+        nominal_start: template?.nominal_start,
+        seconds: template?.duration_estimate?.seconds,
+        placement: template?.placement,
+        // Stored only when false: a routine occupies capacity unless it says otherwise.
+        occupies_capacity: template?.occupies_capacity ?? true,
+        category_tag: template?.category_tag ?? null
+      };
+      const wanted = { timezone: ZONE, rule: "daily", nominal_start: week.asleep.nominalStart, seconds: week.asleep.seconds, placement: "static", occupies_capacity: true, category_tag: null };
+      if (JSON.stringify(recipe) !== JSON.stringify(wanted)) {
+        throw new StagingFailure(`the Asleep routine was not stored as staged: ${JSON.stringify(recipe)}`);
+      }
+      return `${week.asleep.title} (${made.objective_id}), daily from 23:00 to 07:00 ${ZONE} time, Static and occupying capacity`;
     }
   },
   week_backlog: {
@@ -340,7 +379,7 @@ const STEPS = [
   {
     needs: ["spent"],
     title: "Today → Time by category → Show report",
-    expect: "Nobody has looked at this panel yet: report how it reads as well as whether it is right. The range reads as the last 7 days. A row for personal carries at least 1 h, from {spent}. Anything more is a window of the staged week that has already begun; the first begins two hours after the top of the hour this harness was started in. Change the days to 2 and reload: the range sentence changes and the personal row still carries at least 1 h.",
+    expect: "Nobody has looked at this panel yet: report how it reads as well as whether it is right. The range reads as the last 7 days. A row for personal carries at least 1 h, from {spent}. Anything more is a window of the staged week that has already begun: the week's events are in the hours ahead, and its nights, which have no category, are counted under Uncategorized once they begin. Change the days to 2 and reload: the range sentence changes and the personal row still carries at least 1 h.",
     codes: [
       "no code: an empty report says there is no recorded time in the range, and is not an error",
       "time_by_category_invalid_range: from is after to; the app never sends that, so report it as a defect"
@@ -357,20 +396,20 @@ const STEPS = [
     ]
   },
   {
-    needs: ["week_calendar", "week_routine", "week_backlog"],
+    needs: ["week_calendar", "week_routine", "week_night", "week_backlog"],
     title: "Today → Generate Plan",
-    expect: "Timed placements shows the staged week: {week_calendar}; {week_routine}; {week_backlog}. The Static anchors are the captured events and the routine. No Skeleton placement sits over a Static anchor, “Invented standing marmot council” included. “Invented: paint the whole imaginary fence” is in no placement. Report where, if anywhere, the screen names it as left out: the orchestrator names it in unplaced_tasks, and what the app does with that is the thing to look at.",
+    expect: "This should read as a Plan with one Task that did not fit, not as an error. Timed placements shows the staged week: {week_calendar}; {week_routine}; {week_night}; {week_backlog}. The Static anchors are the captured events, the routine and the night. No Skeleton placement sits over a Static anchor, and none falls between 23:00 and 07:00: the night block is why work that does not fit today starts in the morning and not at midnight. Below the placements, “Not in this Plan” names “Invented: paint the whole imaginary fence” by its title, says it is longer than any free interval in the planning horizon, and says in words what can be done. Nothing on the screen is red.",
     codes: [
-      "task_unplaceable: expected at the one-day horizon. It names the Task left out by its id and not its title; that is the orchestrator's own message",
-      "no diagnostic: expected at a longer horizon. The Task left out is then named only in the risk report, as unplaced_work"
+      "task_unplaceable: expected at the one-day horizon, shown quietly as a status with the sentence first and the code after it. It is not an error",
+      "no diagnostic: expected at a longer horizon. “Not in this Plan” still names the Task"
     ]
   },
   {
     needs: ["week_calendar", "week_colours"],
     title: "Calendar → Take preview",
-    expect: "Creates only: one for each placed Task and one for each routine occurrence. Nothing is proposed for “Invented standing marmot council” and it is not among the desired events: UbU does not own it and never writes to it. Nothing is proposed for the two one-off events either: capture already recorded them as applied. The palette is {week_colours}. Approve, Capture and Reconcile are not part of this step: in the app they are Live, and this staged orchestrator refuses a Live calendar request.",
+    expect: "Creates only: one for each placed Task, one for each routine occurrence and one for each night. Asleep is exported: each night is an event with no colour that shows as Busy, which is deliberate. Nothing is proposed for “Invented standing marmot council” and it is not among the desired events: UbU does not own it and never writes to it. Nothing is proposed for the two one-off events either: capture already recorded them as applied. The palette is {week_colours}. Approve, Capture and Reconcile are not part of this step: in the app they are Live, and this staged orchestrator refuses a Live calendar request.",
     codes: [
-      "calendar_event_id_unmappable: expected, once for each instance of “Invented standing marmot council” inside the horizon. It is the exclusion working, not a fault, and it names the occupied-time Task by id",
+      "calendar_event_id_unmappable: expected, once for each instance of “Invented standing marmot council” inside the horizon, shown quietly as a status. It is the exclusion working, not a fault, and it names the occupied-time Task by id",
       "calendar_mock_seed_with_live_export: Approve, Capture or Reconcile was pressed. THE REQUEST DID NOT RUN: this staged orchestrator refuses a Live calendar request, and nothing was written"
     ]
   },

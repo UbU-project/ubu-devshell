@@ -72,7 +72,7 @@ calendar requests ask for `export_mode: "mock"`.
 | 16 | reopen | A Task is completed. Reopening with another Task's completion id is refused with 409 `reopen_stale_completion`. Reopening with the right id returns it to `active`. Reopening again is refused with 409 `reopen_not_completed`. The Task can be completed again. |
 | 17 | description | A Task is captured with a multi-line `Q:`/`A:` description and read back byte for byte. A PATCH to a longer narrative reads back exactly; a PATCH of `description` to `null` removes it; a description of blank lines, tabs and non-ASCII text is accepted and returned unchanged. |
 | 18 | time by category | Six Tasks are staged: a Static Task overlapping the range's start, a completed Dynamic Task with an observed window from a coloured event, one with a Fixed estimate and no observed window, one with a stochastic estimate, one with neither, and one with no category. `GET /reports/time-by-category` returns every row with the expected seconds, the `unmeasured` entry with its title, rows in seconds-descending then category-ascending order, the total, an `Uncategorized` row, the seven-day default range, and a 400 `time_by_category_invalid_range` when `from` is after `to`. A Task completed, reopened and completed again contributes its seconds once. |
-| 19 | a realistic week | *Seeded.* The switch rehearsal. One invented week, `scripts/rehearsal-week.mjs`: a recurring commitment of three daily instances UbU cannot own, two one-off events it can, one with a colour mapped to nothing, a daily routine, a Dynamic backlog of six Tasks across three categories with one too long to fit anywhere, a Preference, and `calendar.color.*` Settings. The whole loop is walked on its own store at each of two planning horizons, one day and one week: capture, generate, the no-overlap check, preview, a Mock approve, reconcile, Next Task and a completion, the time-by-category report, and a second full pass. See [the rehearsal](#the-rehearsal). |
+| 19 | a realistic week | *Seeded.* The switch rehearsal. One invented week, `scripts/rehearsal-week.mjs`: seven daily instances of a recurring commitment UbU cannot own, two one-off events it can, one with a colour mapped to nothing, a daily routine, an Asleep routine for the night, a Dynamic backlog of six Tasks across three categories with one too long to fit anywhere, a Preference, and `calendar.color.*` Settings. The whole loop is walked on its own store at each of two planning horizons, one day and one week: capture, generate, the no-overlap and night checks, preview, a Mock approve, reconcile, Next Task and a completion, the time-by-category report, and a second full pass. See [the rehearsal](#the-rehearsal). |
 
 The seeded scenarios first apply a day with no seed, then restart the
 orchestrator on the same store with a fixture built from the events that
@@ -112,9 +112,10 @@ realistic and every title is obviously synthetic:
 
 | | |
 |---|---|
-| recurring commitment | three daily instances, ids shaped `{invented base32hex}_{timestamp}`, coloured for `work` |
-| one-off events | two with ids UbU can own: one coloured for `personal`, one with colour 1, which the Settings leave mapped to nothing |
-| routine | one daily Static routine of half an hour, category `personal` |
+| recurring commitment | seven daily instances at 14:00 local, a week of it, ids shaped `{invented base32hex}_{timestamp}`, coloured for `work` |
+| one-off events | two with ids UbU can own: one at 16:00 coloured for `personal`, one at 18:00 with colour 1, which the Settings leave mapped to nothing |
+| routine | one daily Static routine of half an hour at noon, category `personal` |
+| night | an **Asleep** routine: daily, 23:00 local, 480 minutes, Static, occupying capacity, no category |
 | backlog | six Dynamic Tasks across `work`, `grocery` and `personal`, three Fixed and two stochastic, and one Fixed at thirty hours that cannot fit any free interval |
 | Preference | one, ordering two of the backlog |
 | Settings | `calendar.color.*` for the three categories used, and one that moves `entertainment` off colour 1 |
@@ -123,20 +124,43 @@ The last Setting is there because every one of Google's eleven colours is
 mapped to a category by default. A colour is only ever unmapped after the
 operator has moved a category off it.
 
+**The week lives in a timezone**, because a night does. Its events are at
+local wall-clock hours. The runner stages it in a fixed-offset zone in which
+the top of the current hour is 21:00, so every walk is the same evening: two
+hours before Asleep, with a backlog longer than those two hours. Some of the
+work has to cross the night, which is what makes the night's assertions mean
+something. The acceptance harness stages the same week in the computer's own
+zone, so the night on screen is the operator's night.
+
+**Capture records occupied time; it does not reconstruct recurrence.** The
+calendar holds one recurring commitment. The store, after capture, holds one
+unrelated Static Task for each instance inside the horizon. Nothing in UbU
+knows they are the same commitment: there is no series, no rule, and an
+instance beyond the horizon is not seen until the horizon reaches it.
+
 **What is walked, and asserted, on each store:**
 
 1. **capture**: every event inside the horizon is captured and none is
-   skipped; each recurring instance carries `capture_occupancy_only`; the
-   unmapped colour is diagnosed; no diagnostic carries a title; a second
-   capture admits nothing.
+   skipped; the unowned instances are reported once, in one
+   `capture_occupancy_only` that names a single id, or the count and the
+   first three; the unmapped colour is diagnosed; no diagnostic carries a
+   title; a second capture admits nothing.
 2. **generate**: every backlog Task is in the Plan or named in
    `unplaced_tasks`, and the two sets together are the whole backlog, each
    Task once. The Task left out has a reason, an explanation and alternatives.
 3. **no overlap**: no planned Dynamic step overlaps any Static window that
    occupies capacity, the unowned ones included.
+   **The night**: Asleep materialises once for each day of the horizon; each
+   occurrence is Static, occupies capacity, begins at 23:00 local, lasts
+   eight hours and spans midnight; **no Dynamic placement falls inside any
+   Asleep window**; and at least one placement waits for the morning,
+   beginning no earlier than 07:00.
 4. **preview**: the desired set holds both events UbU can own, every placed
    Task and every routine occurrence, and no unowned Task; no operation names
-   an unowned event.
+   an unowned event. **Each Asleep occurrence is created as an event with no
+   colour and `transparent: false`**, a Busy block. That export is a decision
+   on record, see [availability](AVAILABILITY.md), and is asserted so that it
+   is not a surprise.
 5. **approve in Mock**: applied, with no operation result and no applied event
    naming an unowned event or its Task.
 6. **reconcile**: the only conflicts are the unowned instances, each
@@ -144,7 +168,8 @@ operator has moved a category off it.
 7. **next action, then complete**: the recommendation is a placed backlog
    Task, and completing it transitions it.
 8. **report**: `time-by-category` is the Static windows plus the one
-   completion, and `Uncategorized` is exactly the unmapped-colour Task.
+   completion. `Uncategorized` is the unmapped-colour Task and eight hours
+   for every night, because Asleep has no category.
 9. **repeat**: a second full pass. Capture admits nothing, the same Tasks are
    placed and left out, the preview creates nothing and names no unowned
    event, a preview straight after the approve proposes nothing, reconcile is
@@ -159,11 +184,14 @@ an approve.
 and may be up to 2678400. The walk runs at 86400 and at 604800, each on its
 own store. Where the two legitimately differ, the difference is asserted and
 not the value: one day sees one instance of the recurring commitment and one
-week sees all three; one week holds more routine occurrences and so more
-Static time; and the Task that fits nowhere is left out for a different
-stated reason at each. At both, the same five Tasks are placed.
+week sees all seven; one day holds one night and one week holds seven; one
+week holds more routine occurrences and so more Static time; and the Task
+that fits nowhere is left out for a different stated reason at each. At
+both, the same five Tasks are placed, three before the night and two the
+next morning.
 
 The scenario prints, for each horizon, the capture diagnostics, the Plan, the
+placements in the week's local time with each night marked `ASLEEP`, the
 unplaced Tasks, the planning diagnostics, the risk report, the preview
 diagnostics, the reconcile conflicts and the time-by-category response, and
 then one line comparing the two.
@@ -246,7 +274,7 @@ PASS  7 colour means done: a colour on an applied Dynamic event completes its Ta
 A complete walk ends with nineteen `PASS` lines, two `SKIP` lines and:
 
 ```text
-RESULT: 19 of 19 scenarios passed, 0 failed, 2 skipped, 280 requests, all to 127.0.0.1
+RESULT: 19 of 19 scenarios passed, 0 failed, 2 skipped, 286 requests, all to 127.0.0.1
 ```
 
 The walk stops at the first failure. The `FAIL` line names the scenario and

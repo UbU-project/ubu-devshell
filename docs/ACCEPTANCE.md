@@ -145,7 +145,7 @@ harness prints `none`.
 | 2 | Tasks → Notes for the described Task | no | `described` |
 | 3 | Today → Time by category | no | `spent` |
 | 4 | Next Task → Complete, then Undo | no | `completable` |
-| 5 | Today → Generate Plan, over the staged week | no | `week_calendar`, `week_routine`, `week_backlog` |
+| 5 | Today → Generate Plan, over the staged week | no | `week_calendar`, `week_routine`, `week_night`, `week_backlog` |
 | 6 | Calendar → Take preview | no | `week_calendar`, `week_colours` |
 | 7 | Review → Clarify → Run on the default; answer what it asks | **yes** | `interview`, `described`, `advisory` |
 | 8 | Review → Clarify → Run again, selector set | **yes** | `interview`, `advisory` |
@@ -161,8 +161,11 @@ was left on its default.
 Steps 5 and 6 check rendering only. That the week's Plan accounts for every
 Task, that nothing overlaps an occupied window and that no preview names an
 event UbU does not own are asserted by the runner's rehearsal scenario. What
-is left for a human is how Today and Calendar show it, and in particular
-where, if anywhere, the app names a Task the Plan left out.
+is left for a human is how Today and Calendar show it. From P1B-52 that
+means three things in particular: that Generate Plan reads as a Plan with one
+Task that did not fit and not as an error, with the Task named by title under
+**Not in this Plan**; that no work is placed in the night; and that Take
+preview reports the skipped occupancy window quietly, as a status.
 
 ## The staged week
 
@@ -174,8 +177,9 @@ what the operator looks at. Every title in it is invented and says so.
 | seed | what it stages | what its check asserts |
 |---|---|---|
 | `week_colours` | `calendar.color.*` for the three categories the week uses, and one colour left mapped to nothing | each is a Setting, and colour 1 maps to no category |
-| `week_calendar` | the week's calendar, captured in Mock | every event inside the horizon is one Static Task with its colour's category; each recurring instance was reported `capture_occupancy_only`; a second capture admits nothing |
-| `week_routine` | one daily routine | it is listed |
+| `week_calendar` | the week's calendar, captured in Mock | every event inside the horizon is one Static Task with its colour's category; the unowned instances were reported once, as one `capture_occupancy_only`; a second capture admits nothing |
+| `week_routine` | one daily routine, at noon | it is listed |
+| `week_night` | the **Asleep** routine: daily, 23:00, 480 minutes | read back from the store: this computer's timezone, daily, `nominal_start` 23:00:00, 28800 seconds, Static, occupying capacity, no category |
 | `week_backlog` | six Dynamic Tasks, one too long to fit anywhere, and a Preference | all six are active and Dynamic, and the Preference is listed |
 
 The week's calendar is a file the mock Calendar observes, written before the
@@ -186,8 +190,24 @@ reach a real calendar from the staged orchestrator.
 **The horizon** is the orchestrator's default of one day. Export
 `UBU_PLANNING_HORIZON_SECONDS=604800` before running the harness to stage one
 week; the harness passes it through and prints which horizon is staged. At
-one day, one of the three recurring instances is inside the horizon; at one
-week, all three are.
+one day, one of the seven recurring instances is inside the horizon; at one
+week, all seven are.
+
+**Each instance is its own Task.** Capture records occupied time; it does
+not reconstruct recurrence. The staged calendar holds one recurring
+commitment, and the staged store holds one unrelated Static Task for each
+instance inside the horizon. Nothing in UbU knows they are one commitment,
+and the harness says so in the line it prints for `week_calendar`.
+
+**The week has a night in it.** The harness stages the week in this
+computer's own timezone, with its events at local wall-clock hours, and an
+Asleep routine from 23:00 to 07:00. UbU has no working-hours setting; a
+capacity-occupying Static routine is how it is told when no work may be
+placed. See [availability](AVAILABILITY.md). The night block is why a Plan
+generated in the evening starts the rest of the work the next morning and
+not at midnight, and the Generate Plan step says so. Take preview shows each
+night as an event to create: Asleep is exported to the calendar as a Busy
+block, on purpose.
 
 **No Plan is staged.** With no Plan, Next Task recommends the earliest ready
 Task, which is what the `completable` seed promises and checks. With a Plan it
