@@ -95,8 +95,9 @@ by id, rather than trusting that creating it first made it first.
 
 ## Whether a step belongs in the list at all
 
-From P1B-50, three rules decide it. A step that fails any one of them is
-not written; it is either moved to the runner or dropped.
+From P1B-50, three rules decide it, and from P1B-51 a fourth. A step that
+fails any one of them is not written; it is moved to the runner, dropped, or
+moved to where it breaks nothing.
 
 1. **A manual step may not verify what the runner or a `ubu-ui` test already
    asserts.** P1B-48's dependent-question check broke this rule: that a
@@ -113,8 +114,55 @@ not written; it is either moved to the runner or dropped.
    the stub model. A real-model step may only check that a real model
    answers at all, and every one of its outcomes is a result to report.
 
+4. **Deterministic steps come first and model-dependent steps come last, and
+   no step may be a prerequisite of a later step unless it is deterministic.**
+   P1B-50's list broke this rule. Its third step was answered by a model, its
+   fourth read what the model's questions had produced, and the time-by-category
+   panel and two more came after. The model answered `done` on round one, so
+   there were no answers, the fourth step had nothing to show, and the three
+   steps after it were abandoned: the whole of the time-by-category panel
+   went unlooked at. Under this rule:
+   - a step whose outcome depends on a model is placed after every step that
+     does not;
+   - a step that follows a model-dependent step must be runnable whatever that
+     step's outcome was, and its `codes` name each case;
+   - what a later step needs is staged by the harness, never produced by an
+     earlier step that could fail. The notes step reads a description the
+     harness staged itself, not one an interview wrote.
+
+A model that declines to ask is a result to report, not a reason to stop.
+The harness prints, under the list: **a step that cannot be completed is
+reported as such, and the steps after it are still run.**
+
 A step with no diagnostic to meet says so: its `codes` is `[]` and the
 harness prints `none`.
+
+### The list from P1B-51
+
+| # | step | depends on a model | staged by |
+|---|---|---|---|
+| 1 | Setup → Run self-check | no | nothing |
+| 2 | Tasks → Notes for the described Task | no | `described` |
+| 3 | Today → Time by category | no | `spent` |
+| 4 | Next Task → Complete, then Undo | no | `completable` |
+| 5 | Today → Generate Plan, over the staged week | no | `week_calendar`, `week_routine`, `week_backlog` |
+| 6 | Calendar → Take preview | no | `week_calendar`, `week_colours` |
+| 7 | Review → Clarify → Run on the default; answer what it asks | **yes** | `interview`, `described`, `advisory` |
+| 8 | Review → Clarify → Run again, selector set | **yes** | `interview`, `advisory` |
+
+Steps 2 and 3 are the two parts of P1B-50 that were never looked at, and they
+are now first after the self-check. Step 4 comes before step 5 on purpose:
+both are deterministic, and once a Plan exists Next Task recommends the
+Plan's first placement and not the Task step 4 is staged for. Step 8 can be
+run whatever step 7 did; its codes name the round-one decline, the finished
+interview, and the run that interviewed another Task because the selector
+was left on its default.
+
+Steps 5 and 6 check rendering only. That the week's Plan accounts for every
+Task, that nothing overlaps an occupied window and that no preview names an
+event UbU does not own are asserted by the runner's rehearsal scenario. What
+is left for a human is how Today and Calendar show it, and in particular
+where, if anywhere, the app names a Task the Plan left out.
 
 ## The staged week
 
@@ -154,7 +202,8 @@ not only on the ones made before that seed.
 
 ## How to add a step
 
-1. Check the step against the three rules above.
+1. Check the step against the four rules above, and decide where in the
+   order it goes: before the first model-dependent step unless it is one.
 2. Write the step in `STEPS`, in order, with `needs` naming every seed it
    relies on and `codes` naming every diagnostic it can meet. If the
    precondition does not exist yet, write the seed in `SEEDS` with a `what`,

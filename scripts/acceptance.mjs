@@ -104,12 +104,12 @@ const staged = {};
 
 const SEEDS = {
   completable: {
-    what: "a ready Task that Next Task recommends, to complete and then undo",
+    what: "a ready Task that Next Task recommends now, to complete and then undo",
     async make() {
       // Created FIRST, because with no explicit priority next_action_service
       // orders by created_at then id, so the earliest ready Task is recommended.
-      // It carries a description so Clarify's default skips over it: step 5 must
-      // not act on the Task steps 2 to 4 are interviewing.
+      // It carries a description so Clarify's default skips over it: the undo step
+      // must not act on the Task the Clarify steps are interviewing.
       return captureTask({
         title: TITLE("— take the bins out"),
         description: "Staged for the undo step; not part of the interview.",
@@ -120,14 +120,15 @@ const SEEDS = {
       const task = await readTask(made.task_id);
       if (task.payload.status !== "active") throw new StagingFailure("the completable Task is not active");
       const recommendation = (await nextAction()).recommendation;
-      if (!recommendation) throw new StagingFailure("Next Task recommends nothing: step 5 would have no Complete button");
+      if (!recommendation) throw new StagingFailure("Next Task recommends nothing: the undo step would have no Complete button");
       if (recommendation.task_id !== made.task_id) {
         throw new StagingFailure(
-          `Next Task recommends ${recommendation.title} (${recommendation.task_id}), not the Task staged for step 5 — ` +
-            `step 5 would act on a Task another step is using`
+          `Next Task recommends ${recommendation.title} (${recommendation.task_id}), not the Task staged for the undo step — ` +
+            `that step would act on a Task another step is using`
         );
       }
-      return `${task.payload.title} (${made.task_id}), recommended now`;
+      // That it is recommended now is what the check above established.
+      return `${task.payload.title} (${made.task_id})`;
     }
   },
   interview: {
@@ -157,7 +158,7 @@ const SEEDS = {
     }
   },
   described: {
-    what: "an active Task that already has a description, so Clarify's default has something to skip over",
+    what: "an active Task that already has a description: the Notes step reads it, and Clarify's default skips over it",
     async make() {
       return captureTask({
         title: TITLE("— already answered"),
@@ -319,6 +320,10 @@ const SEEDS = {
 // Each names the seeds it acts on. A step that names none is one whose
 // precondition is genuinely an empty store or the app alone.
 
+// Deterministic steps come first and the steps that depend on a model come
+// last, and no step is a prerequisite of a later one unless it is deterministic.
+// P1B-50's list put a model-dependent step in the middle; the model declined to
+// ask, the step after it had nothing to show, and three steps were abandoned.
 const STEPS = [
   {
     needs: [],
@@ -327,58 +332,71 @@ const STEPS = [
     codes: []
   },
   {
-    needs: ["interview", "described", "advisory"],
-    title: "Review → Clarify → Run, with the selector left on its default",
-    expect: "The selected Task is {interview}, not {described}. A proposal appears in the queue with its questions.",
-    codes: [
-      "candidates_enqueued: 1 and no diagnostic: the run happened and there is a proposal to answer",
-      "clarify_already_queued: a proposal for it is already waiting below; answer that one, this run did not ask the model",
-      "advisory_unconfigured or advisory_endpoint_invalid: the model is not configured; set advisory.model in Setup, the run did not happen",
-      "advisory_http_failed, advisory_timeout, advisory_empty_response or advisory_connection_failed: the model was asked and failed; the diagnostic says what to change"
-    ]
-  },
-  {
-    needs: ["interview"],
-    title: "Answer that proposal: fill in the questions and Save answers",
-    expect: "The card leaves the queue and the run result says the answers were saved. Which questions appear, and whether one depends on another, is the model's choice and is not checked here; that a dependent question shows only when its dependency is answered is asserted by the runner's clarify scenario and ubu-ui test 66.",
-    codes: [
-      "advisory_answer_required: Save was pressed with nothing answered; answer at least one question",
-      "clarify_invalid_answer: a yes/no question was answered with something else; use Yes or No",
-      "clarify_description_too_large: the interview has outgrown the Task's notes; nothing was written"
-    ]
-  },
-  {
-    needs: ["interview"],
-    title: "Tasks → expand “Notes for {interview}”",
-    expect: "The notes hold the Q:/A: pairs you just answered, in the order asked, whole and readable. Edit the Task: the same text is in the Notes field. Cancel without saving.",
+    needs: ["described"],
+    title: "Tasks → expand “Notes for {described}”",
+    expect: "The notes are two lines, exactly as the harness staged them: “Q: Is this one already clarified?” and “A: y”. Edit that Task: the same text is in the Notes field. Cancel without saving. Nobody has looked at this field in the app yet.",
     codes: []
   },
   {
-    needs: ["interview", "advisory"],
-    title: "Review → Clarify → Run again, with the selector set to {interview}",
-    expect: "One of three outcomes, and each is a result to report, not a defect: a second round of questions; the model is done; or the run did not happen because the selector was not set.",
+    needs: ["spent"],
+    title: "Today → Time by category → Show report",
+    expect: "Nobody has looked at this panel yet: report how it reads as well as whether it is right. The range reads as the last 7 days. A row for personal carries at least 1 h, from {spent}. Anything more is a window of the staged week that has already begun; the first begins two hours after the top of the hour this harness was started in. Change the days to 2 and reload: the range sentence changes and the personal row still carries at least 1 h.",
     codes: [
-      "candidates_enqueued: 1: a second round, a new question set that does not repeat the first",
-      "clarify_no_questions with candidates_enqueued: 0: the model has nothing more to ask, the interview is finished",
-      "clarify_no_task: THE RUN DID NOT HAPPEN. The selector was left on its default, and on its default Clarify takes only a Task with no description; set the selector to {interview} and run again"
+      "no code: an empty report says there is no recorded time in the range, and is not an error",
+      "time_by_category_invalid_range: from is after to; the app never sends that, so report it as a defect"
     ]
   },
   {
     needs: ["completable"],
     title: "Next Task → Complete, then Undo completion",
-    expect: "{completable} is completed, then active again, and comes back as the recommendation.",
+    expect: "{completable} is completed, then active again, and comes back as the recommendation. This step comes before the Plan is generated on purpose: with a Plan, Next Task recommends the Plan's first placement instead.",
     codes: [
       "reopen_not_completed: Undo was pressed twice; there is nothing left to undo",
-      "reopen_stale_completion: the app named a completion that is not the latest; reload Next Task and try once"
+      "reopen_stale_completion: the app named a completion that is not the latest; reload Next Task and try once",
+      "a recommendation that is another Task: a Plan already exists in this store because a later step was run first; complete and undo what is recommended, and report that"
     ]
   },
   {
-    needs: ["spent", "completable"],
-    title: "Today → Time by category → Show report",
-    expect: "The range reads as the last 7 days. A row for personal carries at least 1 h, from {spent}. {completable} appears in no row: it was completed and then reopened, and a reopened Task contributes nothing. Change the days to 1 and reload: the personal row is still there, since yesterday's hour is inside one day.",
+    needs: ["week_calendar", "week_routine", "week_backlog"],
+    title: "Today → Generate Plan",
+    expect: "Timed placements shows the staged week: {week_calendar}; {week_routine}; {week_backlog}. The Static anchors are the captured events and the routine. No Skeleton placement sits over a Static anchor, “Invented standing marmot council” included. “Invented: paint the whole imaginary fence” is in no placement. Report where, if anywhere, the screen names it as left out: the orchestrator names it in unplaced_tasks, and what the app does with that is the thing to look at.",
     codes: [
-      "no code: an empty report says there is no recorded time in the range, and is not an error",
-      "time_by_category_invalid_range: from is after to; the app never sends that, so report it as a defect"
+      "task_unplaceable: expected at the one-day horizon. It names the Task left out by its id and not its title; that is the orchestrator's own message",
+      "no diagnostic: expected at a longer horizon. The Task left out is then named only in the risk report, as unplaced_work"
+    ]
+  },
+  {
+    needs: ["week_calendar", "week_colours"],
+    title: "Calendar → Take preview",
+    expect: "Creates only: one for each placed Task and one for each routine occurrence. Nothing is proposed for “Invented standing marmot council” and it is not among the desired events: UbU does not own it and never writes to it. Nothing is proposed for the two one-off events either: capture already recorded them as applied. The palette is {week_colours}. Approve, Capture and Reconcile are not part of this step: in the app they are Live, and this staged orchestrator refuses a Live calendar request.",
+    codes: [
+      "calendar_event_id_unmappable: expected, once for each instance of “Invented standing marmot council” inside the horizon. It is the exclusion working, not a fault, and it names the occupied-time Task by id",
+      "calendar_mock_seed_with_live_export: Approve, Capture or Reconcile was pressed. THE REQUEST DID NOT RUN: this staged orchestrator refuses a Live calendar request, and nothing was written"
+    ]
+  },
+  {
+    needs: ["interview", "described", "advisory"],
+    title: "Review → Clarify → Run, with the selector left on its default; answer what it asks",
+    expect: "The selected Task is {interview}, not {described}. If a proposal appears, fill in its questions and Save answers: the card leaves the queue, and Tasks → Notes for that Task then holds the Q:/A: pairs in the order asked. Which questions appear is the model's choice and is not checked. A model that declines to ask is a result to report and not a reason to stop: write down what the screen said and go on.",
+    codes: [
+      "candidates_enqueued: 1 and no diagnostic: the run happened and there is a proposal to answer",
+      "clarify_no_questions on round one: THE MODEL DECLINED TO ASK. The screen says this is a result from the model and not a finished interview, names advisory.model and offers Setup. Report it; there is nothing to answer, and the next step is still run",
+      "clarify_already_queued: a proposal for it is already waiting below; answer that one, this run did not ask the model",
+      "advisory_unconfigured or advisory_endpoint_invalid: the model is not configured; set advisory.model in Setup, the run did not happen",
+      "advisory_http_failed, advisory_timeout, advisory_empty_response or advisory_connection_failed: the model was asked and failed; the diagnostic says what to change",
+      "advisory_answer_required, clarify_invalid_answer or clarify_description_too_large: Save was refused and nothing was written; the message says why"
+    ]
+  },
+  {
+    needs: ["interview", "advisory"],
+    title: "Review → Clarify → Run again, with the selector set to {interview}",
+    expect: "This run can be made whatever the last step did. Every outcome below is a result to report, not a defect.",
+    codes: [
+      "candidates_enqueued: 1: a new question set. It is round two if you saved answers in the last step, and round one again if the model declined there",
+      "clarify_no_questions on round one: the model declined again. The screen says it is a result from the model, and offers Setup",
+      "clarify_no_questions on a later round: the interview is finished. The screen says so, names the round, and offers no Setup",
+      "clarify_already_queued: the proposal from the last step is still waiting; answer, defer or reject it, then run again",
+      "a Selected Task that is not {interview}: THE RUN DID NOT INTERVIEW THIS TASK. The selector was left on its default, which takes the first Task with no notes; set the selector and run again"
     ]
   }
 ];
@@ -483,7 +501,7 @@ async function main() {
   for (const name of unused) console.log(`  --  ${name}: staged but no step names it`);
 
   const title = (text) => text.replace(/\{(\w+)\}/g, (_, name) => staged[name]?.described ?? `{${name}}`);
-  console.log("\nsteps: run these in the app, in order.\n");
+  console.log("\nsteps: run these in the app, in order. Deterministic steps come first; the two that depend on a model are last.\n");
   STEPS.forEach((step, index) => {
     console.log(`  ${index + 1}. ${title(step.title)}`);
     console.log(`     expect: ${title(step.expect)}`);
@@ -493,6 +511,7 @@ async function main() {
     for (const code of step.codes.slice(1)) console.log(`             ${title(code)}`);
     console.log("");
   });
+  console.log("A step that cannot be completed is reported as such, and the steps after it are still run.\n");
   // --stage-only proves the staging and the preconditions without waiting for a
   // human. It is how these steps are checked before they are ever handed over.
   if (process.argv.includes("--stage-only")) {
