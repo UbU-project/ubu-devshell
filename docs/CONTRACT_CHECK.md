@@ -169,11 +169,13 @@ instance beyond the horizon is not seen until the horizon reaches it.
    is none again.
 5. **approve in Mock**: applied, with no operation result and no applied event
    naming an unowned event or its Task.
-   **A second Plan at once**: the Plan starts on a whole minute, so a Plan
-   generated again in the same minute has identical Dynamic windows and the
-   preview between the two proposes no operations. If the clock crossed a
-   minute between them the windows moved, and the scenario asserts updates
-   only.
+   **Two Plans back to back**: the Plan starts on a whole minute, and an
+   unchanged store planned twice in one minute is one Plan. Two Plans are
+   generated with nothing changed between them: they have identical Dynamic
+   windows, and the preview between them proposes no operations. Whether they
+   fell in the same minute is read from the clock around each request. If the
+   clock crossed a minute the windows moved, and the scenario asserts updates
+   only and says which case it was.
 6. **reconcile**: the only conflicts are the unowned instances, each
    `foreign`; the status is `observed`, not `drifted`.
 7. **next action, then complete**: the recommendation is a placed backlog
@@ -290,7 +292,7 @@ PASS  7 colour means done: a colour on an applied Dynamic event completes its Ta
 A complete walk ends with nineteen `PASS` lines, two `SKIP` lines and:
 
 ```text
-RESULT: 19 of 19 scenarios passed, 0 failed, 2 skipped, 306 requests, all to 127.0.0.1
+RESULT: 19 of 19 scenarios passed, 0 failed, 2 skipped, 312 requests, all to 127.0.0.1
 ```
 
 The walk stops at the first failure. The `FAIL` line names the scenario and

@@ -1246,16 +1246,30 @@ const scenarios = [
         same(approved.status, "applied", `${tag} the Mock approve applies`);
 
         // ---- a re-plan inside the same minute writes nothing
-        // The Plan starts on a whole minute, so a second Plan made in that minute has the same Dynamic
-        // windows. If the clock has crossed a minute since, the windows legitimately moved, and say so.
+        // The Plan starts on a whole minute, and an unchanged store planned twice in one minute is one
+        // Plan. Two Plans are generated back to back here, with nothing changed between them. Whether
+        // they fell in the same minute is read from the clock around each request, not inferred from
+        // the result: if the clock crossed a minute, the windows legitimately moved, and that is said.
         const dynamicWindows = (plan) => plan.steps.filter((step) => !step.static_anchor).map((step) => [step.task_id, step.start, step.end]);
-        const again2 = await generate();
+        const minuteOf = () => Math.ceil(Date.now() / 60_000);
+        const timed = async () => {
+          const before = minuteOf();
+          const made = await generate();
+          return { made, minute: before === minuteOf() ? before : null };
+        };
+        const one = await timed();
+        // What the calendar holds from here on is what this approve applied.
+        const settled = await approve(o, (await preview(o)).preview_id);
+        same(settled.status, "applied", `${tag} the Plan the two are compared from is applied`);
+        const two = await timed();
         const between = await preview(o);
-        say("operations between two Plans", { same_minute: JSON.stringify(dynamicWindows(again2.plan)) === JSON.stringify(dynamicWindows(planned.plan)), operations: between.operations.map((operation) => operation.kind) });
-        if (JSON.stringify(dynamicWindows(again2.plan)) === JSON.stringify(dynamicWindows(planned.plan))) {
-          same(between.operations, [], `${tag} a second Plan in the same minute has identical Dynamic windows, and the preview between them proposes no operations`);
+        const sameMinute = one.minute !== null && one.minute === two.minute;
+        say("operations between two Plans of an unchanged store", { same_minute: sameMinute, operations: between.operations.map((operation) => operation.kind) });
+        if (sameMinute) {
+          same(dynamicWindows(two.made.plan), dynamicWindows(one.made.plan), `${tag} two Plans made in the same minute have identical Dynamic windows`);
+          same(between.operations, [], `${tag} and the preview between them proposes no operations`);
         } else {
-          ok(between.operations.every((operation) => operation.kind === "update"), `${tag} the minute changed between the two Plans, so the Dynamic windows moved: ${between.operations.length} update(s) and nothing else`);
+          ok(between.operations.every((operation) => operation.kind === "update"), `${tag} the clock crossed a minute between the two Plans, so the Dynamic windows moved: ${between.operations.length} update(s) and nothing else`);
         }
         same(Math.min(...dynamicWindows(planned.plan).map(([, start]) => start)) % 60, 0, `${tag} the first Dynamic placement begins on a whole minute`);
         ok(approved.operation_results.every((result) => result.status === "applied"), `${tag} all ${approved.operation_results.length} operations were applied`);
@@ -1263,7 +1277,7 @@ const scenarios = [
         same(approved.applied_events.length, owned.length + placed.length + occurrences.length + nights.length, `${tag} the applied record holds the two owned captures and what was created, and no unowned window`);
 
         // ---- 6. reconcile: the unowned events are foreign and nothing else drifts
-        o = await observing(o, approved.applied_events);
+        o = await observing(o, settled.applied_events);
         const foreignOnly = instances.map((event) => ["foreign", event.external_id]);
         const reconciled = await reconcile(o);
         say("reconcile conflicts", reconciled.conflicts);
