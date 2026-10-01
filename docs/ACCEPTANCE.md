@@ -116,6 +116,42 @@ not written; it is either moved to the runner or dropped.
 A step with no diagnostic to meet says so: its `codes` is `[]` and the
 harness prints `none`.
 
+## The staged week
+
+From P1B-51 the harness also stages the switch rehearsal's week, the one
+`check-ui-contract.sh` walks and asserts in its scenario 19. It is
+`scripts/rehearsal-week.mjs`, imported by both, so what the runner proves is
+what the operator looks at. Every title in it is invented and says so.
+
+| seed | what it stages | what its check asserts |
+|---|---|---|
+| `week_colours` | `calendar.color.*` for the three categories the week uses, and one colour left mapped to nothing | each is a Setting, and colour 1 maps to no category |
+| `week_calendar` | the week's calendar, captured in Mock | every event inside the horizon is one Static Task with its colour's category; each recurring instance was reported `capture_occupancy_only`; a second capture admits nothing |
+| `week_routine` | one daily routine | it is listed |
+| `week_backlog` | six Dynamic Tasks, one too long to fit anywhere, and a Preference | all six are active and Dynamic, and the Preference is listed |
+
+The week's calendar is a file the mock Calendar observes, written before the
+orchestrator starts and named by `UBU_CALENDAR_MOCK_EVENTS`. With that set, a
+Live calendar request is refused before any client exists, so the app cannot
+reach a real calendar from the staged orchestrator.
+
+**The horizon** is the orchestrator's default of one day. Export
+`UBU_PLANNING_HORIZON_SECONDS=604800` before running the harness to stage one
+week; the harness passes it through and prints which horizon is staged. At
+one day, one of the three recurring instances is inside the horizon; at one
+week, all three are.
+
+**No Plan is staged.** With no Plan, Next Task recommends the earliest ready
+Task, which is what the `completable` seed promises and checks. With a Plan it
+recommends the Plan's first placement, which is a different Task. So the step
+that completes and undoes comes before the step in which the operator
+generates the Plan.
+
+**Checks run after every seed is made**, in a second pass. That was always the
+documented contract and from P1B-51 it is what the code does: what Next Task
+recommends and which Task Clarify picks depend on every Task in the store,
+not only on the ones made before that seed.
+
 ## How to add a step
 
 1. Check the step against the three rules above.

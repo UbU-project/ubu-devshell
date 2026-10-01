@@ -24,6 +24,8 @@ import net from "node:net";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { rehearsalWeek, routineBody } from "./rehearsal-week.mjs";
+
 function option(name) {
   const index = process.argv.indexOf(`--${name}`);
   if (index === -1 || index + 1 >= process.argv.length) {
@@ -645,25 +647,43 @@ const scenarios = [
     }
   },
   {
-    name: "recurring refusal",
+    name: "recurring occupancy",
     seeded: true,
     async run(first) {
       const day = await appliedDay(first);
       ok(/^[0-9a-v]+_\d{8}T\d{6}Z$/.test(RECURRING_ID), `the seeded id has the {base32hex}_{timestamp} shape: ${RECURRING_ID}`);
       const o = await restartObserving(first, [...day.applied, observedEvent(RECURRING_ID, "Synthetic recurring instance", 6)]);
       ok(true, "the orchestrator started on the seed, so the event parsed");
-      const refusal = `Calendar event \`${RECURRING_ID}\` cannot be captured: its id cannot be a UbU Task handle, so UbU cannot own it`;
+      const notOwnable = `Calendar event \`${RECURRING_ID}\` cannot be captured: its id cannot be a UbU Task handle, so UbU cannot own it`;
       const reconciliation = await reconcile(o);
       same(reconciliation.conflicts.map((conflict) => [conflict.conflict_type, conflict.external_id]), [["foreign", RECURRING_ID]], "reconcile classifies it foreign");
-      same(reconciliation.diagnostics, [{ code: "capture_event_not_ownable", message: refusal }], "reconcile says why it cannot be owned");
+      same(reconciliation.diagnostics, [{ code: "capture_event_not_ownable", message: notOwnable }], "reconcile says why it cannot be owned");
       const captured = await capture(o);
-      same(captured.diagnostics, [{ code: "capture_event_not_ownable", message: refusal }], "capture refuses it with capture_event_not_ownable");
-      same({ captured: captured.captured, skipped: captured.skipped, unchanged: captured.unchanged }, { captured: 0, skipped: 1, unchanged: 2 }, "capture captured nothing and skipped one");
-      same((await listTasks(o)).map((task) => task.title).sort(), ["Synthetic fixed appointment", "Synthetic flexible errand"], "no Task was created for it");
+      same(
+        captured.diagnostics,
+        [
+          { code: "capture_colour_absent", message: `Calendar event \`${RECURRING_ID}\` has no colour; no category assigned` },
+          { code: "capture_occupancy_only", message: `Calendar event \`${RECURRING_ID}\` cannot be owned by UbU, so its time is recorded as an occupied window that UbU will never write back to or export` }
+        ],
+        "capture records it as occupied time with capture_occupancy_only, naming the id and never the title"
+      );
+      same({ captured: captured.captured, skipped: captured.skipped, unchanged: captured.unchanged }, { captured: 1, skipped: 0, unchanged: 2 }, "capture captured one and skipped nothing");
+      const occupancy = (await listTasks(o)).find((task) => task.title === "Synthetic recurring instance");
+      same(occupancy?.placement, "static", "a Static Task now holds its window");
+      const stored = (await readTask(o, occupancy.task_id)).payload;
+      same(stored.provenance.source, { source_kind: "google_calendar", source_id: RECURRING_ID }, "the Google id is its provenance source, the dedupe key");
+      ok(!occupancy.task_id.includes(RECURRING_ID.split("_")[0]), `its handle is minted, not derived from the Google id: ${occupancy.task_id}`);
+      const again = await capture(o);
+      same({ captured: again.captured, updated: again.updated, unchanged: again.unchanged }, { captured: 0, updated: 0, unchanged: 3 }, "a second capture admits nothing");
+      same((await listTasks(o)).length, 3, "and there is still one Task for it");
       const after = await reconcile(o);
       same(after.conflicts.map((conflict) => [conflict.conflict_type, conflict.external_id]), [["foreign", RECURRING_ID]], "after capture it is still foreign, so it is not in the applied record");
       same((await repair(o, after.reconciliation_id)).applied_event_count, 2, "the applied record still holds only the two events UbU applied");
-      return "a recurring instance parses, classifies foreign, is refused by capture, creates no Task and is not recorded as applied";
+      await generatePlan(o);
+      const proposed = await preview(o);
+      ok(!JSON.stringify([proposed.events, proposed.operations]).includes(RECURRING_ID), "the next preview neither desires nor operates on the event");
+      ok(!proposed.events.some((event) => event.task_id === occupancy.task_id), "and the occupancy Task is in no desired event");
+      return "a recurring instance parses, classifies foreign, is captured as occupied time under a minted handle, stays foreign and is never offered to the calendar";
     }
   },
   {
@@ -875,6 +895,7 @@ const scenarios = [
       const done = await runClarify(o, task);
       same({ status: done.status, enqueued: done.candidates_enqueued, code: done.diagnostics[0]?.code }, { status: "ok", enqueued: 0, code: "clarify_no_questions" }, "when the model has nothing left to ask, the run is ok and enqueues nothing");
       same(prompt(2).round, 3, "having been asked as round 3");
+      same(done.round, 3, "and the run reports that round, which is how the app tells a finished interview from a model that declined on round one");
       same((await readTask(o, task)).payload.description, both, "and the Task is unchanged");
       console.log(`  the composed description, verbatim: ${JSON.stringify(both)}`);
       return "an interview runs two rounds: one open at a time, admitted by answering, and its answers accumulate in the Task's description";
@@ -1006,6 +1027,216 @@ const scenarios = [
       const final = await report(restarted, range);
       same(final.total_seconds, 11_100, "the total is back to what it was, not 600 more");
       return "six staged Tasks give the expected rows, the unmeasured entry, the order and the total; the default is seven days; a backwards range is refused; a Task completed, reopened and completed again counts once";
+    }
+  },
+  {
+    name: "a realistic week",
+    seeded: true,
+    // The switch rehearsal. One invented week, the whole daily loop, walked on its own store at each of two
+    // planning horizons. The week is rehearsal-week.mjs; the acceptance harness stages the same one.
+    async run(first) {
+      await first.stop();
+      const week = rehearsalWeek(thisHour);
+      const HORIZONS = [
+        ["one day", 86_400],
+        ["one week", 604_800]
+      ];
+      const fenceKey = week.backlog.find((task) => task.tooLong).key;
+
+      async function rehearse(label, horizonSeconds) {
+        const tag = `[${label}]`;
+        const say = (what, value) => console.log(`  ${tag} ${what}: ${JSON.stringify(value)}`);
+        const dir = join(first.dir, label.replace(" ", "-"));
+        mkdirSync(dir, { recursive: true });
+        const seed = join(dir, "mock-calendar-events.json");
+        const start = (events) => {
+          writeFileSync(seed, JSON.stringify(events, null, 2));
+          return startOrchestrator(dir, { UBU_CALENDAR_MOCK_EVENTS: seed, UBU_PLANNING_HORIZON_SECONDS: String(horizonSeconds) });
+        };
+        /// What the calendar would hold after an approve: the operator's own events, and what UbU applied.
+        const observing = async (running, applied) => {
+          await running.stop();
+          return start([...week.recurring, ...applied]);
+        };
+        let o = await start(week.calendar);
+        const horizonEnd = Date.now() + horizonSeconds * 1000;
+        const inHorizon = (event) => Date.parse(event.start_at) < horizonEnd;
+        const instances = week.recurring.filter(inHorizon);
+        const seen = week.calendar.filter(inHorizon);
+        ok(seen.length >= 3, `${tag} the horizon holds ${seen.length} of the calendar's ${week.calendar.length} events, ${instances.length} of them instances of the recurring commitment`);
+
+        // ---- the store: colours, the routine, the backlog, the Preference
+        for (const [name, value] of week.settings) await putSetting(o, name, value);
+        await call(o.base, "POST", endpoints.OBJECTIVE_CREATE_PATH, routineBody(week, endpoints.OBJECTIVE_SCHEMA_VERSION), 201);
+        const ids = {};
+        for (const task of week.backlog) {
+          ids[task.key] = (await captureTask(o, { title: task.title, duration_estimate: task.duration_estimate, category_tag: task.category, tags: [task.category] })).task_id;
+        }
+        const keyOf = Object.fromEntries(Object.entries(ids).map(([key, id]) => [id, key]));
+        await call(o.base, "POST", endpoints.PREFERENCE_CREATE_PATH, { schema_version: endpoints.PREFERENCE_SCHEMA_VERSION, task_a: ids[week.preference.before], task_b: ids[week.preference.after], order: "a_preferred_to_b" }, 201);
+
+        // ---- 1. capture: every event in the horizon is captured or diagnosed
+        const occupancyOnly = (id) => ({ code: "capture_occupancy_only", message: `Calendar event \`${id}\` cannot be owned by UbU, so its time is recorded as an occupied window that UbU will never write back to or export` });
+        const captured = await capture(o);
+        say("capture diagnostics", captured.diagnostics);
+        same({ captured: captured.captured, skipped: captured.skipped }, { captured: seen.length, skipped: 0 }, `${tag} every event inside the horizon is captured and none is skipped`);
+        same(
+          captured.diagnostics,
+          [
+            { code: "capture_colour_unmapped", message: `Calendar event \`${week.unmapped.external_id}\` has unmapped colour \`${week.unmappedColour}\`; no category assigned; map that colour in Settings to assign a category` },
+            ...instances.map((event) => occupancyOnly(event.external_id))
+          ],
+          `${tag} the unmapped colour is diagnosed, and each recurring instance carries capture_occupancy_only`
+        );
+        ok(!JSON.stringify(captured.diagnostics).includes("Invented"), `${tag} no diagnostic carries an event's title`);
+        const bySource = {};
+        for (const task of await listTasks(o)) {
+          const source = (await readTask(o, task.task_id)).payload.provenance?.source;
+          if (source?.source_kind === "google_calendar") bySource[source.source_id] = task;
+        }
+        same(Object.keys(bySource).sort(), seen.map((event) => event.external_id).sort(), `${tag} each of those events is now exactly one Task, keyed by its Google id`);
+        same(
+          seen.map((event) => [bySource[event.external_id].placement, bySource[event.external_id].category_tag ?? null]),
+          seen.map((event) => ["static", week.categoryOfColour[event.color_id] ?? null]),
+          `${tag} every one is Static, with the category its colour maps to, and none for the unmapped colour`
+        );
+        const unowned = instances.map((event) => bySource[event.external_id].task_id);
+        const owned = [week.mapped, week.unmapped].map((event) => bySource[event.external_id].task_id);
+        const again = await capture(o);
+        same({ captured: again.captured, updated: again.updated, unchanged: again.unchanged, skipped: again.skipped }, { captured: 0, updated: 0, unchanged: seen.length, skipped: 0 }, `${tag} a second capture admits nothing new`);
+
+        // ---- 2. generate: every backlog Task is placed or named as unplaced
+        const generate = async () => {
+          const planned = await call(o.base, "POST", endpoints.PLANNING_GENERATE_PATH, { schema_version: endpoints.PLANNING_SCHEMA_VERSION, request: null });
+          if (!planned?.plan) throw new CheckFailure(`planning produced no Plan: ${JSON.stringify(planned?.diagnostics)}`);
+          return planned;
+        };
+        const partition = (planned, backlogKeys) => {
+          const placed = planned.plan.steps.map((step) => keyOf[step.task_id]).filter((key) => key !== undefined).sort();
+          const unplaced = planned.unplaced_tasks.map((entry) => keyOf[entry.task_id]).filter((key) => key !== undefined).sort();
+          same([...placed, ...unplaced].sort(), [...backlogKeys].sort(), `${tag} placed and unplaced together account for the whole backlog, each Task once`);
+          return { placed, unplaced };
+        };
+        const planned = await generate();
+        const steps = planned.plan.steps;
+        say("plan", { status: planned.status, steps: steps.map((step) => [step.start_at, step.end_at, step.static_anchor ? "static" : "dynamic", step.summary]) });
+        say("unplaced", planned.unplaced_tasks.map(({ task_id, summary, reason, explanation, safe_alternatives }) => ({ task_id, summary, reason, explanation, alternatives: safe_alternatives.map((alternative) => alternative.action) })));
+        say("planning diagnostics", planned.diagnostics);
+        say("risk report", { level: planned.risk_report?.level, findings: (planned.risk_report?.findings ?? []).map(({ category, severity, detail }) => ({ category, severity, detail })) });
+        const { placed, unplaced } = partition(planned, week.backlog.map((task) => task.key));
+        same(unplaced, [fenceKey], `${tag} the one Task too long for any free interval is the one left out`);
+        same(planned.status, "partial", `${tag} and the Plan says it is partial`);
+        const fence = planned.unplaced_tasks.find((entry) => entry.task_id === ids[fenceKey]);
+        ok(fence.reason.length > 0 && fence.explanation.includes(ids[fenceKey]) && fence.safe_alternatives.length > 0, `${tag} it is named, with a reason, an explanation and alternatives: ${fence.reason}`);
+        const start_of = (key) => steps.find((step) => step.task_id === ids[key]).start;
+        ok(start_of(week.preference.before) <= start_of(week.preference.after), `${tag} the Preference holds: ${week.preference.before} is placed no later than ${week.preference.after}`);
+        const occurrences = steps.filter((step) => step.summary === week.routine.title);
+        ok(occurrences.length >= 1 && occurrences.every((step) => step.static_anchor && step.start_at.slice(11, 19) === week.routine.nominalStart), `${tag} the routine has ${occurrences.length} occurrence(s) in the Plan, each Static at its nominal start`);
+
+        // ---- 3. no overlap: no planned Dynamic step runs over any Static window
+        const anchors = steps.filter((step) => step.static_anchor && step.occupies_capacity);
+        const dynamic = steps.filter((step) => !step.static_anchor);
+        same(anchors.filter((step) => unowned.includes(step.task_id)).length, instances.length, `${tag} every unowned window is in the Plan as a Static anchor that occupies capacity`);
+        const collisions = dynamic.flatMap((step) => anchors.filter((anchor) => step.start < anchor.end && step.end > anchor.start).map((anchor) => `${step.summary} over ${anchor.summary}`));
+        same(collisions, [], `${tag} none of the ${dynamic.length} Dynamic steps overlaps any of the ${anchors.length} Static windows, the unowned ones included`);
+        same(dynamic.map((step) => keyOf[step.task_id]).sort(), placed, `${tag} the Dynamic steps are exactly the placed backlog`);
+
+        // ---- 4. preview: the desired set holds the owned Tasks and no unowned one
+        const proposed = await preview(o);
+        const desired = proposed.events.map((event) => event.task_id);
+        ok(owned.every((id) => desired.includes(id)), `${tag} both events UbU can own are in the desired set`);
+        ok(placed.every((key) => desired.includes(ids[key])) && occurrences.every((step) => desired.includes(step.task_id)), `${tag} so is every placed Task and every routine occurrence`);
+        same(desired.filter((id) => unowned.includes(id)), [], `${tag} no unowned Task is in the desired set`);
+        const mentionsUnowned = (value) => instances.some((event) => JSON.stringify(value).includes(event.external_id)) || unowned.some((id) => JSON.stringify(value).includes(id.slice(5)));
+        ok(!mentionsUnowned(proposed.operations) && !mentionsUnowned(proposed.events), `${tag} no operation and no desired event names an unowned event or its Task`);
+        same(proposed.operations.map((operation) => operation.kind), Array(placed.length + occurrences.length).fill("create"), `${tag} the operations are creates for UbU's own work, and nothing against what it captured`);
+        say("preview diagnostics", proposed.diagnostics);
+        same(
+          proposed.diagnostics.map((diagnostic) => diagnostic.code),
+          unowned.map(() => "calendar_event_id_unmappable"),
+          `${tag} the preview reports each unowned step as calendar_event_id_unmappable, and nothing else`
+        );
+
+        // ---- 5. approve in Mock: applied, with no write for an unowned Task
+        const approved = await approve(o, proposed.preview_id);
+        same(approved.status, "applied", `${tag} the Mock approve applies`);
+        ok(approved.operation_results.every((result) => result.status === "applied"), `${tag} all ${approved.operation_results.length} operations were applied`);
+        ok(!mentionsUnowned(approved.operation_results) && !mentionsUnowned(approved.applied_events), `${tag} no operation result and no applied event names an unowned event or its Task`);
+        same(approved.applied_events.length, owned.length + placed.length + occurrences.length, `${tag} the applied record holds the two owned captures and what was created, and no unowned window`);
+
+        // ---- 6. reconcile: the unowned events are foreign and nothing else drifts
+        o = await observing(o, approved.applied_events);
+        const foreignOnly = instances.map((event) => ["foreign", event.external_id]);
+        const reconciled = await reconcile(o);
+        say("reconcile conflicts", reconciled.conflicts);
+        same(reconciled.conflicts.map((conflict) => [conflict.conflict_type, conflict.external_id]), foreignOnly, `${tag} the only conflicts are the unowned instances, and each is foreign`);
+        same(reconciled.status, "observed", `${tag} reconcile reports an observation, not drift`);
+        same([...new Set(reconciled.diagnostics.map((diagnostic) => diagnostic.code))], ["capture_event_not_ownable"], `${tag} and still says why UbU cannot own them`);
+
+        // ---- 7. next action, then complete
+        const nextQuery = new URLSearchParams({ schema_version: endpoints.NEXT_ACTION_SCHEMA_VERSION });
+        const recommendation = (await call(o.base, "GET", `${endpoints.NEXT_ACTION_PATH}?${nextQuery}`)).recommendation;
+        ok(recommendation !== null && placed.includes(keyOf[recommendation.task_id]), `${tag} Next Task recommends a planned backlog Task: ${recommendation?.title}`);
+        const done = week.backlog.find((task) => task.key === keyOf[recommendation.task_id]);
+        const completion = await recordAction(o, recommendation.task_id, "complete");
+        same({ applied: completion.transition_applied, status: completion.task_status, stored: (await readTask(o, recommendation.task_id)).status }, { applied: true, status: "completed", stored: "completed" }, `${tag} completing it transitions it to completed`);
+
+        // ---- 8. report: the Static windows plus the completion
+        const report = () => call(o.base, "GET", `${endpoints.TIME_BY_CATEGORY_PATH}?${new URLSearchParams({ schema_version: endpoints.TIME_BY_CATEGORY_SCHEMA_VERSION, from: week.at(0), to: week.at(168) })}`);
+        const expected = {};
+        const add = (category, staticSeconds, completedSeconds) => {
+          const row = (expected[category] ??= { category, seconds: 0, static_seconds: 0, completed_seconds: 0, task_count: 0 });
+          row.static_seconds += staticSeconds;
+          row.completed_seconds += completedSeconds;
+          row.seconds += staticSeconds + completedSeconds;
+          row.task_count += 1;
+        };
+        const span = (event) => (Date.parse(event.end_at) - Date.parse(event.start_at)) / 1000;
+        for (const event of seen) add(week.categoryOfColour[event.color_id] ?? "Uncategorized", span(event), 0);
+        for (const _ of occurrences) add(week.routine.category, week.routine.seconds, 0);
+        add(done.category, 0, done.seconds);
+        const rows = Object.values(expected).sort((a, b) => b.seconds - a.seconds || (a.category < b.category ? -1 : 1));
+        const body = await report();
+        say("time-by-category response", body);
+        same(body.categories, rows, `${tag} the report is the Static windows plus the one completion, and the unmapped-colour Task is in Uncategorized`);
+        same({ total: body.total_seconds, unmeasured: body.unmeasured }, { total: rows.reduce((sum, row) => sum + row.seconds, 0), unmeasured: [] }, `${tag} the total is the sum of the rows and nothing is unmeasured`);
+        same(body.categories.find((row) => row.category === "Uncategorized"), { category: "Uncategorized", seconds: span(week.unmapped), static_seconds: span(week.unmapped), completed_seconds: 0, task_count: 1 }, `${tag} Uncategorized is exactly the unmapped-colour Task's hour`);
+
+        // ---- 9. repeat: a second full pass over the same store
+        const before = (await listTasks(o)).length;
+        const recaptured = await capture(o);
+        same({ captured: recaptured.captured, skipped: recaptured.skipped }, { captured: 0, skipped: 0 }, `${tag} [repeat] capture admits nothing`);
+        same(recaptured.diagnostics, instances.map((event) => occupancyOnly(event.external_id)), `${tag} [repeat] and still says which events it does not own`);
+        same((await listTasks(o)).length, before, `${tag} [repeat] no Task was created`);
+        const replanned = await generate();
+        const second = partition(replanned, week.backlog.map((task) => task.key).filter((key) => key !== done.key));
+        same(second, { placed: placed.filter((key) => key !== done.key), unplaced }, `${tag} [repeat] the same Tasks are placed and the same one is left out, less the completed one`);
+        const reproposed = await preview(o);
+        say("[repeat] preview operations", reproposed.operations.map((operation) => [operation.kind, operation.event?.summary ?? operation.summary]));
+        ok(!mentionsUnowned(reproposed.operations) && !mentionsUnowned(reproposed.events), `${tag} [repeat] the preview still names no unowned event`);
+        ok(reproposed.operations.every((operation) => operation.kind !== "create"), `${tag} [repeat] and creates nothing: every event it needs already exists`);
+        const reapproved = await approve(o, reproposed.preview_id);
+        same(reapproved.status, "applied", `${tag} [repeat] the second approve applies`);
+        ok(!mentionsUnowned(reapproved.operation_results) && !mentionsUnowned(reapproved.applied_events), `${tag} [repeat] with no write for an unowned Task`);
+        same((await preview(o)).operations, [], `${tag} [repeat] a preview straight after it proposes nothing`);
+        o = await observing(o, reapproved.applied_events);
+        same((await reconcile(o)).conflicts.map((conflict) => [conflict.conflict_type, conflict.external_id]), foreignOnly, `${tag} [repeat] reconcile is unchanged: the unowned instances, foreign, and no drift`);
+        same((await report()).categories, rows, `${tag} [repeat] the report is unchanged: nothing was counted twice`);
+        await o.stop();
+        return { instances: instances.length, captured: seen.length, occurrences: occurrences.length, placed, unplaced, reason: fence.reason, planningDiagnostics: planned.diagnostics.map((diagnostic) => diagnostic.code), total: body.total_seconds };
+      }
+
+      const results = {};
+      for (const [label, seconds] of HORIZONS) results[label] = await rehearse(label, seconds);
+      const [day, sevenDays] = [results["one day"], results["one week"]];
+      console.log(`  horizons compared: ${JSON.stringify(results)}`);
+      // Judgment call 9: where the two horizons legitimately differ, the difference is what is asserted.
+      same({ placed: day.placed, unplaced: day.unplaced }, { placed: sevenDays.placed, unplaced: sevenDays.unplaced }, "at both horizons the same five Tasks are placed and the same one is left out");
+      same([day.instances, sevenDays.instances], [1, week.recurring.length], "one day sees one instance of the recurring commitment; one week sees all three");
+      ok(sevenDays.occurrences > day.occurrences, `one week holds more routine occurrences than one day: ${sevenDays.occurrences} against ${day.occurrences}`);
+      ok(sevenDays.total > day.total, `so one week accounts for more Static time: ${sevenDays.total} seconds against ${day.total}`);
+      ok(day.reason !== sevenDays.reason, `the too-long Task is left out for a different stated reason: ${day.reason} at one day, ${sevenDays.reason} at one week`);
+      return `the daily loop holds over an invented week at one day and at one week: ${day.captured} and ${sevenDays.captured} events captured, ${day.placed.length} of ${week.backlog.length} backlog Tasks placed at both, the unowned windows never overlapped and never written`;
     }
   }
 ];

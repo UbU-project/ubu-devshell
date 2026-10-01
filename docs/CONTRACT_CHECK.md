@@ -1,7 +1,7 @@
 # The scenario runner
 
 `scripts/check-ui-contract.sh` builds the real `ubu-orchestrator` and walks
-the daily loop against it over HTTP, in eighteen scenarios. It needs no
+the daily loop against it over HTTP, in nineteen scenarios. It needs no
 webview, no Google account and no model. A full walk takes about ten seconds
 once the orchestrator is built.
 
@@ -46,7 +46,7 @@ at that time:
 
 Those two assertions are still scenario 1, and still run first.
 
-## The eighteen scenarios
+## The nineteen scenarios
 
 Every scenario starts its own orchestrator on its own ephemeral loopback
 port with its own empty store. Nothing is carried from one to the next. All
@@ -63,15 +63,16 @@ calendar requests ask for `export_mode: "mock"`.
 | 7 | colour means done | *Seeded.* The calendar shows the applied Dynamic event with a colour. Capture completes that Task and only that Task. A second capture completes nothing again. |
 | 8 | drag means move | *Seeded.* The calendar shows the applied Static event at a later window. Capture moves the Task's `static_window` to it, and the next Plan places it there. |
 | 9 | foreign | *Seeded.* The calendar shows an event UbU never applied. Reconcile classifies it `foreign`. Repair leaves the applied record as it was, creates no Task, and the event is still foreign afterwards. |
-| 10 | recurring refusal | *Seeded.* The calendar shows an event whose id has the `{base32hex}_{timestamp}` shape. It parses, classifies `foreign`, is refused by capture with `capture_event_not_ownable`, creates no Task, and is not in the applied record. |
+| 10 | recurring occupancy | *Seeded.* The calendar shows an event whose id has the `{base32hex}_{timestamp}` shape. It parses and classifies `foreign`, with `capture_event_not_ownable` from reconcile. Capture records it as occupied time: one Static Task under a minted handle, the Google id in `provenance.source`, and `capture_occupancy_only` naming the id. A second capture admits nothing. It is still `foreign` afterwards, it is not in the applied record, and the next preview neither desires nor operates on it. |
 | 11 | preferences | Two Preferences are created. A third that closes a cycle is refused naming the members in order. One is deleted, and the refused one is then accepted. |
 | 12 | decomposition | A Task is decomposed into three children held as one segment. In the Plan each child starts when the one before it ends. Undo restores the Task under a new handle and moots the children. |
 | 13 | settings reach planning | A category colour changed through `PUT /setting/:name` is carried by the next preview, with no restart and no new Plan. Reverting returns the default. |
 | 14 | advisory | Against the stub model: unconfigured names both Settings and asks the model nothing; a 404 body reaches `advisory_http_failed`; an empty answer reports `advisory_empty_response` and whether thinking was present; a slow answer trips `advisory_timeout` at the budget; a good answer enqueues candidates, and admitting one sets the category. |
-| 15 | clarify | Against the stub model: a run with no Task named interviews the Task with no description, and the prompt carries its id, title and round 1 and no description. A second run is refused with `clarify_already_queued` and the model receives no request. Plain Admit is refused with `advisory_answer_required`, and a yes/no answered `maybe` with `clarify_invalid_answer`. A proper answer admits the candidate and the Task's `description` is exactly the expected `Q:`/`A:` text, in question order, with the blank and the inapplicable answer dropped. Round two must name the Task; its prompt carries round 2 and that description; answering it makes the description grow. A third run reports `clarify_no_questions`. |
+| 15 | clarify | Against the stub model: a run with no Task named interviews the Task with no description, and the prompt carries its id, title and round 1 and no description. A second run is refused with `clarify_already_queued` and the model receives no request. Plain Admit is refused with `advisory_answer_required`, and a yes/no answered `maybe` with `clarify_invalid_answer`. A proper answer admits the candidate and the Task's `description` is exactly the expected `Q:`/`A:` text, in question order, with the blank and the inapplicable answer dropped. Round two must name the Task; its prompt carries round 2 and that description; answering it makes the description grow. A third run reports `clarify_no_questions`, and `round: 3`. |
 | 16 | reopen | A Task is completed. Reopening with another Task's completion id is refused with 409 `reopen_stale_completion`. Reopening with the right id returns it to `active`. Reopening again is refused with 409 `reopen_not_completed`. The Task can be completed again. |
 | 17 | description | A Task is captured with a multi-line `Q:`/`A:` description and read back byte for byte. A PATCH to a longer narrative reads back exactly; a PATCH of `description` to `null` removes it; a description of blank lines, tabs and non-ASCII text is accepted and returned unchanged. |
 | 18 | time by category | Six Tasks are staged: a Static Task overlapping the range's start, a completed Dynamic Task with an observed window from a coloured event, one with a Fixed estimate and no observed window, one with a stochastic estimate, one with neither, and one with no category. `GET /reports/time-by-category` returns every row with the expected seconds, the `unmeasured` entry with its title, rows in seconds-descending then category-ascending order, the total, an `Uncategorized` row, the seven-day default range, and a 400 `time_by_category_invalid_range` when `from` is after `to`. A Task completed, reopened and completed again contributes its seconds once. |
+| 19 | a realistic week | *Seeded.* The switch rehearsal. One invented week, `scripts/rehearsal-week.mjs`: a recurring commitment of three daily instances UbU cannot own, two one-off events it can, one with a colour mapped to nothing, a daily routine, a Dynamic backlog of six Tasks across three categories with one too long to fit anywhere, a Preference, and `calendar.color.*` Settings. The whole loop is walked on its own store at each of two planning horizons, one day and one week: capture, generate, the no-overlap check, preview, a Mock approve, reconcile, Next Task and a completion, the time-by-category report, and a second full pass. See [the rehearsal](#the-rehearsal). |
 
 The seeded scenarios first apply a day with no seed, then restart the
 orchestrator on the same store with a fixture built from the events that
@@ -98,6 +99,78 @@ checked too.
 
 The timeout step takes five seconds, because five seconds is the floor of
 `advisory.timeout_ms`.
+
+## The rehearsal
+
+Scenario 19 is the rehearsal for the switch to mainline planning. It answers
+one question the other eighteen do not: what does a week that looks like a
+real one do to the whole loop, end to end, on one store?
+
+**The week is invented and says so.** It is `scripts/rehearsal-week.mjs`. It
+is not the operator's calendar and not an imitation of it. Its shape is
+realistic and every title is obviously synthetic:
+
+| | |
+|---|---|
+| recurring commitment | three daily instances, ids shaped `{invented base32hex}_{timestamp}`, coloured for `work` |
+| one-off events | two with ids UbU can own: one coloured for `personal`, one with colour 1, which the Settings leave mapped to nothing |
+| routine | one daily Static routine of half an hour, category `personal` |
+| backlog | six Dynamic Tasks across `work`, `grocery` and `personal`, three Fixed and two stochastic, and one Fixed at thirty hours that cannot fit any free interval |
+| Preference | one, ordering two of the backlog |
+| Settings | `calendar.color.*` for the three categories used, and one that moves `entertainment` off colour 1 |
+
+The last Setting is there because every one of Google's eleven colours is
+mapped to a category by default. A colour is only ever unmapped after the
+operator has moved a category off it.
+
+**What is walked, and asserted, on each store:**
+
+1. **capture**: every event inside the horizon is captured and none is
+   skipped; each recurring instance carries `capture_occupancy_only`; the
+   unmapped colour is diagnosed; no diagnostic carries a title; a second
+   capture admits nothing.
+2. **generate**: every backlog Task is in the Plan or named in
+   `unplaced_tasks`, and the two sets together are the whole backlog, each
+   Task once. The Task left out has a reason, an explanation and alternatives.
+3. **no overlap**: no planned Dynamic step overlaps any Static window that
+   occupies capacity, the unowned ones included.
+4. **preview**: the desired set holds both events UbU can own, every placed
+   Task and every routine occurrence, and no unowned Task; no operation names
+   an unowned event.
+5. **approve in Mock**: applied, with no operation result and no applied event
+   naming an unowned event or its Task.
+6. **reconcile**: the only conflicts are the unowned instances, each
+   `foreign`; the status is `observed`, not `drifted`.
+7. **next action, then complete**: the recommendation is a placed backlog
+   Task, and completing it transitions it.
+8. **report**: `time-by-category` is the Static windows plus the one
+   completion, and `Uncategorized` is exactly the unmapped-colour Task.
+9. **repeat**: a second full pass. Capture admits nothing, the same Tasks are
+   placed and left out, the preview creates nothing and names no unowned
+   event, a preview straight after the approve proposes nothing, reconcile is
+   unchanged and the report is unchanged.
+
+The mock Calendar observes a file read at startup, so the scenario restarts
+the orchestrator on the same store after each approve, observing the
+operator's events and what UbU applied. That is what a calendar holds after
+an approve.
+
+**Two horizons.** `UBU_PLANNING_HORIZON_SECONDS` defaults to 86400, one day,
+and may be up to 2678400. The walk runs at 86400 and at 604800, each on its
+own store. Where the two legitimately differ, the difference is asserted and
+not the value: one day sees one instance of the recurring commitment and one
+week sees all three; one week holds more routine occurrences and so more
+Static time; and the Task that fits nowhere is left out for a different
+stated reason at each. At both, the same five Tasks are placed.
+
+The scenario prints, for each horizon, the capture diagnostics, the Plan, the
+unplaced Tasks, the planning diagnostics, the risk report, the preview
+diagnostics, the reconcile conflicts and the time-by-category response, and
+then one line comparing the two.
+
+**The rehearsal reports; it does not fix.** What it shows that nobody
+anticipated is written down as a gap, in the ticket's report, and is not
+patched in the scenario. `acceptance.sh` stages the same week for the app.
 
 ## What the runner cannot cover
 
@@ -170,10 +243,10 @@ scenario 7 of 16: colour means done (seeded mock calendar)
 PASS  7 colour means done: a colour on an applied Dynamic event completes its Task at capture, and only that Task
 ```
 
-A complete walk ends with eighteen `PASS` lines, two `SKIP` lines and:
+A complete walk ends with nineteen `PASS` lines, two `SKIP` lines and:
 
 ```text
-RESULT: 18 of 18 scenarios passed, 0 failed, 2 skipped, 191 requests, all to 127.0.0.1
+RESULT: 19 of 19 scenarios passed, 0 failed, 2 skipped, 280 requests, all to 127.0.0.1
 ```
 
 The walk stops at the first failure. The `FAIL` line names the scenario and
@@ -199,8 +272,8 @@ Two scripts, one boundary.
 | | `check-ui-contract.sh` | `acceptance.sh` |
 |---|---|---|
 | Covers | The HTTP layer: what the orchestrator does with a request. | The rendered layer: what a human sees in the app. |
-| Asserts | Everything it checks, in eighteen scenarios, each on its own store. | Nothing about behaviour. It stages a store and prints steps. |
-| Store | Sixteen throwaway stores on ephemeral ports. | One throwaway store on the app's default port, held until Ctrl-C. |
+| Asserts | Everything it checks, in nineteen scenarios, each on its own store. | Nothing about behaviour. It stages a store and prints steps. |
+| Store | One throwaway store per scenario, and two for the rehearsal, on ephemeral ports. | One throwaway store on the app's default port, held until Ctrl-C. |
 | Preconditions | Each scenario stages exactly what it asserts. | Each step declares the seeds it needs; each seed checks itself over HTTP. |
 | A human | Reads PASS and FAIL lines. | Opens the app and follows the steps. |
 

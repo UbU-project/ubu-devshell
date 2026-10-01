@@ -13,10 +13,12 @@
 // UBU_DB_PATH inside the temp directory, in mock modes, with no credential in
 // its environment, so the operator's own store cannot be read or written.
 import { spawn } from "node:child_process";
-import { appendFileSync, mkdirSync, openSync, readFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs";
 import net from "node:net";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+
+import { rehearsalWeek, routineBody } from "./rehearsal-week.mjs";
 
 function option(name, fallback = null) {
   const index = process.argv.indexOf(`--${name}`);
@@ -80,6 +82,20 @@ const nextAction = () =>
 // Obviously invented, and obviously this harness's, so a row in the app is never
 // mistaken for the operator's own work.
 const TITLE = (what) => `Acceptance ${what}`;
+
+// The switch rehearsal's week, the same one check-ui-contract.mjs walks and
+// asserts. Its calendar is what the mock Calendar observes, so it is written
+// to a file before the orchestrator starts. The horizon is the orchestrator's
+// own default of one day unless UBU_PLANNING_HORIZON_SECONDS says otherwise:
+// which of the two the switch runs on is a decision this harness does not make.
+const week = rehearsalWeek(thisHour);
+const HORIZON_SECONDS = Number(process.env.UBU_PLANNING_HORIZON_SECONDS ?? 86_400);
+const HORIZON = HORIZON_SECONDS % 86_400 === 0 ? `${HORIZON_SECONDS / 86_400}-day` : `${HORIZON_SECONDS}-second`;
+const inHorizon = (event) => Date.parse(event.start_at) < Date.now() + HORIZON_SECONDS * 1000;
+const captureCalendar = () =>
+  call("POST", endpoints.CALENDAR_CAPTURE_PATH, { schema_version: endpoints.CALENDAR_CAPTURE_SCHEMA_VERSION, export_mode: "mock" });
+// What every seed made and how its check described it, for the step titles.
+const staged = {};
 
 // --------------------------------------------------------------- the seeds
 //
@@ -194,7 +210,108 @@ const SEEDS = {
         ? `endpoint ${named("advisory.endpoint")}, timeout ${named("advisory.timeout_ms")} ms, model ${named("advisory.model")}`
         : `endpoint ${named("advisory.endpoint")}, timeout ${named("advisory.timeout_ms")} ms; SET advisory.model IN SETUP FIRST`;
     }
+  },
+  // ---- the switch rehearsal's week: rehearsal-week.mjs, staged the way the runner stages it
+  week_colours: {
+    what: "calendar.color.* for the three categories the week uses, and one colour left mapped to nothing",
+    async make() {
+      for (const [name, value] of week.settings) await putSetting(name, value);
+    },
+    async check() {
+      const palette = (await call("GET", endpoints.SETTINGS_LIST_PATH)).palette;
+      for (const [name, colour] of week.settings) {
+        const category = name.replace("calendar.color.", "");
+        const entry = palette.find((candidate) => candidate.category === category);
+        if (entry?.color_id !== colour || entry?.origin !== "setting") {
+          throw new StagingFailure(`${name} is not the Setting that was staged: ${JSON.stringify(entry)}`);
+        }
+      }
+      if (palette.some((entry) => entry.color_id === week.unmappedColour)) {
+        throw new StagingFailure(`colour ${week.unmappedColour} is still mapped to a category, so the lighthouse tour would not arrive uncategorised`);
+      }
+      const used = Object.entries(week.categoryOfColour).map(([colour, category]) => `${category} on colour ${colour}`).join(", ");
+      return `${used}; colour ${week.unmappedColour} maps to nothing`;
+    }
+  },
+  week_calendar: {
+    what: "the week's calendar, captured in Mock: a recurring commitment UbU cannot own and two one-off events it can",
+    async make() {
+      return captureCalendar();
+    },
+    async check(made) {
+      const seen = week.calendar.filter(inHorizon);
+      const instances = week.recurring.filter(inHorizon);
+      if (made.captured !== seen.length || made.skipped !== 0) {
+        throw new StagingFailure(`capture took ${made.captured} and skipped ${made.skipped} of the ${seen.length} events inside the horizon: ${JSON.stringify(made.diagnostics)}`);
+      }
+      const bySource = {};
+      for (const summary of await listTasks("active")) {
+        const source = (await readTask(summary.task_id)).payload.provenance?.source;
+        if (source?.source_kind === "google_calendar") bySource[source.source_id] = summary;
+      }
+      for (const event of seen) {
+        const task = bySource[event.external_id];
+        if (!task) throw new StagingFailure(`no Task was captured from calendar event ${event.external_id}`);
+        if (task.placement !== "static") throw new StagingFailure(`the Task captured from ${event.external_id} is not Static`);
+        const category = week.categoryOfColour[event.color_id] ?? null;
+        if ((task.category_tag ?? null) !== category) {
+          throw new StagingFailure(`the Task captured from ${event.external_id} has category ${task.category_tag ?? "none"}, not ${category ?? "none"}`);
+        }
+      }
+      for (const event of instances) {
+        if (!made.diagnostics.some((diagnostic) => diagnostic.code === "capture_occupancy_only" && diagnostic.message.includes(event.external_id))) {
+          throw new StagingFailure(`capture did not report ${event.external_id} as capture_occupancy_only`);
+        }
+      }
+      const again = await captureCalendar();
+      if (again.captured !== 0) throw new StagingFailure(`a second capture admitted ${again.captured} more Task(s)`);
+      return (
+        `${seen.length} of its ${week.calendar.length} events are inside the ${HORIZON} horizon and are Static Tasks; ` +
+        `${instances.length} of them ${instances.length === 1 ? "is an instance" : "are instances"} of “${week.recurring[0].summary}”, occupied time UbU does not own`
+      );
+    }
+  },
+  week_routine: {
+    what: "one daily routine, so the week has occurrences UbU made itself",
+    async make() {
+      return call("POST", endpoints.OBJECTIVE_CREATE_PATH, routineBody(week, endpoints.OBJECTIVE_SCHEMA_VERSION), 201);
+    },
+    async check(made) {
+      const objectives = (await call("GET", endpoints.OBJECTIVE_LIST_PATH)).objectives;
+      if (!objectives.some((objective) => objective.title === week.routine.title)) {
+        throw new StagingFailure(`the routine ${week.routine.title} is not listed`);
+      }
+      return `${week.routine.title} (${made.objective_id}), daily at ${week.routine.nominalStart} UTC`;
+    }
+  },
+  week_backlog: {
+    what: "six Dynamic Tasks across three categories, one of them too long to fit anywhere, and a Preference between two",
+    async make() {
+      const ids = {};
+      for (const task of week.backlog) {
+        ids[task.key] = (await captureTask({ title: task.title, duration_estimate: task.duration_estimate, category_tag: task.category, tags: [task.category] })).task_id;
+      }
+      await call("POST", endpoints.PREFERENCE_CREATE_PATH, { schema_version: endpoints.PREFERENCE_SCHEMA_VERSION, task_a: ids[week.preference.before], task_b: ids[week.preference.after], order: "a_preferred_to_b" }, 201);
+      return { ids };
+    },
+    async check(made) {
+      const active = await listTasks("active");
+      for (const task of week.backlog) {
+        const row = active.find((candidate) => candidate.task_id === made.ids[task.key]);
+        if (!row) throw new StagingFailure(`the backlog Task ${task.title} is not active`);
+        if (row.placement !== "planned") throw new StagingFailure(`the backlog Task ${task.title} is not Dynamic`);
+      }
+      const title = (key) => week.backlog.find((task) => task.key === key).title;
+      const preferences = (await call("GET", endpoints.PREFERENCE_LIST_PATH)).preferences;
+      if (!preferences.some((preference) => preference.task_a_title === title(week.preference.before) && preference.task_b_title === title(week.preference.after))) {
+        throw new StagingFailure("the Preference between two backlog Tasks is not listed");
+      }
+      return `${week.backlog.length} Dynamic Tasks, among them “${week.backlog.find((task) => task.tooLong).title}” at 30 hours; “${title(week.preference.before)}” is preferred to “${title(week.preference.after)}”`;
+    }
   }
+  // No Plan is staged. Next Task with no Plan recommends the earliest ready Task,
+  // which is what `completable` promises; a staged Plan would make it recommend the
+  // Plan's first placement instead. The operator generates the Plan in a step.
 };
 
 // --------------------------------------------------------------- the steps
@@ -282,6 +399,8 @@ function portFree(port) {
 let child = null;
 async function startOrchestrator(dir) {
   mkdirSync(dir, { recursive: true });
+  const calendarFile = join(dir, "mock-calendar-events.json");
+  writeFileSync(calendarFile, JSON.stringify(week.calendar, null, 2));
   const log = openSync(join(dir, "orchestrator.log"), "a");
   child = spawn(binary, [], {
     cwd: dir,
@@ -293,6 +412,10 @@ async function startOrchestrator(dir) {
       UBU_DEVICE_REGISTRATION: join(dir, "device-registration.json"),
       UBU_GITHUB_INGEST_MODE: "mock",
       UBU_GITHUB_PROJECTION_EXPORT_MODE: "mock",
+      // What the mock Calendar observes. With this set a Live calendar request is
+      // refused before any client exists, so the app cannot reach a real calendar from here.
+      UBU_CALENDAR_MOCK_EVENTS: calendarFile,
+      ...(process.env.UBU_PLANNING_HORIZON_SECONDS ? { UBU_PLANNING_HORIZON_SECONDS: process.env.UBU_PLANNING_HORIZON_SECONDS } : {}),
       NO_COLOR: "1"
     },
     stdio: ["ignore", log, log]
@@ -338,13 +461,23 @@ async function main() {
   await startOrchestrator(workDir);
   console.log(`up:    ${BASE}\n`);
 
+  console.log(`horizon: ${HORIZON}${process.env.UBU_PLANNING_HORIZON_SECONDS ? "" : ", the orchestrator's default; UBU_PLANNING_HORIZON_SECONDS=604800 stages one week"}\n`);
+
   console.log("staging:");
-  const staged = {};
+  // Every seed is made before any is checked, so a check sees the whole staged
+  // store: what Next Task recommends, and which Task Clarify picks, depend on
+  // every Task there is and not only on the ones made so far.
   for (const [name, seed] of Object.entries(SEEDS)) {
-    const made = await seed.make();
-    const described = await seed.check(made);
-    staged[name] = { made, described };
-    console.log(`  OK  ${name}: ${described}`);
+    staged[name] = { made: await seed.make() };
+  }
+  for (const [name, seed] of Object.entries(SEEDS)) {
+    try {
+      staged[name].described = await seed.check(staged[name].made);
+    } catch (error) {
+      if (error instanceof StagingFailure) error.message = `seed ${name}: ${error.message}`;
+      throw error;
+    }
+    console.log(`  OK  ${name}: ${staged[name].described}`);
     console.log(`      ${seed.what}`);
   }
   for (const name of unused) console.log(`  --  ${name}: staged but no step names it`);
