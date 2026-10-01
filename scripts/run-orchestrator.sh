@@ -2,6 +2,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Build settings: how parallel cargo is, and where it builds. See docs/BUILD_ENV.md.
+# shellcheck source=scripts/env.sh
+source "$SCRIPT_DIR/env.sh"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPOS_DIR="${REPOS_DIR:-$(cd "$ROOT_DIR/.." && pwd)}"
 ORCHESTRATOR_DIR="${ORCHESTRATOR_DIR:-$REPOS_DIR/ubu-orchestrator}"
@@ -12,6 +15,7 @@ if [[ ! -d "$ORCHESTRATOR_DIR" ]]; then
 fi
 
 cd "$ORCHESTRATOR_DIR"
+ubu_cargo_env
 export HOST="${HOST:-127.0.0.1}"
 export BIND_ADDR="${BIND_ADDR:-127.0.0.1}"
 

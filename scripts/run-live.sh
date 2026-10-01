@@ -13,6 +13,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Build settings: how parallel cargo is, and where it builds. See docs/BUILD_ENV.md.
+# shellcheck source=scripts/env.sh
+source "$SCRIPT_DIR/env.sh"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPOS_DIR="${REPOS_DIR:-$(cd "$ROOT_DIR/.." && pwd)}"
 ORCHESTRATOR_DIR="${ORCHESTRATOR_DIR:-$REPOS_DIR/ubu-orchestrator}"
@@ -177,6 +180,7 @@ read -r -p "Type the word live to start, or anything else to stop: " answer
 [[ "$answer" == "live" ]] || refuse "you typed something other than live"
 
 cd "$ORCHESTRATOR_DIR"
+ubu_cargo_env
 export HOST="${HOST:-127.0.0.1}"
 export BIND_ADDR="${BIND_ADDR:-127.0.0.1}"
 echo "run: cargo run --locked in $ORCHESTRATOR_DIR bound to 127.0.0.1"

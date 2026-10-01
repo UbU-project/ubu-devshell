@@ -45,6 +45,12 @@ Run local apps when the target repositories exist:
 ./scripts/run-ui.sh
 ```
 
+Every script here that runs cargo first sources `scripts/env.sh`, the one
+place for build settings: how many jobs cargo runs at once, and, when
+`UBU_TARGET_ROOT` is set, where each repository builds. See
+[build settings](docs/BUILD_ENV.md). No repository commits a machine-specific
+path.
+
 `run-orchestrator.sh` starts the orchestrator with no Google variables, so it
 cannot reach a calendar. To run it against your own store with Google
 Calendar reachable, use `./scripts/run-live.sh`, which says what it is about

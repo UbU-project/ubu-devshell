@@ -24,6 +24,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Build settings: how parallel cargo is, and where it builds. See docs/BUILD_ENV.md.
+# shellcheck source=scripts/env.sh
+source "$SCRIPT_DIR/env.sh"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPOS_DIR="${REPOS_DIR:-$(cd "$ROOT_DIR/.." && pwd)}"
 ORCHESTRATOR_DIR="${ORCHESTRATOR_DIR:-$REPOS_DIR/ubu-orchestrator}"
@@ -111,7 +114,7 @@ trap cleanup EXIT
 trap 'echo; echo "interrupted"; exit 130' INT TERM
 
 echo "build: cargo build --locked --offline in $ORCHESTRATOR_DIR"
-if ! (cd "$ORCHESTRATOR_DIR" && cargo build --locked --offline --message-format=json-render-diagnostics >"$WORK_DIR/build.json"); then
+if ! (cd "$ORCHESTRATOR_DIR" && ubu_cargo_env && cargo build --locked --offline --message-format=json-render-diagnostics >"$WORK_DIR/build.json"); then
   fail "ubu-orchestrator did not build; the harness cannot run without the real binary"
 fi
 BINARY="$(node -e '

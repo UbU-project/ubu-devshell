@@ -2,6 +2,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Build settings: how parallel cargo is, and where it builds. See docs/BUILD_ENV.md.
+# shellcheck source=scripts/env.sh
+source "$SCRIPT_DIR/env.sh"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPOS_FILE="${REPOS_FILE:-$ROOT_DIR/repos.toml}"
 REPOS_DIR="${REPOS_DIR:-$(cd "$ROOT_DIR/.." && pwd)}"
@@ -35,7 +38,7 @@ while read -r name; do
   ran=0
   if [[ -f "$dir/Cargo.toml" ]]; then
     echo "cargo fmt: $dir"
-    (cd "$dir" && cargo fmt --all)
+    (cd "$dir" && ubu_cargo_env && cargo \1 --all)
     ran=1
   fi
   if [[ -f "$dir/package.json" ]]; then
