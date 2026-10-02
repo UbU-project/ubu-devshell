@@ -244,7 +244,7 @@ const SEEDS = {
     }
   },
   week_calendar: {
-    what: "the week's calendar, captured in Mock: seven instances of one recurring commitment, which UbU cannot own, and two one-off events it can",
+    what: "the week's calendar, captured in Mock: seven instances of one recurring commitment, which UbU cannot own; two coloured one-off events, which are commitments; and two uncoloured ones, which are work for UbU to schedule",
     async make() {
       return captureCalendar();
     },
@@ -262,7 +262,9 @@ const SEEDS = {
       for (const event of seen) {
         const task = bySource[event.external_id];
         if (!task) throw new StagingFailure(`no Task was captured from calendar event ${event.external_id}`);
-        if (task.placement !== "static") throw new StagingFailure(`the Task captured from ${event.external_id} is not Static`);
+        // A colour decides the placement: coloured is a commitment at its own time, uncoloured is Dynamic work.
+        const wanted = event.color_id === null ? "planned" : "static";
+        if (task.placement !== wanted) throw new StagingFailure(`the Task captured from ${event.external_id} is ${task.placement}, not ${wanted}`);
         const category = week.categoryOfColour[event.color_id] ?? null;
         if ((task.category_tag ?? null) !== category) {
           throw new StagingFailure(`the Task captured from ${event.external_id} has category ${task.category_tag ?? "none"}, not ${category ?? "none"}`);
@@ -275,10 +277,16 @@ const SEEDS = {
       if (occupancy.length !== 1 || !named || !counted) {
         throw new StagingFailure(`capture did not report the ${instances.length} unowned instance(s) once, as capture_occupancy_only: ${JSON.stringify(occupancy)}`);
       }
+      const parked = week.parked.filter(inHorizon);
+      const said = made.diagnostics.filter((diagnostic) => diagnostic.code === "capture_colour_absent");
+      if (said.length !== parked.length || !parked.every((event) => said.some((diagnostic) => diagnostic.message.includes(event.external_id) && diagnostic.message.includes("work for UbU to schedule")))) {
+        throw new StagingFailure(`capture did not say of each of the ${parked.length} uncoloured event(s) that it is work for UbU to schedule: ${JSON.stringify(said)}`);
+      }
       const again = await captureCalendar();
       if (again.captured !== 0) throw new StagingFailure(`a second capture admitted ${again.captured} more Task(s)`);
       return (
-        `${seen.length} of its ${week.calendar.length} events are inside the ${HORIZON} horizon and are Static Tasks; ` +
+        `${seen.length} of its ${week.calendar.length} events are inside the ${HORIZON} horizon; the coloured ones are Static Tasks, and the ${parked.length} uncoloured ones, ` +
+        `${parked.map((event) => `“${event.summary}” parked at ${local(event.start_at)}`).join(" and ")}, are Dynamic Tasks for the planner to place; ` +
         `${instances.length} of them ${instances.length === 1 ? "is an instance" : "are instances"} of “${week.recurring[0].summary}”, ` +
         `the first at ${local(instances[0].start_at)}, each captured as its own Static Task of occupied time that UbU does not own; ` +
         `nothing in UbU knows they are one commitment`

@@ -213,7 +213,7 @@ what the operator looks at. Every title in it is invented and says so.
 | seed | what it stages | what its check asserts |
 |---|---|---|
 | `week_colours` | `calendar.color.*` for the three categories the week uses, and one colour left mapped to nothing | each is a Setting, and colour 1 maps to no category |
-| `week_calendar` | the week's calendar, captured in Mock | every event inside the horizon is one Static Task with its colour's category; the unowned instances were reported once, as one `capture_occupancy_only`; a second capture admits nothing |
+| `week_calendar` | the week's calendar, captured in Mock | every event inside the horizon is one Task; a coloured event is Static, with its colour's category; each of the two uncoloured ones is Dynamic, and capture said it is work for UbU to schedule; the unowned instances were reported once, as one `capture_occupancy_only`; a second capture admits nothing |
 | `week_routine` | one daily routine, at noon | it is listed |
 | `week_night` | the **Asleep** routine: daily, 23:00, 480 minutes, category `sleep` | read back from the store: this computer's timezone, daily, `nominal_start` 23:00:00, 28800 seconds, Static, occupying capacity, category `sleep` |
 | `week_sleep_colour` | nothing: the default palette is checked as it stands | `sleep` is on colour 8 with origin `default`, `location` is not in the palette, and the inverse table reports colour 8 as `mapped` with `sleep` alone |

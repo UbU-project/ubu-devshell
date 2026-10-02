@@ -662,10 +662,10 @@ const scenarios = [
       same(
         captured.diagnostics,
         [
-          { code: "capture_colour_absent", message: `Calendar event \`${RECURRING_ID}\` has no colour; no category assigned` },
+          { code: "capture_colour_absent", message: `Calendar event \`${RECURRING_ID}\` has no colour, but UbU cannot own it and so cannot move it: it stays a commitment at its own time, with no category` },
           { code: "capture_occupancy_only", message: `Calendar event \`${RECURRING_ID}\` cannot be owned by UbU, so its time is recorded as an occupied window that UbU will never write back to or export` }
         ],
-        "capture records it as occupied time with capture_occupancy_only, naming the id and never the title"
+        "capture records it as occupied time with capture_occupancy_only, naming the id and never the title; uncoloured, it still stays where it is"
       );
       same({ captured: captured.captured, skipped: captured.skipped, unchanged: captured.unchanged }, { captured: 1, skipped: 0, unchanged: 2 }, "capture captured one and skipped nothing");
       const occupancy = (await listTasks(o)).find((task) => task.title === "Synthetic recurring instance");
@@ -1101,28 +1101,47 @@ const scenarios = [
         const captured = await capture(o);
         say("capture diagnostics", captured.diagnostics);
         same({ captured: captured.captured, skipped: captured.skipped }, { captured: seen.length, skipped: 0 }, `${tag} every event inside the horizon is captured and none is skipped`);
+        // One line for each event whose colour says something, in id order, and then the occupancy line once.
+        // No colour is not a deficiency: the line says the event was taken as work for UbU to schedule.
+        const parked = week.parked.filter(inHorizon);
+        same(parked.length, week.parked.length, `${tag} both uncoloured events are inside the horizon`);
+        const colourLine = (event) =>
+          event.color_id === null
+            ? { code: "capture_colour_absent", message: `Calendar event \`${event.external_id}\` has no colour, so it is taken as work for UbU to schedule: a Dynamic Task of the event's length, at no fixed time` }
+            : { code: "capture_colour_unmapped", message: `Calendar event \`${event.external_id}\` has unmapped colour \`${week.unmappedColour}\`; no category assigned; map that colour in Settings to assign a category` };
         same(
           captured.diagnostics,
-          [
-            { code: "capture_colour_unmapped", message: `Calendar event \`${week.unmapped.external_id}\` has unmapped colour \`${week.unmappedColour}\`; no category assigned; map that colour in Settings to assign a category` },
-            occupancyOnly(instances)
-          ],
-          `${tag} the unmapped colour is diagnosed, and the ${instances.length} unowned instance(s) are reported once, as capture_occupancy_only`
+          [...[week.unmapped, ...parked].sort((a, b) => (a.external_id < b.external_id ? -1 : 1)).map(colourLine), occupancyOnly(instances)],
+          `${tag} the unmapped colour is diagnosed, each uncoloured event is said to be work for UbU to schedule, and the ${instances.length} unowned instance(s) are reported once, as capture_occupancy_only`
         );
         ok(!JSON.stringify(captured.diagnostics).includes("Invented"), `${tag} no diagnostic carries an event's title`);
         const bySource = {};
+        const payloadOf = {};
         for (const task of await listTasks(o)) {
-          const source = (await readTask(o, task.task_id)).payload.provenance?.source;
-          if (source?.source_kind === "google_calendar") bySource[source.source_id] = task;
+          const payload = (await readTask(o, task.task_id)).payload;
+          const source = payload.provenance?.source;
+          if (source?.source_kind === "google_calendar") {
+            bySource[source.source_id] = task;
+            payloadOf[source.source_id] = payload;
+          }
         }
         same(Object.keys(bySource).sort(), seen.map((event) => event.external_id).sort(), `${tag} each of those events is now exactly one Task, keyed by its Google id`);
+        // A colour decides the placement: coloured is Static, with the colour's category; uncoloured is Dynamic, with none.
         same(
           seen.map((event) => [bySource[event.external_id].placement, bySource[event.external_id].category_tag ?? null]),
-          seen.map((event) => ["static", week.categoryOfColour[event.color_id] ?? null]),
-          `${tag} every one is Static, with the category its colour maps to, and none for the unmapped colour`
+          seen.map((event) => (event.color_id === null ? ["planned", null] : ["static", week.categoryOfColour[event.color_id] ?? null])),
+          `${tag} every coloured event is Static, with the category its colour maps to and none for the unmapped colour; every uncoloured one is Dynamic, with none`
+        );
+        same(
+          parked.map((event) => [payloadOf[event.external_id].duration_estimate, payloadOf[event.external_id].static_window ?? null, payloadOf[event.external_id].occupies_capacity]),
+          parked.map((event) => [{ type: "fixed", seconds: event.seconds }, null, true]),
+          `${tag} each uncoloured event keeps its length as a fixed duration, and has no static_window`
         );
         const unowned = instances.map((event) => bySource[event.external_id].task_id);
         const owned = [week.mapped, week.unmapped].map((event) => bySource[event.external_id].task_id);
+        // The Dynamic work that came from the calendar, beside the backlog: Task id to its key, and to its event.
+        const parkedKey = Object.fromEntries(parked.map((event) => [bySource[event.external_id].task_id, event.key]));
+        const originOf = Object.fromEntries(parked.map((event) => [bySource[event.external_id].task_id, event.external_id]));
         const again = await capture(o);
         same({ captured: again.captured, updated: again.updated, unchanged: again.unchanged, skipped: again.skipped }, { captured: 0, updated: 0, unchanged: seen.length, skipped: 0 }, `${tag} a second capture admits nothing new`);
 
@@ -1191,7 +1210,13 @@ const scenarios = [
         same(anchors.filter((step) => unowned.includes(step.task_id)).length, instances.length, `${tag} every unowned window is in the Plan as a Static anchor that occupies capacity`);
         const collisions = dynamic.flatMap((step) => anchors.filter((anchor) => step.start < anchor.end && step.end > anchor.start).map((anchor) => `${step.summary} over ${anchor.summary}`));
         same(collisions, [], `${tag} none of the ${dynamic.length} Dynamic steps overlaps any of the ${anchors.length} Static windows, the unowned ones included`);
-        same(dynamic.map((step) => keyOf[step.task_id]).sort(), placed, `${tag} the Dynamic steps are exactly the placed backlog`);
+        same(dynamic.map((step) => keyOf[step.task_id] ?? parkedKey[step.task_id]).sort(), [...placed, ...parked.map((event) => event.key)].sort(), `${tag} the Dynamic steps are exactly the placed backlog and the two uncoloured events`);
+        // The two were parked at overlapping times. They are Dynamic, so nothing collides, and the planner chose their times.
+        same(planned.diagnostics.filter((diagnostic) => diagnostic.code === "static_task_collision"), [], `${tag} two uncoloured events at overlapping times produce no static_task_collision`);
+        const stepOfEvent = (event) => steps.find((step) => step.task_id === bySource[event.external_id].task_id);
+        say("where the uncoloured events were placed", parked.map((event) => ({ event: event.summary, parked_at: event.start_at, placed_at: stepOfEvent(event).start_at, until: stepOfEvent(event).end_at })));
+        ok(parked.every((event) => stepOfEvent(event).start_at !== event.start_at), `${tag} each is placed at a time the planner chose, not the time it was parked at`);
+        same(parked.map((event) => stepOfEvent(event).end - stepOfEvent(event).start), parked.map((event) => event.seconds), `${tag} and each keeps its own length`);
 
         // ---- 4. preview: the desired set holds the owned Tasks and no unowned one
         const proposed = await preview(o);
@@ -1217,7 +1242,16 @@ const scenarios = [
         same(desired.filter((id) => unowned.includes(id)), [], `${tag} no unowned Task is in the desired set`);
         const mentionsUnowned = (value) => instances.some((event) => JSON.stringify(value).includes(event.external_id)) || unowned.some((id) => JSON.stringify(value).includes(id.slice(5)));
         ok(!mentionsUnowned(proposed.operations) && !mentionsUnowned(proposed.events), `${tag} no operation and no desired event names an unowned event or its Task`);
-        same(proposed.operations.map((operation) => operation.kind), Array(placed.length + occurrences.length + nights.length).fill("create"), `${tag} the operations are creates for UbU's own work, and nothing against what it captured`);
+        const creates = proposed.operations.filter((operation) => operation.kind === "create");
+        const moves = proposed.operations.filter((operation) => operation.kind === "update");
+        same(creates.length, placed.length + occurrences.length + nights.length, `${tag} one create for each piece of UbU's own work, and nothing against a commitment it captured`);
+        same(proposed.operations.length, creates.length + moves.length, `${tag} and no delete`);
+        say("preview operations for the uncoloured events", moves.map((operation) => ({ kind: operation.kind, static_anchor: operation.static_anchor, summary: operation.event.summary, start_at: operation.event.start_at, end_at: operation.event.end_at, color_id: operation.event.color_id })));
+        same(
+          moves.map((operation) => [operation.event.external_id, operation.static_anchor, operation.event.color_id, operation.event.start_at, operation.event.end_at]).sort(),
+          parked.map((event) => [event.external_id, false, null, stepOfEvent(event).start_at, stepOfEvent(event).end_at]).sort(),
+          `${tag} each uncoloured event is one update: Dynamic, with no colour, to the window the Plan chose`
+        );
         say("preview diagnostics", proposed.diagnostics);
         same(
           proposed.diagnostics.map((diagnostic) => diagnostic.code),
@@ -1287,7 +1321,7 @@ const scenarios = [
         same(Math.min(...dynamicWindows(planned.plan).map(([, start]) => start)) % 60, 0, `${tag} the first Dynamic placement begins on a whole minute`);
         ok(approved.operation_results.every((result) => result.status === "applied"), `${tag} all ${approved.operation_results.length} operations were applied`);
         ok(!mentionsUnowned(approved.operation_results) && !mentionsUnowned(approved.applied_events), `${tag} no operation result and no applied event names an unowned event or its Task`);
-        same(approved.applied_events.length, owned.length + placed.length + occurrences.length + nights.length, `${tag} the applied record holds the two owned captures and what was created, and no unowned window`);
+        same(approved.applied_events.length, owned.length + parked.length + placed.length + occurrences.length + nights.length, `${tag} the applied record holds the owned captures, coloured and uncoloured, and what was created, and no unowned window`);
 
         // ---- 6. reconcile: the unowned events are foreign and nothing else drifts
         o = await observing(o, settled.applied_events);
@@ -1301,8 +1335,9 @@ const scenarios = [
         // ---- 7. next action, then complete
         const nextQuery = new URLSearchParams({ schema_version: endpoints.NEXT_ACTION_SCHEMA_VERSION });
         const recommendation = (await call(o.base, "GET", `${endpoints.NEXT_ACTION_PATH}?${nextQuery}`)).recommendation;
-        ok(recommendation !== null && placed.includes(keyOf[recommendation.task_id]), `${tag} Next Task recommends a planned backlog Task: ${recommendation?.title}`);
-        const done = week.backlog.find((task) => task.key === keyOf[recommendation.task_id]);
+        // Planned Dynamic work, from either source: the backlog, or an uncoloured event.
+        const done = week.backlog.find((task) => task.key === keyOf[recommendation?.task_id]) ?? parked.find((event) => event.key === parkedKey[recommendation?.task_id]);
+        ok(recommendation !== null && done !== undefined && (placed.includes(done.key) || parkedKey[recommendation.task_id] !== undefined), `${tag} Next Task recommends planned Dynamic work: ${recommendation?.title}`);
         const completion = await recordAction(o, recommendation.task_id, "complete");
         same({ applied: completion.transition_applied, status: completion.task_status, stored: (await readTask(o, recommendation.task_id)).status }, { applied: true, status: "completed", stored: "completed" }, `${tag} completing it transitions it to completed`);
 
@@ -1317,11 +1352,13 @@ const scenarios = [
           row.task_count += 1;
         };
         const span = (event) => (Date.parse(event.end_at) - Date.parse(event.start_at)) / 1000;
-        for (const event of seen) add(week.categoryOfColour[event.color_id] ?? "Uncategorized", span(event), 0);
+        // Only a coloured event is a commitment with a window. An uncoloured one is Dynamic work, counted when it is done.
+        for (const event of seen.filter((candidate) => candidate.color_id !== null)) add(week.categoryOfColour[event.color_id] ?? "Uncategorized", span(event), 0);
         for (const _ of occurrences) add(week.routine.category, week.routine.seconds, 0);
         // The night is in the sleep category, so its hours are reported as sleep.
         for (const _ of nights) add(week.asleep.category, week.asleep.seconds, 0);
-        add(done.category, 0, done.seconds);
+        // Work that came from an uncoloured event has no category.
+        add(done.category ?? "Uncategorized", 0, done.seconds);
         const rows = Object.values(expected).sort((a, b) => b.seconds - a.seconds || (a.category < b.category ? -1 : 1));
         const body = await report();
         say("time-by-category response", body);
@@ -1329,7 +1366,8 @@ const scenarios = [
         same({ total: body.total_seconds, unmeasured: body.unmeasured }, { total: rows.reduce((sum, row) => sum + row.seconds, 0), unmeasured: [] }, `${tag} the total is the sum of the rows and nothing is unmeasured`);
         const slept = nights.length * week.asleep.seconds;
         same(body.categories.find((row) => row.category === week.asleep.category), { category: week.asleep.category, seconds: slept, static_seconds: slept, completed_seconds: 0, task_count: nights.length }, `${tag} the sleep row carries eight hours for each night`);
-        same(body.categories.find((row) => row.category === "Uncategorized"), { category: "Uncategorized", seconds: span(week.unmapped), static_seconds: span(week.unmapped), completed_seconds: 0, task_count: 1 }, `${tag} and Uncategorized is only the unmapped-colour Task again`);
+        same(body.categories.find((row) => row.category === "Uncategorized"), expected.Uncategorized, `${tag} and Uncategorized is the unmapped-colour Task, and the completed work if it came from an uncoloured event`);
+        same(expected.Uncategorized.static_seconds, span(week.unmapped), `${tag} its Static time is the unmapped-colour Task alone: an uncoloured event is not a commitment and adds none`);
 
         // ---- 9. repeat: a second full pass over the same store
         const before = (await listTasks(o)).length;
@@ -1345,7 +1383,7 @@ const scenarios = [
         ok(!mentionsUnowned(reproposed.operations) && !mentionsUnowned(reproposed.events), `${tag} [repeat] the preview still names no unowned event`);
         ok(reproposed.operations.every((operation) => operation.kind === "update"), `${tag} [repeat] it creates nothing and deletes nothing: every event it needs already exists`);
         // P1B-53: the completed Task's event is frozen. It is in no operation, and the preview says why, once.
-        const completedEvent = recommendation.task_id.slice(5);
+        const completedEvent = originOf[recommendation.task_id] ?? recommendation.task_id.slice(5);
         ok(!JSON.stringify(reproposed.operations).includes(completedEvent), `${tag} [repeat] the completed Task's event is in no operation: it is neither updated nor deleted`);
         say("[repeat] retained-event diagnostic", reproposed.diagnostics.filter((diagnostic) => diagnostic.code === "calendar_event_retained"));
         same(
@@ -1376,7 +1414,7 @@ const scenarios = [
       same([day.nights, sevenDays.nights], [1, 7], "one day holds one night and one week holds seven");
       ok(sevenDays.total > day.total, `so one week accounts for more Static time: ${sevenDays.total} seconds against ${day.total}`);
       ok(day.reason !== sevenDays.reason, `the too-long Task is left out for a different stated reason: ${day.reason} at one day, ${sevenDays.reason} at one week`);
-      return `the daily loop holds over an invented week at one day and at one week: ${day.captured} and ${sevenDays.captured} events captured, ${day.placed.length} of ${week.backlog.length} backlog Tasks placed at both, the unowned windows never overlapped and never written`;
+      return `the daily loop holds over an invented week at one day and at one week: ${day.captured} and ${sevenDays.captured} events captured, the ${week.parked.length} uncoloured ones as Dynamic work, ${day.placed.length} of ${week.backlog.length} backlog Tasks placed at both, the unowned windows never overlapped and never written`;
     }
   },
   {
@@ -1385,6 +1423,12 @@ const scenarios = [
     // The hazard of a store reset. UbU recognises the events it exported by two things: the applied record,
     // and the Tasks its own event ids map back to. Both are in the store. A new store on a calendar that
     // still holds those events knows neither, so it captures them as if they were someone else's.
+    //
+    // What it captures them AS follows the colour (P1B-55), and export decided the colour: a Static Task
+    // is exported in its category's colour and a Dynamic one with none. So a categorised commitment comes
+    // back as a commitment, pinned, beside whatever still generates it. Dynamic work comes back as Dynamic
+    // work, which is the round trip closing. And a commitment with NO category was exported with no
+    // colour, so it comes back as Dynamic work: the one case the round trip does not close.
     // One day of horizon, so there is one occurrence of the routine and the output can be read.
     async run(first) {
       await first.stop();
@@ -1398,37 +1442,44 @@ const scenarios = [
       };
       const REVIEW = "Synthetic evening review";
       const ERRAND = "Synthetic flexible errand";
+      const BARE = "Synthetic uncategorised appointment";
       const routine = {
         schema_version: endpoints.OBJECTIVE_SCHEMA_VERSION,
         mode: "evergreen",
         title: REVIEW,
         recurrence: { timezone: "UTC", rule: { kind: "daily" } },
-        routine_instance_template: { title: REVIEW, duration_estimate: fixed(30), nominal_start: timeOfDay(3), placement: "static", occupies_capacity: true, tags: [], reminder_minutes: [] }
+        // In a category, so its events are exported in that category's colour.
+        routine_instance_template: { title: REVIEW, duration_estimate: fixed(30), nominal_start: timeOfDay(3), placement: "static", occupies_capacity: true, category_tag: "personal", tags: ["personal"], reminder_minutes: [] }
       };
       const generate = (o) => call(o.base, "POST", endpoints.PLANNING_GENERATE_PATH, { schema_version: endpoints.PLANNING_SCHEMA_VERSION, request: null });
       const counts = (result) => ({ captured: result.captured, updated: result.updated, unchanged: result.unchanged, skipped: result.skipped });
 
-      // ---- 1. the old store: nothing captured, one routine and one Dynamic Task, exported in Mock
+      // ---- 1. the old store: nothing captured; a routine, a Dynamic Task and a commitment with no category, exported in Mock
       let old = await start("old-store", []);
       same(counts(await capture(old)), { captured: 0, updated: 0, unchanged: 0, skipped: 0 }, "on an empty calendar, capture takes nothing");
       await call(old.base, "POST", endpoints.OBJECTIVE_CREATE_PATH, routine, 201);
       const errand = (await captureTask(old, { title: ERRAND, duration_estimate: fixed(30) })).task_id;
+      await captureTask(old, { title: BARE, static_window: { start: at(5), end: at(5, 45) } });
       const oldPlan = await generatePlan(old);
       const occurrence = oldPlan.steps.find((step) => step.summary === REVIEW);
       ok(occurrence?.static_anchor === true, "the Plan holds the routine's occurrence, Static");
       const proposed = await preview(old);
-      same(proposed.operations.map((operation) => [operation.kind, operation.event.summary]).sort(), [["create", REVIEW], ["create", ERRAND]], "the preview creates one event for the occurrence and one for the Dynamic Task");
+      same(
+        proposed.operations.map((operation) => [operation.kind, operation.event.summary, operation.static_anchor, operation.event.color_id]).sort(),
+        [["create", REVIEW, true, "3"], ["create", ERRAND, false, null], ["create", BARE, true, null]],
+        "the preview creates three events: the occurrence in its category's colour, and the Dynamic Task and the uncategorised commitment with none"
+      );
       const approved = await approve(old, proposed.preview_id);
-      same(approved.status, "applied", "the Mock approve applies: UbU now owns two events");
+      same(approved.status, "applied", "the Mock approve applies: UbU now owns three events");
       const exported = approved.applied_events;
       const idOf = Object.fromEntries(exported.map((event) => [event.summary, event.external_id]));
       same(`task_${idOf[ERRAND]}`, errand, "an event UbU exports carries its Task's id: that mapping is how UbU knows its own");
 
       // ---- 2. the calendar holds them, and the store that exported them knows them
       old = await restartObserving(old, exported);
-      same(counts(await capture(old)), { captured: 0, updated: 0, unchanged: 2, skipped: 0 }, "a second capture on the same store takes both as unchanged, not as new");
+      same(counts(await capture(old)), { captured: 0, updated: 0, unchanged: 3, skipped: 0 }, "a second capture on the same store takes all three as unchanged, not as new");
       const oldTasks = await listTasks(old);
-      same(oldTasks.map((task) => task.title).sort(), [REVIEW, ERRAND], "and there are still two Tasks");
+      same(oldTasks.map((task) => [task.title, task.placement]).sort(), [[REVIEW, "static"], [ERRAND, "planned"], [BARE, "static"]], "and there are still three Tasks, placed as they were");
       await old.stop();
 
       // ---- 3. the reset: a new orchestrator on a new store, and the same calendar
@@ -1438,10 +1489,19 @@ const scenarios = [
       // ---- 4. capture: UbU's own events are now foreign
       const taken = await capture(fresh);
       say("what the fresh store captured", { ...counts(taken), diagnostics: taken.diagnostics });
-      same(counts(taken), { captured: 2, updated: 0, unchanged: 0, skipped: 0 }, "the new store captures both of UbU's own events as new");
+      same(counts(taken), { captured: 3, updated: 0, unchanged: 0, skipped: 0 }, "the new store captures all three of UbU's own events as new");
       const copies = await listTasks(fresh);
       say("the Tasks it made", copies.map((task) => ({ title: task.title, task_id: task.task_id, placement: task.placement, is_routine_occurrence: task.is_routine_occurrence })));
-      same(copies.map((task) => [task.title, task.placement]).sort(), [[REVIEW, "static"], [ERRAND, "static"]], "each became a Static Task: a fixed commitment, as any foreign event would");
+      same(
+        copies.map((task) => [task.title, task.placement, task.category_tag ?? null]).sort(),
+        [[REVIEW, "static", "personal"], [ERRAND, "planned", null], [BARE, "planned", null]],
+        "the coloured event is a commitment again, in its category; the Dynamic Task's uncoloured event is Dynamic work again; and the uncategorised commitment, exported with no colour, is Dynamic work too"
+      );
+      same(
+        taken.diagnostics.map((diagnostic) => diagnostic.code),
+        ["capture_colour_absent", "capture_colour_absent"],
+        "capture says of each uncoloured event that it is taken as work for UbU to schedule"
+      );
       for (const copy of copies) {
         const stored = (await readTask(fresh, copy.task_id)).payload;
         same(stored.provenance.source, { source_kind: "google_calendar", source_id: idOf[copy.title] }, `“${copy.title}” is keyed by the Google id of the event UbU exported`);
@@ -1463,17 +1523,19 @@ const scenarios = [
         "the routine's occurrence collides with the copy of itself, and the warning says so"
       );
       const duplicating = await preview(fresh);
-      same(duplicating.operations.map((operation) => [operation.kind, operation.event.summary]), [["create", REVIEW]], "and the next preview would create the review's event a second time: the copy on the calendar is not this store's occurrence");
+      same(duplicating.operations.filter((operation) => operation.kind === "create").map((operation) => operation.event.summary), [REVIEW], "and the next preview would create the review's event a second time: the copy on the calendar is not this store's occurrence");
+      const others = duplicating.operations.filter((operation) => operation.kind !== "create");
+      ok(others.every((operation) => operation.kind === "update" && operation.static_anchor === false && operation.event.color_id === null && [ERRAND, BARE].includes(operation.event.summary)), `every other operation moves Dynamic work to where this store planned it: ${JSON.stringify(others.map((operation) => [operation.kind, operation.event.summary]))}`);
 
       // ---- 6. approve that, and reset once more: the calendar now holds the review twice
       const doubled = await approve(fresh, duplicating.preview_id);
       same(doubled.status, "applied", "the approve applies");
       const calendarNow = [...new Map([...exported, ...doubled.applied_events].map((event) => [event.external_id, event])).values()];
-      same(calendarNow.map((event) => event.summary).sort(), [REVIEW, REVIEW, ERRAND], "the calendar holds three events: the errand, and the review twice at the same time");
+      same(calendarNow.map((event) => event.summary).sort(), [REVIEW, REVIEW, ERRAND, BARE], "the calendar holds four events: the errand, the appointment, and the review twice at the same time");
       await fresh.stop();
       const newer = await start("newer-store", calendarNow);
       const takenAgain = await capture(newer);
-      same(counts(takenAgain), { captured: 3, updated: 0, unchanged: 0, skipped: 0 }, "a third store captures all three as new");
+      same(counts(takenAgain), { captured: 4, updated: 0, unchanged: 0, skipped: 0 }, "a third store captures all four as new");
       const work = (await captureTask(newer, { title: "Synthetic: sort the button jar", duration_estimate: fixed(30) })).task_id;
       const collided = await generate(newer);
       ok(collided.plan !== null && collided.plan !== undefined, "two fixed copies of one event collide, and the Plan is still built: before P1B-54 there was no Plan at all here");
@@ -1489,8 +1551,133 @@ const scenarios = [
       const placedWork = collided.plan.steps.find((step) => step.task_id === work);
       ok(placedWork !== undefined && placedWork.static_anchor === false, "the Dynamic Task is in the Plan");
       ok(placedWork.end <= twinSteps[0].start || placedWork.start >= twinSteps[0].end, `and it is placed outside the span the two copies cover: ${placedWork.start_at} to ${placedWork.end_at}`);
-      return "a store that exported two events recognises them; a new store on the same calendar captures them as foreign Static Tasks, a routine collides with its own copy, and a second reset leaves two copies that collide: the Plan is built each time";
+      return "a store that exported three events recognises them; a new store on the same calendar captures the coloured one as a commitment and the uncoloured ones as Dynamic work, a routine collides with its own copy, and a second reset leaves two copies that collide: the Plan is built each time";
 
+    }
+  },
+  {
+    name: "a colour decides the placement",
+    seeded: true,
+    // P1B-55. At capture an event with no colour is work for UbU to schedule, and an event with any
+    // colour is a commitment at its own time. It is the inverse of export, where a Static Task carries
+    // its category colour and a Dynamic one carries none. Six invented events, one of each kind.
+    async run(first) {
+      await first.stop();
+      const say = (what, value) => console.log(`  ${what}: ${JSON.stringify(value)}`);
+      const plain = (external_id, summary, start, end, color_id) => ({ external_id, summary, start_at: start, end_at: end, color_id, transparent: false, reminders_minutes: [] });
+      const FERN = plain("0inv3nt3dfernrep0t", "Invented: repot the plastic fern", at(4), at(4, 45), null);
+      const JAR = plain("0inv3nt3djars0rt", "Invented: sort the button jar", at(4, 20), at(4, 50), null);
+      const TEA = plain("0inv3nt3dteatasting", "Invented tea tasting", at(6), at(6, 30), "2");
+      const TOUR = plain("0inv3nt3dc0llisi0n", "Invented lighthouse tour", at(7), at(7, 30), "3");
+      const INSTANT = plain("0inv3nt3dinstant", "Invented instant", at(8), at(8), null);
+      // An all-day event, in Google's own shape: a date and no time.
+      const ALL_DAY = { id: "0inv3nt3da11day", summary: "Invented all-day fair", start: { date: at(24).slice(0, 10) }, end: { date: at(48).slice(0, 10) } };
+      const seed = join(first.dir, "mock-calendar-events.json");
+      const start = (events) => {
+        writeFileSync(seed, JSON.stringify(events, null, 2));
+        return startOrchestrator(first.dir, { UBU_CALENDAR_MOCK_EVENTS: seed });
+      };
+      const calendar = (fern = FERN) => [fern, JAR, TEA, TOUR, INSTANT, ALL_DAY];
+      const counts = (result) => ({ captured: result.captured, updated: result.updated, unchanged: result.unchanged, skipped: result.skipped });
+      const absent = (event) => ({ code: "capture_colour_absent", message: `Calendar event \`${event.external_id}\` has no colour, so it is taken as work for UbU to schedule: a Dynamic Task of the event's length, at no fixed time` });
+      const allDay = { code: "capture_all_day_unsupported", message: `list event \`${ALL_DAY.id}\` entry 5: all-day event has no dateTime; it carries no duration, so it cannot be scheduled and is skipped` };
+      const stored = async (o, event) => {
+        for (const task of await listTasks(o)) {
+          const read = await readTask(o, task.task_id);
+          if (read.payload.provenance?.source?.source_id === event.external_id) return { task_id: task.task_id, version: read.version, payload: read.payload };
+        }
+        return undefined;
+      };
+
+      // ---- 1. the seed, and a palette in which colour 3 belongs to two categories
+      let o = await start(calendar());
+      await putSetting(o, "calendar.color.work", "3");
+      const inverse = (await call(o.base, "GET", endpoints.SETTINGS_LIST_PATH)).inverse;
+      same(
+        [TEA, TOUR].map((event) => inverse.find((entry) => entry.color_id === event.color_id)),
+        [{ color_id: "2", categories: ["grocery"], status: "mapped" }, { color_id: "3", categories: ["personal", "work"], status: "collision" }],
+        "colour 2 maps to one category and colour 3 is a collision between two"
+      );
+
+      // ---- 2. capture
+      const captured = await capture(o);
+      say("capture response", captured);
+      same(counts(captured), { captured: 4, updated: 0, unchanged: 0, skipped: 2 }, "four events are captured and two are not");
+      same(
+        captured.diagnostics,
+        [
+          allDay,
+          { code: "capture_colour_ambiguous", message: `Calendar event \`${TOUR.external_id}\` has a colour shared by multiple categories; no category assigned` },
+          absent(FERN),
+          { code: "capture_event_invalid", message: "Calendar event has an unusable title or concrete time span; skipped" },
+          absent(JAR)
+        ],
+        "the all-day event is skipped and says why, the collision colour and the two uncoloured events each say what was done, and the event of no length is refused"
+      );
+      const fern = await stored(o, FERN);
+      const jar = await stored(o, JAR);
+      say("the payload of one Dynamic capture", fern.payload);
+      same(
+        [fern, jar].map((task) => [task.payload.duration_estimate, task.payload.static_window ?? null, task.payload.category_tag ?? null, task.payload.occupies_capacity]),
+        [[{ type: "fixed", seconds: 2_700 }, null, null, true], [{ type: "fixed", seconds: 1_800 }, null, null, true]],
+        "the two overlapping uncoloured events are Dynamic Tasks: each has the event's length as its duration, no static_window and no category"
+      );
+      const tea = await stored(o, TEA);
+      const tour = await stored(o, TOUR);
+      same(
+        [tea, tour].map((task) => [task.payload.static_window, task.payload.category_tag ?? null, task.payload.duration_estimate ?? null]),
+        [[{ start: TEA.start_at, end: TEA.end_at }, "grocery", null], [{ start: TOUR.start_at, end: TOUR.end_at }, null, null]],
+        "the mapped colour is a Static Task in its category, and the collision colour is a Static Task with none"
+      );
+      same([await stored(o, INSTANT), (await listTasks(o)).length], [undefined, 4], "the event of no length made no Task, and neither did the all-day one: four Tasks in all");
+
+      // ---- 3. generate: nothing collides, and the planner chooses the times
+      const planned = await call(o.base, "POST", endpoints.PLANNING_GENERATE_PATH, { schema_version: endpoints.PLANNING_SCHEMA_VERSION, request: null });
+      ok(planned.plan !== null && planned.plan !== undefined, "the Plan is built");
+      same(planned.diagnostics.filter((diagnostic) => ["static_task_collision", "static_tasks_share_committed_time"].includes(diagnostic.code)), [], "two uncoloured events at overlapping times produce no static_task_collision: neither is Static");
+      const stepOf = (task) => planned.plan.steps.find((step) => step.task_id === task.task_id);
+      same([fern, jar].map((task) => stepOf(task)?.static_anchor), [false, false], "both Dynamic Tasks are placed");
+      ok(stepOf(fern).start_at !== FERN.start_at && stepOf(jar).start_at !== JAR.start_at, `each at a time the planner chose and not the time its event was parked at: ${stepOf(fern).start_at} and ${stepOf(jar).start_at}`);
+      ok(stepOf(fern).end <= stepOf(jar).start || stepOf(jar).end <= stepOf(fern).start, "and the two no longer overlap");
+      same([tea, tour].map((task) => [stepOf(task).static_anchor, stepOf(task).start_at]), [[true, TEA.start_at], [true, TOUR.start_at]], "the two commitments are Static, at their own times");
+
+      // ---- 4. preview: the Dynamic captures move, with no colour; the commitments are left alone
+      const proposed = await preview(o);
+      say("preview operations", proposed.operations);
+      same(
+        proposed.operations.map((operation) => ({ kind: operation.kind, static_anchor: operation.static_anchor, external_id: operation.event.external_id, start_at: operation.event.start_at, end_at: operation.event.end_at, color_id: operation.event.color_id })).sort((a, b) => (a.external_id < b.external_id ? -1 : 1)),
+        [fern, jar].map((task, index) => ({ kind: "update", static_anchor: false, external_id: [FERN, JAR][index].external_id, start_at: stepOf(task).start_at, end_at: stepOf(task).end_at, color_id: null })),
+        "the two Dynamic Tasks are update operations carrying their new windows and no colour, and nothing is proposed for the Static ones"
+      );
+
+      // ---- 5. the operator colours one of the uncoloured events
+      await o.stop();
+      o = await start(calendar({ ...FERN, color_id: "2" }));
+      const coloured = await capture(o);
+      same(counts(coloured), { captured: 0, updated: 1, unchanged: 3, skipped: 2 }, "the recoloured event is one update, and the rest are unchanged");
+      const pinned = await stored(o, FERN);
+      say("the same Task after its event was given a colour", pinned.payload);
+      same(
+        { id: pinned.task_id, version: pinned.version, static_window: pinned.payload.static_window, category: pinned.payload.category_tag, duration: pinned.payload.duration_estimate ?? null },
+        { id: fern.task_id, version: fern.version + 1, static_window: { start: FERN.start_at, end: FERN.end_at }, category: "grocery", duration: null },
+        "the same Task is now Static at the event's own time, in the colour's category: its static_window is present and its duration is gone"
+      );
+
+      // ---- 6. and takes the colour away again
+      await o.stop();
+      o = await start(calendar());
+      const uncoloured = await capture(o);
+      same(counts(uncoloured), { captured: 0, updated: 1, unchanged: 3, skipped: 2 }, "the uncoloured event is one update again");
+      same(uncoloured.diagnostics.filter((diagnostic) => diagnostic.code === "capture_colour_absent"), [absent(FERN)], "and capture says it is taken as work for UbU to schedule");
+      const freed = await stored(o, FERN);
+      say("the same Task after its event lost the colour again", freed.payload);
+      same(
+        { id: freed.task_id, version: freed.version, static_window: freed.payload.static_window ?? null, category: freed.payload.category_tag ?? null, duration: freed.payload.duration_estimate },
+        { id: fern.task_id, version: fern.version + 2, static_window: null, category: null, duration: { type: "fixed", seconds: 2_700 } },
+        "it is Dynamic again: the static_window is gone, the category with it, and the duration is the event's length"
+      );
+      same((await listTasks(o)).length, 4, "and through all of it there are still four Tasks");
+      return "uncoloured events become Dynamic Tasks that do not collide and are moved by the preview with no colour; coloured ones stay commitments; an event of no length and an all-day event make no Task; and one Task goes Static and back as its event gains and loses a colour";
     }
   }
 ];

@@ -7,12 +7,20 @@
 //
 // Every title here is invented and says so. This is not the operator's
 // calendar and not an imitation of it. Its SHAPE is realistic: a recurring
-// commitment, coloured one-off events, a routine, a night, a Dynamic backlog
-// with one Task that cannot fit anywhere, a Preference, and category colours.
+// commitment, coloured one-off events, two uncoloured events parked at
+// overlapping times, a routine, a night, a Dynamic backlog with one Task that
+// cannot fit anywhere, a Preference, and category colours.
+//
+// A colour decides the placement (P1B-55). The coloured events are commitments
+// at their own times. The two uncoloured ones are to-dos: capture takes each as
+// Dynamic work of the event's length, and the planner decides when. So the week
+// has two sources of Dynamic work, the backlog and the calendar, as a real one
+// does.
 //
 // The week lives in a timezone, because a night does. Its events are at local
 // wall-clock hours: the routine at noon, the standing commitment at 14:00, the
-// one-off events at 16:00 and 18:00, and Asleep from 23:00 for eight hours.
+// one-off events at 16:00 and 18:00, the two parked to-dos at 17:00 and 17:15,
+// and Asleep from 23:00 for eight hours.
 // The runner stages it in a zone where it is always evening, so every walk is
 // the same walk; the harness stages it in the computer's own zone, so the
 // night on screen is the operator's night.
@@ -104,14 +112,26 @@ export function rehearsalWeek(nowMs, zone) {
   const mapped = event("0inv3nt3dk3tt1edescaling", "Invented kettle descaling appointment", next(16), 30, "3");
   const unmapped = event("0inv3nt3d1ighth0uset0ur", "Invented lighthouse tour", next(18), 60, "1");
 
+  // Two one-off events with no colour, parked at overlapping times as to-dos
+  // are. Capture takes each as Dynamic work: its length is its duration, and
+  // its time is not kept. Being Dynamic, the two do not collide.
+  const parked = [
+    { key: "globe", seconds: 2_700, ...event("0inv3nt3dg10bereturn", "Invented: return the library globe", next(17), 45, null) },
+    { key: "duck", seconds: 1_800, ...event("0inv3nt3dbrassduck", "Invented: polish the brass duck", next(17) + 15 * 60_000, 30, null) }
+  ];
+  /// The event alone, as the mock Calendar holds it.
+  const asEvent = ({ key, seconds, ...rest }) => rest;
+
   return {
     at,
     zone,
     recurring,
     mapped,
     unmapped,
+    /// The uncoloured events, each with a `key` and its length in `seconds`.
+    parked,
     /// What the mock Calendar observes: the file UBU_CALENDAR_MOCK_EVENTS names.
-    calendar: [...recurring, mapped, unmapped],
+    calendar: [...recurring, mapped, unmapped, ...parked.map(asEvent)],
 
     /// calendar.color.* for each category the week uses, stated as Settings
     /// rather than left to the defaults. The fourth frees a colour: every one of
