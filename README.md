@@ -66,6 +66,11 @@ Default devshell checks are offline and egress-free. `scripts/check-all.sh`,
 non-live and with no `GITHUB_TOKEN` in the environment. They use the recording
 fake path and never run the live smoke.
 
+`check-all.sh` and `test-all.sh` do not run the fixture demo unless
+`UBU_RUN_FIXTURE_DEMO=1` is set. The demo has not compiled since before the
+P1B series, and the scenario runner covers what it was for. See
+[docs/fixture-demo.md](docs/fixture-demo.md).
+
 The live smoke is governed by `UBU-D0244` and `UBU-D0245`. The canonical home
 for the recursive live smoke procedure is `ubu-design`'s `README.md`; this
 section mirrors the runnable devshell procedure for the local script.

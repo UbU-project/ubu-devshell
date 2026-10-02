@@ -218,6 +218,24 @@ then one line comparing the two.
 anticipated is written down as a gap, in the ticket's report, and is not
 patched in the scenario. `acceptance.sh` stages the same week for the app.
 
+## The stage this runner replaced
+
+`check-all.sh` and `test-all.sh` ended with a "Fixture demo standing
+diagnostic": `run-fixture-demo.sh`, an end-to-end pass over a seeded store.
+That script builds a smoke binary which calls `queries::admit_object` with
+two arguments. The function takes three. The binary stopped compiling when the
+function gained its envelope parameter, before the P1B series, and both gate
+scripts exited 101 at their last stage on every run until P1B-54.
+
+From P1B-54 the stage is quarantined behind `UBU_RUN_FIXTURE_DEMO=1`, off by
+default. Both scripts print that it did not run and why. With the flag set,
+the stage runs as it always did and fails the same way: the quarantine is a
+decision, not a disguise.
+
+It is not repaired, because this runner is the end-to-end pass now. Each
+scenario here starts the real orchestrator on its own store and walks the
+loop over HTTP, which is what the demo was for.
+
 ## What the runner cannot cover
 
 - **The Tauri HTTP plugin transport.** Requests here are made by Node's

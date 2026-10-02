@@ -2,6 +2,21 @@
 
 The fixture demo is a public-safe dogfooding loop that uses fake data only.
 
+**It does not compile, and it is quarantined.** `scripts/run-fixture-demo.sh`
+line 400 calls `ubu_store`'s `queries::admit_object` with two arguments. The
+function takes three: it gained a `&MutationEnvelope` parameter after this
+script was last touched, in a D19 commit, before the P1B series. The smoke
+binary the demo builds has failed to compile ever since.
+
+`check-all.sh` and `test-all.sh` ran the demo as their last stage, so both
+exited 101 on every run from then until P1B-54. From P1B-54 that stage runs
+only when `UBU_RUN_FIXTURE_DEMO=1` is set. It is off by default. With the
+flag set it runs exactly as before and fails the same way.
+
+The stage is not repaired. What it was for is covered by the scenario runner,
+`scripts/check-ui-contract.sh`; see [CONTRACT_CHECK.md](CONTRACT_CHECK.md).
+The rest of this document describes the demo as it was written.
+
 Current entry point:
 
 ```sh
