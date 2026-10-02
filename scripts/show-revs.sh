@@ -75,14 +75,32 @@ tree_state() {
   fi
 }
 
+# Is the pinned commit on origin? Answered from the remote-tracking refs, which
+# record what origin held at the last fetch or push. Nothing here contacts the
+# network: a pin pushed from another machine shows as NO until `git fetch`.
+#
+# A pin that names a commit origin does not have is a pin nobody else can build.
+# Until P1B-54 this script compared the pin with the local HEAD only, so a pin
+# to a commit on an unpushed branch passed.
+on_origin() {
+  local dir="$1" rev="$2"
+  git -C "$dir" cat-file -e "${rev}^{commit}" 2>/dev/null || { printf 'NO'; return; }
+  if [[ -n "$(git -C "$dir" for-each-ref --contains "$rev" --count=1 refs/remotes/origin 2>/dev/null)" ]]; then
+    printf 'yes'
+  else
+    printf 'NO'
+  fi
+}
+
 mismatch=0
+unpushed=()
 
 printf 'Recorded R_* baseline: post-O20 R_orchestrator, post-GA2 R_adapter, post-S17 R_schemas, post-C12 R_core, post-ST7 R_store\n'
 printf '\n'
-printf '%-24s %-14s %-9s %-19s %-6s %-9s %s\n' \
-  "REPO" "BRANCH" "HEAD" "SIG" "TREE" "PINNED" "STATUS"
-printf '%-24s %-14s %-9s %-19s %-6s %-9s %s\n' \
-  "----" "------" "----" "---" "----" "------" "------"
+printf '%-24s %-14s %-9s %-19s %-6s %-9s %-7s %s\n' \
+  "REPO" "BRANCH" "HEAD" "SIG" "TREE" "PINNED" "ORIGIN" "STATUS"
+printf '%-24s %-14s %-9s %-19s %-6s %-9s %-7s %s\n' \
+  "----" "------" "----" "---" "----" "------" "------" "------"
 
 while read -r name; do
   dir="$REPOS_DIR/$(repo_dir_name "$name")"
@@ -95,8 +113,8 @@ while read -r name; do
     else
       status="unset"
     fi
-    printf '%-24s %-14s %-9s %-19s %-6s %-9s %s\n' \
-      "$name" "-" "missing" "-" "-" "${pinned:0:8}" "$status"
+    printf '%-24s %-14s %-9s %-19s %-6s %-9s %-7s %s\n' \
+      "$name" "-" "missing" "-" "-" "${pinned:0:8}" "-" "$status"
     continue
   fi
 
@@ -118,12 +136,36 @@ while read -r name; do
     mismatch=1
   fi
 
+  # The pin is checked against origin whatever the local HEAD is.
+  origin="-"
+  if [[ -n "$pinned" ]]; then
+    origin="$(on_origin "$dir" "$pinned")"
+    if [[ "$origin" == "NO" ]]; then
+      unpushed+=("$name ${pinned}")
+      mismatch=1
+      if [[ "$status" == "OK" ]]; then
+        status="UNPUSHED"
+      else
+        status="$status, UNPUSHED"
+      fi
+    fi
+  fi
+
   pinned_short="${pinned:0:8}"
-  printf '%-24s %-14s %-9s %-19s %-6s %-9s %s\n' \
-    "$name" "$branch" "$actual" "$sig" "$tree" "${pinned_short:-(unset)}" "$status"
+  printf '%-24s %-14s %-9s %-19s %-6s %-9s %-7s %s\n' \
+    "$name" "$branch" "$actual" "$sig" "$tree" "${pinned_short:-(unset)}" "$origin" "$status"
 done < <(repo_names)
 
+if [[ "${#unpushed[@]}" -gt 0 ]]; then
+  printf '\n'
+  for entry in "${unpushed[@]}"; do
+    printf 'UNPUSHED: the pin for %s, %s, is on no branch of origin as this checkout last saw it.\n' "${entry%% *}" "${entry#* }"
+  done
+  printf 'A pin that names a commit origin does not have is a pin nobody else can build.\n'
+  printf 'Push the branch that holds it, or run git fetch if it was pushed from elsewhere, then run this again.\n'
+fi
+
 if [[ "$mismatch" -ne 0 ]]; then
-  printf '\nWARN: one or more repos have MISSING, MISMATCH, or ERROR status.\n'
+  printf '\nWARN: one or more repos have MISSING, MISMATCH, UNPUSHED, or ERROR status.\n'
   exit 1
 fi

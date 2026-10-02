@@ -35,6 +35,11 @@ REPOS_DIR=/path/to/workspace ./scripts/clone-all.sh
 ./scripts/show-revs.sh
 ```
 
+`show-revs.sh` compares each pin in `pinned-revs.toml` with the local checkout
+and checks that the pinned commit is on a branch of `origin`, from the
+remote-tracking refs and with no network. A pin whose branch was never pushed
+is `UNPUSHED`, and the script exits 1.
+
 `gen-patch-config.sh` writes local-only Cargo patch files into Rust sibling
 repos. Those generated files must be ignored by those sibling repos.
 

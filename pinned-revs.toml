@@ -11,7 +11,8 @@
 #   R_ui           → ubu_ui
 #
 # Leave a value as "" when a repo has not yet landed.
-# show-revs.sh compares these against local checkout HEADs.
+# show-revs.sh compares these against local checkout HEADs, and checks that
+# each pinned commit is on a branch of origin. Push a branch before pinning it.
 
 [pinned]
 ubu_schemas         = "4974166aeaf344c43fed5c8ab10dfa1c9139bb7d"  # R_schemas (P1B-37a A: decomposition Container schemas, schema reference bundling fixed)
@@ -19,7 +20,7 @@ ubu_core            = "c77c0a2d1c3e206b8c18c023bb8b4ee0d06eb2d0"  # R_core (P1B-
 ubu_store           = "7b24cd82d78b70eea9c49f8816778a10b320b8ed"  # R_store (P1B-37a F: Container admission, required limits recorded)
 ubu_planning_kernel = "84b6d0d9b621ca9a9df10034a8f8dc660baaca5d"  # R_planning (P1B-37a E: pinned to the published Container core revision)
 ubu_github_adapter  = "4c7e3b6d31008a3bd64f28c303b8aa01bca3e2a0"  # R_adapter (P1B-37a E: pinned to the published Container core revision)
-ubu_orchestrator    = "9dd15adce018c13e43dfc2d04111080a2f6dce85"  # P1B-53 D: week horizon by default, effects once per Task, completed events frozen, a whole-minute start and one Plan for one minute, static_anchor on the preview; 445 tests, 55 OpenAPI paths
-ubu_ui              = "732ebd2c9808da03004a946345fbb0fdb67fa9c7"  # P1B-53 E: Calendar reads placement from static_anchor, not from the colour; 108 tests, 42 path constants
+ubu_orchestrator    = "38eb28ea2d72fc30e1df6d80e466c3680eb01958"  # P1B-54 B: a Static collision is a warning and the Plan is still built, location retired and sleep on colour 8; 457 tests, 55 OpenAPI paths, no new property
+ubu_ui              = "019c578faf602b1fd3974e37dc58ddf6b5fe28fe"  # P1B-54 B: Today shows start_at and end_at in local time, blocked Tasks in Not in this Plan, and says when fixed commitments collide; 121 tests, 42 path constants
 ubu_design          = "f7c4a1dbe2979fa498ae115bb2ee74e6772d4c2c"  # P1B-41 H: unchanged design baseline; inventory previously unset
 ubu_brand           = "faf2005a8bd9e64742dd76ee6d1f91f45223946b"  # P1B-41 H: unchanged brand baseline; inventory previously unset
