@@ -73,7 +73,7 @@ calendar requests ask for `export_mode: "mock"`.
 | 17 | description | A Task is captured with a multi-line `Q:`/`A:` description and read back byte for byte. A PATCH to a longer narrative reads back exactly; a PATCH of `description` to `null` removes it; a description of blank lines, tabs and non-ASCII text is accepted and returned unchanged. |
 | 18 | time by category | Six Tasks are staged: a Static Task overlapping the range's start, a completed Dynamic Task with an observed window from a coloured event, one with a Fixed estimate and no observed window, one with a stochastic estimate, one with neither, and one with no category. `GET /reports/time-by-category` returns every row with the expected seconds, the `unmeasured` entry with its title, rows in seconds-descending then category-ascending order, the total, an `Uncategorized` row, the seven-day default range, and a 400 `time_by_category_invalid_range` when `from` is after `to`. A Task completed, reopened and completed again contributes its seconds once. |
 | 19 | a realistic week | *Seeded.* The switch rehearsal. One invented week, `scripts/rehearsal-week.mjs`: seven daily instances of a recurring commitment UbU cannot own, two one-off events it can, one with a colour mapped to nothing, a daily routine, an Asleep routine for the night, a Dynamic backlog of six Tasks across three categories with one too long to fit anywhere, a Preference, and `calendar.color.*` Settings. The whole loop is walked on its own store at each of two planning horizons, one day and one week: capture, generate, the no-overlap and night checks, preview, a Mock approve, reconcile, Next Task and a completion, the time-by-category report, and a second full pass. See [the rehearsal](#the-rehearsal). |
-| 20 | a fresh store | *Seeded.* The hazard of a store reset, on three stores and one calendar. A store exports a routine's occurrence in its category's colour, a Dynamic Task with no colour, and a commitment with no category, also with no colour. A second capture on that store takes all three as `unchanged`. **A new store on the same calendar captures all three as new**, each under a new handle, and the colour decides what each becomes: the coloured occurrence is a Static commitment again, the Dynamic Task is Dynamic work again, and **the uncategorised commitment comes back as Dynamic work**. The routine, authored again, collides with its own copy: `routine_occurrence_overlaps_commitment`, and the Plan is built. Its preview creates the event a second time. After an approve and a second reset, the third store captures two coloured copies of one event at one time: **`static_task_collision`, naming both by title and by id, and the Plan is still built**. See [the fresh store](#the-fresh-store). |
+| 20 | a fresh store | *Seeded.* The hazard of a store reset, on four stores and one calendar. A store exports a routine's occurrence in its category's colour, a Dynamic Task with no colour, and a commitment with no category, also with no colour. A second capture on that store takes all three as `unchanged`. **A new store on a calendar that holds them as UbU inserted them, stamped, captures none**: all three are skipped and named once as `capture_stale_export`, and the store holds no Task. **On the same calendar without the stamps**, which is every event from before P1B-57, a new store captures all three as new, each under a new handle, and the colour decides what each becomes: the coloured occurrence is a Static commitment again, the Dynamic Task is Dynamic work again, and the uncategorised commitment comes back as Dynamic work. The routine, authored again, collides with its own copy: `routine_occurrence_overlaps_commitment`, and the Plan is built. Its preview creates the event a second time. After an approve and a second reset, another store captures two coloured copies of one event at one time: `static_task_collision`, naming both by title and by id, and the Plan is still built. See [the fresh store](#the-fresh-store). |
 | 21 | a colour decides the placement | *Seeded.* Six invented events: two uncoloured at overlapping times, one in a colour mapped to one category, one in a colour two categories share, one uncoloured of no length, and one all-day. **Capture** makes the two uncoloured ones Dynamic Tasks with their lengths as durations and no `static_window`, the mapped one Static in its category, the shared-colour one Static with none; it refuses the one of no length with `capture_event_invalid` and skips the all-day one with `capture_all_day_unsupported`. **Generate** emits no `static_task_collision` and places both Dynamic Tasks at times it chose. **Preview** proposes two `update` operations with the new windows and no colour, and nothing for the commitments. One uncoloured event is then given a colour: its Task is Static at the event's own time, with a `static_window`. The colour is removed: the Task is Dynamic again and the `static_window` is gone. See [the colour convention](COLOUR_CONVENTION.md). |
 
 The seeded scenarios first apply a day with no seed, then restart the
@@ -116,6 +116,7 @@ realistic and every title is obviously synthetic:
 |---|---|
 | recurring commitment | seven daily instances at 14:00 local, a week of it, ids shaped `{invented base32hex}_{timestamp}`, coloured for `work` |
 | one-off events | two with ids UbU can own: one at 16:00 coloured for `personal`, one at 18:00 with colour 1, which the Settings leave mapped to nothing |
+| leftover | one event UbU itself wrote in an earlier run, in Google's own shape, carrying UbU's stamp for a Task no store here has. From P1B-57 capture recognises it and makes no Task of it |
 | uncoloured events | two with ids UbU can own and **no colour**, parked at 17:00 for 45 minutes and at 17:15 for 30, so they overlap. From P1B-55 these are to-dos: capture takes each as Dynamic work |
 | routine | one daily Static routine of half an hour at noon, category `personal` |
 | night | an **Asleep** routine: daily, 23:00 local, 480 minutes, Static, occupying capacity, category `sleep` |
@@ -143,8 +144,11 @@ instance beyond the horizon is not seen until the horizon reaches it.
 
 **What is walked, and asserted, on each store:**
 
-1. **capture**: every event inside the horizon is captured and none is
-   skipped; the unowned instances are reported once, in one
+1. **capture**: every event of the operator's inside the horizon is captured.
+   One event is skipped: UbU's own stamped leftover, named once as
+   `capture_stale_export`, by id, on this capture and on every later one. It
+   becomes no Task. Reconciliation does not read the stamp and lists it as
+   foreign; the unowned instances are reported once, in one
    `capture_occupancy_only` that names a single id, or the count and the
    first three; the unmapped colour is diagnosed; no diagnostic carries a
    title; a second capture admits nothing. **A colour decides the
@@ -240,7 +244,22 @@ patched in the scenario. `acceptance.sh` stages the same week for the app.
 
 ## The fresh store
 
-Scenario 20 asserts a hazard instead of describing it.
+Scenario 20 asserts a hazard instead of describing it, and from P1B-57 it
+asserts the cure for it first.
+
+**The cure.** From P1B-57 an insert stamps the event with the Task it was
+minted for, as a private extended property. A new store reading that calendar
+finds an event that names a Task it does not have, and knows it for UbU's own
+echo. It captures nothing from it and reports it once, as
+`capture_stale_export`. The scenario seeds a new store with the old store's
+exports as Google holds them after an insert, and asserts exactly that: three
+skipped, none captured, no Task. The contract for the stamp is
+`ubu-orchestrator/docs/CAPTURE_PROVENANCE.md`.
+
+**The hazard, which remains for every unstamped event.** An event UbU wrote
+before P1B-57 has no stamp, and neither has a copy made by a tool that drops
+private properties. The rest of the scenario seeds the same exports without
+stamps.
 
 UbU knows which calendar events are its own from two things: the applied
 record, and the Tasks its own event ids map back to. **Both are in the
@@ -375,7 +394,7 @@ PASS  7 colour means done: a colour on an applied Dynamic event completes its Ta
 A complete walk ends with twenty-one `PASS` lines, two `SKIP` lines and:
 
 ```text
-RESULT: 21 of 21 scenarios passed, 0 failed, 2 skipped, 387 requests, all to 127.0.0.1
+RESULT: 21 of 21 scenarios passed, 0 failed, 2 skipped, 391 requests, all to 127.0.0.1
 ```
 
 The walk stops at the first failure. The `FAIL` line names the scenario and

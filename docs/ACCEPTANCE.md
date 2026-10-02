@@ -148,6 +148,15 @@ down what the screen said and go on to the next step. Every step is done.**
    acceptance section names the script to run and the document to follow, and
    contains no steps of its own.**
 
+   **An instance of it, from P1B-56.** That ticket's copy-back at step 10 of
+   the live rehearsal asked whether each of three finding names "appears
+   among the findings". Verifying an absence means scanning a list and
+   concluding, which is inference. The operator's answer included "whether it
+   appears among the findings: UNKNOWN", and then every finding pasted in
+   full, which is the form the step should have asked for. P1B-57 changed the
+   copy-back to "every finding's name and severity, in order". A step asks
+   for what is on the screen, never for what is not.
+
    The P1B-53 ticket calls this the fourth rule. It is the fifth here only
    because the P1B-51 ordering rule already holds the fourth place; it is the
    same rule.
@@ -235,7 +244,11 @@ down what the screen said and go on to the next step. Every step is done.**
 A step with no diagnostic to meet says so: its `codes` is `[]` and the
 harness prints `none`.
 
-### The list from P1B-56
+### The list from P1B-56, unchanged by P1B-57
+
+P1B-57 adds no step and retires none. It adds one scenario to the staging,
+`week_leftover`, below: the staged calendar holds an event UbU wrote in an
+earlier run, and the capture must name it and make no Task of it.
 
 One step. The sixth rule retired the three that P1B-55 printed: they passed
 with that ticket, and P1B-56 changes nothing they cover. They are in the
@@ -243,7 +256,7 @@ ledger below. The step that is left is what P1B-56 changed on the screen.
 
 | # | step | kept or new | staged by |
 |---|---|---|---|
-| 1 | The risk report says what it means: Today, “Generate Plan” | new | `week_colours`, `week_calendar`, `week_routine`, `week_night`, `week_backlog`, `week_risk` |
+| 1 | The risk report says what it means: Today, “Generate Plan” | kept: P1B-57 retires nothing | `week_colours`, `week_calendar`, `week_leftover`, `week_routine`, `week_night`, `week_backlog`, `week_risk` |
 
 It reads the badge beside “Plan risk”, the bold names of the findings under
 it, and the three affect rows of “Plan-quality signals”, which on a store
@@ -302,7 +315,7 @@ that nobody takes them for one:
 | dropped | why | what covers it now |
 |---|---|---|
 | step 2, the sentence saying which store was used | there is no longer a choice to state: the step always starts a fresh store | the instruction itself |
-| step 8 as P1B-55 numbered it, the whole instruction: delete UbU's own events from the calendar by hand. It had no copy-back of its own | dropped in P1B-56. It was never run live: the operator declined the hand deletion in the P1B-55 run as too slow. **The hazard it guarded is still real**, and 81 colliding pairs in that run came from it | the calendar reset that replaces it as step 8, and the runner's scenario 20, which asserts the hazard that no live run has. The remedy has moved; the hazard has not gone |
+| step 8 as P1B-55 numbered it, the whole instruction: delete UbU's own events from the calendar by hand. It had no copy-back of its own | dropped in P1B-56. It was never run live: the operator declined the hand deletion in the P1B-55 run as too slow. **The hazard it guarded is still real**, and 81 colliding pairs in that run came from it | the calendar reset that replaces it as step 8, and the runner's scenario 20, which asserts the hazard that no live run has. From P1B-57, also the stamp UbU writes on each event it creates, which lets a new store name its leftovers and capture none, asserted by the harness seed `week_leftover` and by scenarios 19 and 20. **The stamp does not cover events created before it**: those are still indistinguishable from the operator's own, so the reset stays. The remedy has moved; the hazard has not gone |
 | step 10, the sentence saying whether the store was new and what was deleted | the P1B-55 ticket: "the check ran but the hazard was never exercised live". The instruction stays | the runner's scenario 20 asserts the hazard; no live run has |
 | step 11, the titles of commitments that did not come in, and of any title listed twice | it asked the operator to compare two lists and draw a conclusion, which the fifth rule forbids | the capture counters and the grey box, which are still copied back |
 
@@ -350,6 +363,7 @@ what the operator looks at. Every title in it is invented and says so.
 | `week_routine` | one daily routine, at noon | it is listed |
 | `week_night` | the **Asleep** routine: daily, 23:00, 480 minutes, category `sleep` | read back from the store: this computer's timezone, daily, `nominal_start` 23:00:00, 28800 seconds, Static, occupying capacity, category `sleep` |
 | `week_backlog` | six Dynamic Tasks, one too long to fit anywhere, and a Preference | all six are active and Dynamic, and the Preference is listed |
+| `week_leftover` | nothing more: the staged calendar holds one event UbU wrote in an earlier run, carrying its stamp, and `week_calendar` ran the capture | the capture named it once as `capture_stale_export`, by id; no Task was made of it; the Tasks from the calendar are one fewer than its events |
 | `week_risk` | one Plan of the staged week, generated over HTTP | no affect finding; the Plan-quality state is `neutral` and its first suggestion is the stand-in sentence; every coverage boundary is inside the next hour, and no uncovered mass is reported without one; nothing is High except `low_coverage` with a commitment in scope; `unplaced_work` is named |
 
 The week's calendar is a file the mock Calendar observes, written before the

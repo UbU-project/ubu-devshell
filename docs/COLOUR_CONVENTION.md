@@ -86,14 +86,20 @@ means”.
 
 A Static Task with **no category** is exported with no colour. In the store
 that exported it nothing changes: the event is UbU's own and is not captured
-again. But a **new store** reading that calendar sees an uncoloured event and
-takes it as Dynamic work. A commitment made in UbU and given no category does
-not survive a store reset as a commitment.
+again.
 
-The remedy is to give a commitment a category, or to delete UbU's own events
-before capturing into a new store, which
-[the live rehearsal](LIVE_REHEARSAL.md) tells the operator to do. The runner's
-scenario 20 asserts this case.
+A **new store** reading that calendar is the case that matters. From P1B-57
+UbU stamps each event it creates, so a new store knows such an event for UbU's
+own, captures nothing from it and names it as `capture_stale_export`: the
+colour is never read. But an event from before P1B-57 carries no stamp. A new
+store sees an uncoloured event and takes it as Dynamic work, so a commitment
+made in UbU and given no category did not survive a store reset as a
+commitment.
+
+The remedy for unstamped leftovers is to reset the rehearsal calendar before
+capturing into a new store, which [the live rehearsal](LIVE_REHEARSAL.md)
+tells the operator to do. The runner's scenario 20 asserts both cases. The
+stamp is described in `ubu-orchestrator/docs/CAPTURE_PROVENANCE.md`.
 
 ## Where each part is asserted
 

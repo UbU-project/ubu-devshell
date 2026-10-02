@@ -13,11 +13,9 @@ Each step says what to **open**, what to **click** and what to **read**. A
 step asks you to **copy back** only where this run can show something that
 has not already been shown. From P1B-55 a verification that has passed live
 is retired, and recorded in the ledger in [ACCEPTANCE.md](ACCEPTANCE.md).
-This document once asked for fourteen things back. It now asks for seven: the
-six that P1B-55 left, and one that P1B-56 added at step 10, which is that
-ticket's whole acceptance. There are thirteen steps. The steps whose copy-back
-went are still here, as instructions, because the later steps need what they
-set up.
+This document once asked for fourteen things back. It now asks for seven.
+There are thirteen steps. The steps whose copy-back went are still here, as
+instructions, because the later steps need what they set up.
 
 When a step cannot be completed, write down what the screen said and go on to
 the next step.
@@ -44,14 +42,15 @@ will now say what does not fit, which is the question the tool exists to
 answer. The thing to judge is not whether everything fits. It is whether
 **what it chose to schedule is what you would have chosen**.
 
-**The risk report should stop saying high.** Every Plan until P1B-56 arrived
-under a high-risk report, for three reasons that were all defects in the
-report. A coverage figure about the whole week was printed as a statement
-about the next 60 minutes. And an affect state that nobody had recorded was
-reported as exactly at its limit, which added two findings and “depleted”.
-Both are fixed. The prediction this run is checked against: **the risk level
-is medium; “low coverage”, “affect margin” and “post plan depletion” are not
-among the findings; and “unplaced work” is.** Step 10 asks for exactly that.
+**The risk report says what it means.** Every Plan until P1B-56 arrived
+under a high-risk report, for reasons that were defects in the report: a
+coverage figure about the whole week printed as a statement about the next 60
+minutes, and an affect state nobody had recorded reported as exactly at its
+limit. Both were fixed in P1B-56, and its run read medium, with “low
+coverage”, “affect margin” and “post plan depletion” all absent. Step 10
+still asks for the badge and for every finding's name and severity, in the
+order the panel lists them, so that nobody has to scan a list and conclude
+that something is not in it.
 
 ## Before you start
 
@@ -211,8 +210,14 @@ store, and this store is new. On the calendar itself an event UbU wrote in an
 earlier run cannot be told from one of yours, so there is nothing to detect
 and nothing to filter. A calendar that is copied fresh has none.
 
-If the reset was incomplete, this is what you will see, and it is the one
-thing that tells you. What a leftover becomes follows its colour, like any
+From P1B-57 UbU stamps each event it creates, so a later run names those
+events and does not capture them: they appear in the capture's grey box in
+step 9 as `capture_stale_export`, with the count. Events on the calendar from
+before P1B-57 carry no stamp, which is why the reset is still the
+instruction.
+
+If the reset was incomplete, this is what you will see for an unstamped
+leftover, and it is the one thing that tells you. What a leftover becomes follows its colour, like any
 other event. One with a colour is captured as a commitment, beside the
 routine that still generates it: the same title twice on Tasks, and on Today
 a grey box with `routine_occurrence_overlaps_commitment` or
@@ -232,6 +237,9 @@ Read: six counters appear: “captured”, “updated”, “unchanged”, “sk
 - a quiet grey box with the other lines, each with a code in small print:
   - `capture_occupancy_only`: the instances of recurring events, recorded as
     occupied time. It names one id, or a count and the first three;
+  - `capture_stale_export`: events UbU itself created in an earlier run and
+    stamped. Each is left alone and becomes no Task. It names one id, or a
+    count and the first three;
   - `capture_colour_unmapped`, `capture_colour_ambiguous`: a commitment whose
     colour maps to no category, or to several. It is captured at its own
     time with no category;
@@ -266,15 +274,15 @@ Read, in this order:
 
 Then read the panel headed “Plan risk”, above the placements. The badge
 beside the heading reads “low risk”, “medium risk” or “high risk”. Under it,
-each finding has a name in bold, such as “unplaced work”.
+each finding has a name in bold, such as “unplaced work”, and its severity
+on a badge beside the name.
 
 Copy back: the first sentence of any box above “Timed placements”. The
 number of placements carrying the badge “Skeleton”. And the whole section
 “Not in this Plan”, or the words “no such section”.
 
-Copy back, for P1B-56: the words on the badge beside “Plan risk”. And, for
-each of these three names, whether it appears among the findings: “low
-coverage”, “affect margin”, “post plan depletion”.
+Copy back: the words on the badge beside “Plan risk”, and every finding's
+name and severity, in order as the panel lists them.
 
 **11. Take a preview.** Open **Calendar**. Under the heading “1. Preview”,
 click “Take preview”. This calls nothing and writes nothing.
@@ -338,9 +346,8 @@ calendar, at its step 8, so there is nothing to clean up after this one.
 3. From step 10: the first sentence of any box above “Timed placements”, the
    number of “Skeleton” placements, and the whole section “Not in this Plan”
    or the words “no such section”.
-4. From step 10, for P1B-56: the words on the badge beside “Plan risk”, and
-   whether each of “low coverage”, “affect margin” and “post plan depletion”
-   appears among the findings.
+4. From step 10: the words on the badge beside “Plan risk”, and every
+   finding's name and severity, in order.
 5. From step 11: the three counts, and the whole of the first operation
    headed “Update:” that reads “Placement: Dynamic”.
 6. From step 12: the two approval lines, or “I did not approve”.

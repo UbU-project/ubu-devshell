@@ -1068,9 +1068,9 @@ const scenarios = [
         /// What the calendar would hold after an approve: the operator's own events, and what UbU applied.
         const observing = async (running, applied) => {
           await running.stop();
-          return start([...week.recurring, ...applied]);
+          return start([...week.recurring, week.leftover, ...applied]);
         };
-        let o = await start(week.calendar);
+        let o = await start(week.seed);
         const horizonEnd = Date.now() + horizonSeconds * 1000;
         const inHorizon = (event) => Date.parse(event.start_at) < horizonEnd;
         const instances = week.recurring.filter(inHorizon);
@@ -1100,7 +1100,9 @@ const scenarios = [
         };
         const captured = await capture(o);
         say("capture diagnostics", captured.diagnostics);
-        same({ captured: captured.captured, skipped: captured.skipped }, { captured: seen.length, skipped: 0 }, `${tag} every event inside the horizon is captured and none is skipped`);
+        // P1B-57: the one event on the calendar that UbU wrote itself, for a Task this store does not have.
+        const staleLine = { code: "capture_stale_export", message: `Calendar event \`${week.leftover.id}\` was created by UbU for a Task this store does not have, so it is left alone and becomes no Task` };
+        same({ captured: captured.captured, skipped: captured.skipped }, { captured: seen.length, skipped: 1 }, `${tag} every event of the operator's inside the horizon is captured, and the one UbU stamped in an earlier run is skipped`);
         // One line for each event whose colour says something, in id order, and then the occupancy line once.
         // No colour is not a deficiency: the line says the event was taken as work for UbU to schedule.
         const parked = week.parked.filter(inHorizon);
@@ -1111,8 +1113,8 @@ const scenarios = [
             : { code: "capture_colour_unmapped", message: `Calendar event \`${event.external_id}\` has unmapped colour \`${week.unmappedColour}\`; no category assigned; map that colour in Settings to assign a category` };
         same(
           captured.diagnostics,
-          [...[week.unmapped, ...parked].sort((a, b) => (a.external_id < b.external_id ? -1 : 1)).map(colourLine), occupancyOnly(instances)],
-          `${tag} the unmapped colour is diagnosed, each uncoloured event is said to be work for UbU to schedule, and the ${instances.length} unowned instance(s) are reported once, as capture_occupancy_only`
+          [...[week.unmapped, ...parked].sort((a, b) => (a.external_id < b.external_id ? -1 : 1)).map(colourLine), staleLine, occupancyOnly(instances)],
+          `${tag} the unmapped colour is diagnosed, each uncoloured event is said to be work for UbU to schedule, UbU's own leftover is named once as capture_stale_export, and the ${instances.length} unowned instance(s) are reported once, as capture_occupancy_only`
         );
         ok(!JSON.stringify(captured.diagnostics).includes("Invented"), `${tag} no diagnostic carries an event's title`);
         const bySource = {};
@@ -1126,6 +1128,7 @@ const scenarios = [
           }
         }
         same(Object.keys(bySource).sort(), seen.map((event) => event.external_id).sort(), `${tag} each of those events is now exactly one Task, keyed by its Google id`);
+        ok(!(await listTasks(o)).some((task) => task.title === week.leftover.summary) && bySource[week.leftover.id] === undefined, `${tag} the leftover became no Task`);
         // A colour decides the placement: coloured is Static, with the colour's category; uncoloured is Dynamic, with none.
         same(
           seen.map((event) => [bySource[event.external_id].placement, bySource[event.external_id].category_tag ?? null]),
@@ -1143,7 +1146,7 @@ const scenarios = [
         const parkedKey = Object.fromEntries(parked.map((event) => [bySource[event.external_id].task_id, event.key]));
         const originOf = Object.fromEntries(parked.map((event) => [bySource[event.external_id].task_id, event.external_id]));
         const again = await capture(o);
-        same({ captured: again.captured, updated: again.updated, unchanged: again.unchanged, skipped: again.skipped }, { captured: 0, updated: 0, unchanged: seen.length, skipped: 0 }, `${tag} a second capture admits nothing new`);
+        same({ captured: again.captured, updated: again.updated, unchanged: again.unchanged, skipped: again.skipped }, { captured: 0, updated: 0, unchanged: seen.length, skipped: 1 }, `${tag} a second capture admits nothing new, and skips the leftover again`);
 
         // ---- 2. generate: every backlog Task is placed or named as unplaced
         const generate = async () => {
@@ -1345,10 +1348,11 @@ const scenarios = [
 
         // ---- 6. reconcile: the unowned events are foreign and nothing else drifts
         o = await observing(o, settled.applied_events);
-        const foreignOnly = instances.map((event) => ["foreign", event.external_id]);
+        // Reconciliation does not read the stamp: the leftover is foreign there, like the unowned instances.
+        const foreignOnly = [...instances.map((event) => event.external_id), week.leftover.id].sort().map((id) => ["foreign", id]);
         const reconciled = await reconcile(o);
         say("reconcile conflicts", reconciled.conflicts);
-        same(reconciled.conflicts.map((conflict) => [conflict.conflict_type, conflict.external_id]), foreignOnly, `${tag} the only conflicts are the unowned instances, and each is foreign`);
+        same(reconciled.conflicts.map((conflict) => [conflict.conflict_type, conflict.external_id]), foreignOnly, `${tag} the only conflicts are the unowned instances and UbU's leftover, and each is foreign`);
         same(reconciled.status, "observed", `${tag} reconcile reports an observation, not drift`);
         same([...new Set(reconciled.diagnostics.map((diagnostic) => diagnostic.code))], ["capture_event_not_ownable"], `${tag} and still says why UbU cannot own them`);
 
@@ -1392,8 +1396,8 @@ const scenarios = [
         // ---- 9. repeat: a second full pass over the same store
         const before = (await listTasks(o)).length;
         const recaptured = await capture(o);
-        same({ captured: recaptured.captured, skipped: recaptured.skipped }, { captured: 0, skipped: 0 }, `${tag} [repeat] capture admits nothing`);
-        same(recaptured.diagnostics, [occupancyOnly(instances)], `${tag} [repeat] and still says, once, which events it does not own`);
+        same({ captured: recaptured.captured, skipped: recaptured.skipped }, { captured: 0, skipped: 1 }, `${tag} [repeat] capture admits nothing, and the leftover is the one skip`);
+        same(recaptured.diagnostics, [staleLine, occupancyOnly(instances)], `${tag} [repeat] and still says, once each, which event is UbU's own leftover and which events it does not own`);
         same((await listTasks(o)).length, before, `${tag} [repeat] no Task was created`);
         const replanned = await generate();
         const second = partition(replanned, week.backlog.map((task) => task.key).filter((key) => key !== done.key));
@@ -1417,7 +1421,7 @@ const scenarios = [
         ok(reapproved.applied_events.some((event) => event.external_id === completedEvent), `${tag} [repeat] and the completed Task's event is still in the applied record`);
         same((await preview(o)).operations, [], `${tag} [repeat] a preview straight after it proposes nothing`);
         o = await observing(o, reapproved.applied_events);
-        same((await reconcile(o)).conflicts.map((conflict) => [conflict.conflict_type, conflict.external_id]), foreignOnly, `${tag} [repeat] reconcile is unchanged: the unowned instances, foreign, and no drift`);
+        same((await reconcile(o)).conflicts.map((conflict) => [conflict.conflict_type, conflict.external_id]), foreignOnly, `${tag} [repeat] reconcile is unchanged: the unowned instances and the leftover, foreign, and no drift`);
         same((await report()).categories, rows, `${tag} [repeat] the report is unchanged: nothing was counted twice`);
         await o.stop();
         return { instances: instances.length, captured: seen.length, occurrences: occurrences.length, nights: nights.length, placed, unplaced, reason: fence.reason, planningDiagnostics: planned.diagnostics.map((diagnostic) => diagnostic.code), generateMs, placements: steps.length, total: body.total_seconds };
@@ -1440,9 +1444,11 @@ const scenarios = [
   {
     name: "a fresh store",
     seeded: true,
-    // The hazard of a store reset. UbU recognises the events it exported by two things: the applied record,
-    // and the Tasks its own event ids map back to. Both are in the store. A new store on a calendar that
-    // still holds those events knows neither, so it captures them as if they were someone else's.
+    // The hazard of a store reset. UbU recognises the events it exported by two things in the store: the
+    // applied record, and the Tasks its own event ids map back to. A new store has neither. From P1B-57
+    // there is a third thing, on the calendar itself: the stamp an insert writes. With it a new store
+    // knows the events for UbU's own and captures none. Without it, which is every event from before
+    // P1B-57, it captures them as if they were someone else's.
     //
     // What it captures them AS follows the colour (P1B-55), and export decided the colour: a Static Task
     // is exported in its category's colour and a Dynamic one with none. So a categorised commitment comes
@@ -1502,14 +1508,42 @@ const scenarios = [
       same(oldTasks.map((task) => [task.title, task.placement]).sort(), [[REVIEW, "static"], [ERRAND, "planned"], [BARE, "static"]], "and there are still three Tasks, placed as they were");
       await old.stop();
 
-      // ---- 3. the reset: a new orchestrator on a new store, and the same calendar
+      // ---- 3. the reset, as it is from P1B-57: the calendar holds what UbU inserted, stamped
+      // An insert writes the Task it mints the event for as a private extended property. A new
+      // store reads that stamp, sees that it has no such Task, and knows the event for UbU's own.
+      const asInserted = (event) => ({
+        id: event.external_id,
+        summary: event.summary,
+        start: { dateTime: event.start_at },
+        end: { dateTime: event.end_at },
+        ...(event.color_id ? { colorId: event.color_id } : {}),
+        transparency: event.transparent ? "transparent" : "opaque",
+        reminders: { useDefault: false, overrides: event.reminders_minutes.map((minutes) => ({ method: "popup", minutes })) },
+        extendedProperties: { private: { ubu_task: event.task_id } }
+      });
+      const knowing = await start("stamped-store", exported.map(asInserted));
+      const recognised = await capture(knowing);
+      say("what a fresh store makes of stamped events", { ...counts(recognised), diagnostics: recognised.diagnostics });
+      same(counts(recognised), { captured: 0, updated: 0, unchanged: 0, skipped: 3 }, "a new store captures none of UbU's stamped events: all three are skipped");
+      same(
+        recognised.diagnostics,
+        [{ code: "capture_stale_export", message: `3 Calendar events were created by UbU for Tasks this store does not have, so each is left alone and becomes no Task: ${exported.map((event) => `\`${event.external_id}\``).sort().join(", ")}` }],
+        "and it names them once, as capture_stale_export, by id"
+      );
+      same(await listTasks(knowing), [], "so the new store holds no Task, and nothing collides with anything");
+      await knowing.stop();
+
+      // ---- 3b. the same reset on a calendar whose events carry no stamp
+      // Every event UbU wrote before P1B-57 is like this, and so is a copy made by a tool that
+      // drops private properties. Without a stamp a leftover cannot be told from the operator's
+      // own event, and the rest of this scenario is what follows.
       const fresh = await start("new-store", exported);
       same(await listTasks(fresh), [], "the new store holds no Task");
 
       // ---- 4. capture: UbU's own events are now foreign
       const taken = await capture(fresh);
       say("what the fresh store captured", { ...counts(taken), diagnostics: taken.diagnostics });
-      same(counts(taken), { captured: 3, updated: 0, unchanged: 0, skipped: 0 }, "the new store captures all three of UbU's own events as new");
+      same(counts(taken), { captured: 3, updated: 0, unchanged: 0, skipped: 0 }, "with no stamp to go by, the new store captures all three of UbU's own events as new");
       const copies = await listTasks(fresh);
       say("the Tasks it made", copies.map((task) => ({ title: task.title, task_id: task.task_id, placement: task.placement, is_routine_occurrence: task.is_routine_occurrence })));
       same(
@@ -1571,7 +1605,7 @@ const scenarios = [
       const placedWork = collided.plan.steps.find((step) => step.task_id === work);
       ok(placedWork !== undefined && placedWork.static_anchor === false, "the Dynamic Task is in the Plan");
       ok(placedWork.end <= twinSteps[0].start || placedWork.start >= twinSteps[0].end, `and it is placed outside the span the two copies cover: ${placedWork.start_at} to ${placedWork.end_at}`);
-      return "a store that exported three events recognises them; a new store on the same calendar captures the coloured one as a commitment and the uncoloured ones as Dynamic work, a routine collides with its own copy, and a second reset leaves two copies that collide: the Plan is built each time";
+      return "a store that exported three events recognises them; a new store recognises them too when they carry UbU's stamp, and captures none; without the stamp it captures the coloured one as a commitment and the uncoloured ones as Dynamic work, a routine collides with its own copy, and a second reset leaves two copies that collide: the Plan is built each time";
 
     }
   },

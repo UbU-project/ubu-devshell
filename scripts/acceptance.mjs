@@ -134,8 +134,9 @@ const SEEDS = {
     async check(made) {
       const seen = week.calendar.filter(inHorizon);
       const instances = week.recurring.filter(inHorizon);
-      if (made.captured !== seen.length || made.skipped !== 0) {
-        throw new StagingFailure(`capture took ${made.captured} and skipped ${made.skipped} of the ${seen.length} events inside the horizon: ${JSON.stringify(made.diagnostics)}`);
+      // The one skip is UbU's own leftover, which `week_leftover` checks.
+      if (made.captured !== seen.length || made.skipped !== 1) {
+        throw new StagingFailure(`capture took ${made.captured} and skipped ${made.skipped} of the ${seen.length} events of the operator's inside the horizon, where one skip was expected: ${JSON.stringify(made.diagnostics)}`);
       }
       const bySource = {};
       for (const summary of await listTasks("active")) {
@@ -240,6 +241,38 @@ const SEEDS = {
       return `${week.backlog.length} Dynamic Tasks, among them “${week.backlog.find((task) => task.tooLong).title}” at 30 hours; “${title(week.preference.before)}” is preferred to “${title(week.preference.after)}”`;
     }
   },
+  // ---- P1B-57: one scenario at the HTTP layer, on this staged store. The staged calendar holds
+  // one event that UbU wrote in an earlier run, stamped with the Task it was minted for. No Task
+  // here has that id. Capture must recognise it as UbU's own, make no Task of it, and say so.
+  week_leftover: {
+    what: "one event on the staged calendar that UbU itself wrote in an earlier run, carrying UbU's stamp: capture makes no Task of it and names it once",
+    // Nothing more to stage: the event is in the calendar file, and `week_calendar` ran the capture.
+    async make() {
+      return null;
+    },
+    async check() {
+      const captured = staged.week_calendar.made;
+      const stale = captured.diagnostics.filter((diagnostic) => diagnostic.code === "capture_stale_export");
+      const expected = `Calendar event \`${week.leftover.id}\` was created by UbU for a Task this store does not have, so it is left alone and becomes no Task`;
+      if (stale.length !== 1 || stale[0].message !== expected) {
+        throw new StagingFailure(`capture did not name UbU's leftover once, as capture_stale_export: ${JSON.stringify(captured.diagnostics)}`);
+      }
+      // One fewer Task than the calendar has events: the leftover is the difference.
+      const fromCalendar = [];
+      for (const summary of await listTasks("active")) {
+        const source = (await readTask(summary.task_id)).payload.provenance?.source;
+        if (source?.source_kind === "google_calendar") fromCalendar.push(source.source_id);
+      }
+      const onCalendar = week.seed.filter((entry) => Date.parse(entry.start_at ?? entry.start.dateTime) < Date.now() + HORIZON_SECONDS * 1000).length;
+      if (fromCalendar.includes(week.leftover.id) || fromCalendar.length !== onCalendar - 1) {
+        throw new StagingFailure(`the leftover was not the one event left out: ${fromCalendar.length} Task(s) from ${onCalendar} event(s) on the calendar`);
+      }
+      if ((await listTasks("active")).some((task) => task.title === week.leftover.summary)) {
+        throw new StagingFailure("a Task was made from UbU's own leftover");
+      }
+      return `“${week.leftover.summary}” (${week.leftover.id}) is on the staged calendar with UbU's stamp; capture took ${fromCalendar.length} of the ${onCalendar} events, skipped ${captured.skipped}, and named it as capture_stale_export`;
+    }
+  },
   // ---- P1B-56: two scenarios at the HTTP layer, on this staged store. One Plan is generated
   // here, last, so that every other seed is in it. The operator generates another in the step.
   week_risk: {
@@ -316,7 +349,7 @@ const T = {
 // and the Plan-quality rows of a Plan made with no Snapshot.
 const STEPS = [
   {
-    needs: ["week_colours", "week_calendar", "week_routine", "week_night", "week_backlog", "week_risk"],
+    needs: ["week_colours", "week_calendar", "week_leftover", "week_routine", "week_night", "week_backlog", "week_risk"],
     name: "The risk report says what it means",
     open: "Today, in the navigation.",
     click: "The button “Generate Plan”.",
@@ -348,7 +381,7 @@ let child = null;
 async function startOrchestrator(dir) {
   mkdirSync(dir, { recursive: true });
   const calendarFile = join(dir, "mock-calendar-events.json");
-  writeFileSync(calendarFile, JSON.stringify(week.calendar, null, 2));
+  writeFileSync(calendarFile, JSON.stringify(week.seed, null, 2));
   const log = openSync(join(dir, "orchestrator.log"), "a");
   child = spawn(binary, [], {
     cwd: dir,

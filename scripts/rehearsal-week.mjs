@@ -8,8 +8,9 @@
 // Every title here is invented and says so. This is not the operator's
 // calendar and not an imitation of it. Its SHAPE is realistic: a recurring
 // commitment, coloured one-off events, two uncoloured events parked at
-// overlapping times, a routine, a night, a Dynamic backlog with one Task that
-// cannot fit anywhere, a Preference, and category colours.
+// overlapping times, one leftover that UbU itself wrote in an earlier run, a
+// routine, a night, a Dynamic backlog with one Task that cannot fit anywhere,
+// a Preference, and category colours.
 //
 // A colour decides the placement (P1B-55). The coloured events are commitments
 // at their own times. The two uncoloured ones are to-dos: capture takes each as
@@ -122,6 +123,23 @@ export function rehearsalWeek(nowMs, zone) {
   /// The event alone, as the mock Calendar holds it.
   const asEvent = ({ key, seconds, ...rest }) => rest;
 
+  // One event UbU wrote in an earlier run, for a Task no store here has: a
+  // leftover. It is in Google's own shape, because it carries the stamp UbU
+  // writes when it creates an event (P1B-57): a private extended property
+  // naming the Task whose handle the event id is. Capture recognises it as
+  // UbU's own echo. It becomes no Task, and the capture says so once.
+  const LEFTOVER_ID = "0inv3nt3d1eft0verfr0manear1ierrun";
+  const leftoverStart = next(19);
+  const leftover = {
+    id: LEFTOVER_ID,
+    summary: "Invented leftover from an earlier run",
+    start: { dateTime: iso(leftoverStart) },
+    end: { dateTime: iso(leftoverStart + 30 * 60_000) },
+    colorId: "3",
+    reminders: { useDefault: false, overrides: [] },
+    extendedProperties: { private: { ubu_task: `task_${LEFTOVER_ID}` } }
+  };
+
   return {
     at,
     zone,
@@ -130,8 +148,13 @@ export function rehearsalWeek(nowMs, zone) {
     unmapped,
     /// The uncoloured events, each with a `key` and its length in `seconds`.
     parked,
-    /// What the mock Calendar observes: the file UBU_CALENDAR_MOCK_EVENTS names.
+    /// The operator's own events: everything capture should take.
     calendar: [...recurring, mapped, unmapped, ...parked.map(asEvent)],
+    /// UbU's stamped leftover, which capture should not take.
+    leftover,
+    /// What the mock Calendar observes: the file UBU_CALENDAR_MOCK_EVENTS names.
+    /// The operator's events, and the leftover among them.
+    seed: [...recurring, mapped, unmapped, ...parked.map(asEvent), leftover],
 
     /// calendar.color.* for each category the week uses, stated as Settings
     /// rather than left to the defaults. The fourth frees a colour: every one of
