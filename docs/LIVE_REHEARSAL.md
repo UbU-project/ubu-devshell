@@ -13,9 +13,11 @@ Each step says what to **open**, what to **click** and what to **read**. A
 step asks you to **copy back** only where this run can show something that
 has not already been shown. From P1B-55 a verification that has passed live
 is retired, and recorded in the ledger in [ACCEPTANCE.md](ACCEPTANCE.md).
-This document asked for fourteen things back. It now asks for six. The steps
-whose copy-back went are still here, as instructions, because the later steps
-need what they set up.
+This document once asked for fourteen things back. It now asks for seven: the
+six that P1B-55 left, and one that P1B-56 added at step 10, which is that
+ticket's whole acceptance. There are thirteen steps. The steps whose copy-back
+went are still here, as instructions, because the later steps need what they
+set up.
 
 When a step cannot be completed, write down what the screen said and go on to
 the next step.
@@ -41,6 +43,15 @@ Today will be long. Until now UbU could only show a week of fixed blocks. It
 will now say what does not fit, which is the question the tool exists to
 answer. The thing to judge is not whether everything fits. It is whether
 **what it chose to schedule is what you would have chosen**.
+
+**The risk report should stop saying high.** Every Plan until P1B-56 arrived
+under a high-risk report, for three reasons that were all defects in the
+report. A coverage figure about the whole week was printed as a statement
+about the next 60 minutes. And an affect state that nobody had recorded was
+reported as exactly at its limit, which added two findings and “depleted”.
+Both are fixed. The prediction this run is checked against: **the risk level
+is medium; “low coverage”, “affect margin” and “post plan depletion” are not
+among the findings; and “unplaced work” is.** Step 10 asks for exactly that.
 
 ## Before you start
 
@@ -186,21 +197,28 @@ Nothing reached Google before this step. From here, on the screen
 “Calendar”: “Run capture” and “Run reconciliation” READ your calendar, and
 “Approve preview” WRITES to it.
 
-**8. Delete UbU's own events from the calendar.** This store is new. First
-delete from the calendar every event UbU created in an earlier run. UbU
-recognises its own events from the store; a new store does not know them, so
-it will capture them as if they were yours, and a routine that still
-generates them will collide with the copy.
+**8. Reset the rehearsal calendar.** When capture runs, the calendar UbU
+reads must hold **your events, and nothing UbU wrote**. Get it there by
+copying: reconstitute the rehearsal calendar from your own calendar, with the
+tooling you already use for that copy. Do not pick UbU's leftovers out of it
+by hand.
 
-In Google Calendar, delete every event an earlier “Approve preview” created
-in the coming week: each night “Asleep”, each occurrence of a routine, and
-each Task UbU placed. Leave your own events.
+The copy carries your colours, so make it after step 6. If you colour events
+on the rehearsal calendar and not on your own, make the copy before step 6.
 
-What a leftover becomes follows its colour, like any other event. One with a
-colour is captured as a commitment, beside the routine that still generates
-it: the same title twice on Tasks, and on Today a grey box with
-`routine_occurrence_overlaps_commitment` or `static_task_collision`. One with
-no colour is captured as work to schedule: a to-do you did not write.
+Why a reset and not a clean-up: UbU knows which events it wrote only from its
+store, and this store is new. On the calendar itself an event UbU wrote in an
+earlier run cannot be told from one of yours, so there is nothing to detect
+and nothing to filter. A calendar that is copied fresh has none.
+
+If the reset was incomplete, this is what you will see, and it is the one
+thing that tells you. What a leftover becomes follows its colour, like any
+other event. One with a colour is captured as a commitment, beside the
+routine that still generates it: the same title twice on Tasks, and on Today
+a grey box with `routine_occurrence_overlaps_commitment` or
+`static_task_collision`. One with no colour is captured as work to schedule: a
+to-do you did not write. Leftovers are what put 81 colliding pairs in the last
+run.
 
 **9. Capture.** Open **Calendar**. Under the heading “3. Capture”, click
 “Run capture”.
@@ -235,8 +253,8 @@ Read, in this order:
   quiet grey box is something that happened. A red box is a failure. A box
   that begins “N pairs of fixed commitments overlap” is about commitments of
   yours that are double-booked: both are in the Plan, and their time is busy.
-  There were 66 such pairs last time. Pairs of uncoloured events are no
-  longer among them;
+  There were 81 such pairs last time, many of them between an event and a
+  leftover copy of itself. On a reset calendar there should be fewer;
 - under “Timed placements”, the titles and the two times beside each. Your
   coloured events, your routines and “Asleep” carry the badge “Static
   anchor”. **Your uncoloured events carry the badge “Skeleton”, and the times
@@ -246,9 +264,17 @@ Read, in this order:
   be done. This time it will be long, and it is the most useful thing on the
   screen: it is what the week cannot hold.
 
+Then read the panel headed “Plan risk”, above the placements. The badge
+beside the heading reads “low risk”, “medium risk” or “high risk”. Under it,
+each finding has a name in bold, such as “unplaced work”.
+
 Copy back: the first sentence of any box above “Timed placements”. The
 number of placements carrying the badge “Skeleton”. And the whole section
 “Not in this Plan”, or the words “no such section”.
+
+Copy back, for P1B-56: the words on the badge beside “Plan risk”. And, for
+each of these three names, whether it appears among the findings: “low
+coverage”, “affect margin”, “post plan depletion”.
 
 **11. Take a preview.** Open **Calendar**. Under the heading “1. Preview”,
 click “Take preview”. This calls nothing and writes nothing.
@@ -300,9 +326,8 @@ Copy back: those two lines. Or the words “I did not approve”.
 `/tmp/ubu-live-rehearsal.db` is a rehearsal store and can be left or removed.
 
 If you approved, the calendar now holds what that store created and moved.
-The next store will not know those events. Before the next rehearsal, do
-step 8 again: delete the nights and routine occurrences this run created.
-The to-dos it moved are your own events and stay, where UbU put them.
+The next store will not know those events. The next run begins from a reset
+calendar, at its step 8, so there is nothing to clean up after this one.
 
 ## What to copy back, in order
 
@@ -313,9 +338,12 @@ The to-dos it moved are your own events and stay, where UbU put them.
 3. From step 10: the first sentence of any box above “Timed placements”, the
    number of “Skeleton” placements, and the whole section “Not in this Plan”
    or the words “no such section”.
-4. From step 11: the three counts, and the whole of the first operation
+4. From step 10, for P1B-56: the words on the badge beside “Plan risk”, and
+   whether each of “low coverage”, “affect margin” and “post plan depletion”
+   appears among the findings.
+5. From step 11: the three counts, and the whole of the first operation
    headed “Update:” that reads “Placement: Dynamic”.
-5. From step 12: the two approval lines, or “I did not approve”.
-6. And one answer, in your own words: is what it chose to schedule what you
+6. From step 12: the two approval lines, or “I did not approve”.
+7. And one answer, in your own words: is what it chose to schedule what you
    would have chosen, and is this a store you would plan tomorrow on? If
    not, what is missing?

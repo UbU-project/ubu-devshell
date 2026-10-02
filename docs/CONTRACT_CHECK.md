@@ -269,7 +269,11 @@ back as Dynamic work. That is the one case the round trip does not close; see
 
 The remedy is the operator's, and it is step 8 of
 [the live rehearsal](LIVE_REHEARSAL.md): before capturing into a new store,
-delete from the calendar the events an earlier store created.
+reset the rehearsal calendar by copying it afresh from the operator's own, so
+that it holds nothing an earlier store wrote. Until P1B-56 that step asked for
+the leftovers to be deleted by hand, which the operator declined as too slow.
+The hazard itself is unchanged. An event UbU wrote cannot be told from one of
+the operator's after the fact, so there is nothing to detect.
 
 ## The stage this runner replaced
 
