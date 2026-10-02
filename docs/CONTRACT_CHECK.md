@@ -1,7 +1,7 @@
 # The scenario runner
 
 `scripts/check-ui-contract.sh` builds the real `ubu-orchestrator` and walks
-the daily loop against it over HTTP, in twenty-one scenarios. It needs no
+the daily loop against it over HTTP, in twenty-two scenarios. It needs no
 webview, no Google account and no model. A full walk takes about ten seconds
 once the orchestrator is built.
 
@@ -46,7 +46,7 @@ at that time:
 
 Those two assertions are still scenario 1, and still run first.
 
-## The twenty-one scenarios
+## The twenty-two scenarios
 
 Every scenario starts its own orchestrator on its own ephemeral loopback
 port with its own empty store. Nothing is carried from one to the next. All
@@ -75,6 +75,7 @@ calendar requests ask for `export_mode: "mock"`.
 | 19 | a realistic week | *Seeded.* The switch rehearsal. One invented week, `scripts/rehearsal-week.mjs`: seven daily instances of a recurring commitment UbU cannot own, two one-off events it can, one with a colour mapped to nothing, a daily routine, an Asleep routine for the night, a Dynamic backlog of six Tasks across three categories with one too long to fit anywhere, a Preference, and `calendar.color.*` Settings. The whole loop is walked on its own store at each of two planning horizons, one day and one week: capture, generate, the no-overlap and night checks, preview, a Mock approve, reconcile, Next Task and a completion, the time-by-category report, and a second full pass. See [the rehearsal](#the-rehearsal). |
 | 20 | a fresh store | *Seeded.* The hazard of a store reset, on four stores and one calendar. A store exports a routine's occurrence in its category's colour, a Dynamic Task with no colour, and a commitment with no category, also with no colour. A second capture on that store takes all three as `unchanged`. **A new store on a calendar that holds them as UbU inserted them, stamped, captures none**: all three are skipped and named once as `capture_stale_export`, and the store holds no Task. **On the same calendar without the stamps**, which is every event from before P1B-57, a new store captures all three as new, each under a new handle, and the colour decides what each becomes: the coloured occurrence is a Static commitment again, the Dynamic Task is Dynamic work again, and the uncategorised commitment comes back as Dynamic work. The routine, authored again, collides with its own copy: `routine_occurrence_overlaps_commitment`, and the Plan is built. Its preview creates the event a second time. After an approve and a second reset, another store captures two coloured copies of one event at one time: `static_task_collision`, naming both by title and by id, and the Plan is still built. See [the fresh store](#the-fresh-store). |
 | 21 | a colour decides the placement | *Seeded.* Six invented events: two uncoloured at overlapping times, one in a colour mapped to one category, one in a colour two categories share, one uncoloured of no length, and one all-day. **Capture** makes the two uncoloured ones Dynamic Tasks with their lengths as durations and no `static_window`, the mapped one Static in its category, the shared-colour one Static with none; it refuses the one of no length with `capture_event_invalid` and skips the all-day one with `capture_all_day_unsupported`. **Generate** emits no `static_task_collision` and places both Dynamic Tasks at times it chose. **Preview** proposes two `update` operations with the new windows and no colour, and nothing for the commitments. One uncoloured event is then given a colour: its Task is Static at the event's own time, with a `static_window`. The colour is removed: the Task is Dynamic again and the `static_window` is gone. See [the colour convention](COLOUR_CONVENTION.md). |
+| 22 | the UniverseState screen | What the screen “UniverseState” does, request for request, in the body `editUniverseState` sends. On a new store `GET /universe-state` answers the empty state: a null `version` and all four collections present and empty, and reading stores nothing. A Task is captured with a precondition on an invented fact and is in `blocked_tasks`. **Set**: `set_fact` through `PATCH /universe-state` answers with the fact under its key at version 2, the seed being version 1; a later read is exactly what the edit answered with; and the Task is blocked no longer. **Numbers** move by a difference, up with `increment_numeric` from nothing and down with `decrement_numeric`, one version each. **Sets** hold the text and the number as themselves, a member is removed as the value it is, and a set that loses its last member is gone. **Refusals**: five lists that each hold a good mutation and then a bad one, a malformed target, an unknown operation, a `clear_fact` with a payload, a list as a set member and a numeric operation on a fact, are each refused 400 `universe_mutation_invalid` naming mutation 1; an empty list is refused `universe_mutations_empty`; and after all six the state is what it was, version included. **Clear**: `clear_fact` with no payload removes the fact and the Task is blocked again. Nothing the screen does appends an event marker. `ubu-ui` authors no precondition; the Task route accepts one, and that is the only body here the app does not send. |
 
 The seeded scenarios first apply a day with no seed, then restart the
 orchestrator on the same store with a fixture built from the events that
@@ -391,10 +392,10 @@ scenario 7 of 16: colour means done (seeded mock calendar)
 PASS  7 colour means done: a colour on an applied Dynamic event completes its Task at capture, and only that Task
 ```
 
-A complete walk ends with twenty-one `PASS` lines, two `SKIP` lines and:
+A complete walk ends with twenty-two `PASS` lines, two `SKIP` lines and:
 
 ```text
-RESULT: 21 of 21 scenarios passed, 0 failed, 2 skipped, 391 requests, all to 127.0.0.1
+RESULT: 22 of 22 scenarios passed, 0 failed, 2 skipped, 416 requests, all to 127.0.0.1
 ```
 
 The walk stops at the first failure. The `FAIL` line names the scenario and
@@ -420,7 +421,7 @@ Two scripts, one boundary.
 | | `check-ui-contract.sh` | `acceptance.sh` |
 |---|---|---|
 | Covers | The HTTP layer: what the orchestrator does with a request. | The rendered layer: what a human sees in the app. |
-| Asserts | Everything it checks, in twenty-one scenarios, each on its own store. | Nothing about behaviour. It stages a store and prints steps. |
+| Asserts | Everything it checks, in twenty-two scenarios, each on its own store. | Nothing about behaviour. It stages a store and prints steps. |
 | Store | One throwaway store per scenario, and two for the rehearsal, on ephemeral ports. | One throwaway store on the app's default port, held until Ctrl-C. |
 | Preconditions | Each scenario stages exactly what it asserts. | Each step declares the seeds it needs; each seed checks itself over HTTP. |
 | A human | Reads PASS and FAIL lines. | Opens the app and follows the steps. |

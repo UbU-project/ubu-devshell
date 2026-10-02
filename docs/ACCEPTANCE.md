@@ -157,6 +157,35 @@ down what the screen said and go on to the next step. Every step is done.**
    copy-back to "every finding's name and severity, in order". A step asks
    for what is on the screen, never for what is not.
 
+   **A second instance, from P1B-57, where the instrument broke the rule and
+   not the operator.** Step 11 of the live rehearsal asked for "the number of
+   operations headed “Create:”, the number headed “Update:”, the number
+   headed “Delete:”". The Preview panel showed one card for each operation
+   and no count anywhere. The step asked the operator to tally what the
+   screen never summarised. With some ninety operations the answer was "MANY
+   (too many to visually count)", in two runs in a row. P1B-58 made the
+   screen summarise it, in one line above the cards, “Operations proposed: N.
+   Create N, update N, delete N.”, and reworded the copy-back to that line.
+   A step asks for a line to read. When the line does not exist, the fix is
+   to the screen, and the step follows it.
+
+   **A third, also from P1B-57.** Step 9 asked for "every line in the grey
+   box, each sentence with its code". The uncoloured events are not in the
+   grey box: the screen counts them in one sentence and lists them under it.
+   But each of those lines carries a code too, so with the list open the
+   instruction read as though it covered them, and 85 of them came back.
+   Nothing on the screen was wrong. P1B-58 reworded the copy-back to name the
+   three things wanted and to say that the list under the sentence is not
+   one of them. A copy-back says what is not wanted when something beside it
+   looks like what is.
+
+   **A copy-back never asks for a private value.** The step P1B-58 added, for
+   the screen “UniverseState”, asks for one line: the names of the four
+   collections and a count for each. A UniverseState holds facts about the
+   operator's own life. No step may ask for a value, a key or a row from that
+   screen, and the step says so in its own text so that a later edit does not
+   widen it.
+
    The P1B-53 ticket calls this the fourth rule. It is the fifth here only
    because the P1B-51 ordering rule already holds the fourth place; it is the
    same rule.
@@ -244,11 +273,20 @@ down what the screen said and go on to the next step. Every step is done.**
 A step with no diagnostic to meet says so: its `codes` is `[]` and the
 harness prints `none`.
 
-### The list from P1B-56, unchanged by P1B-57
+### The list from P1B-56, unchanged by P1B-57 and by P1B-58
 
 P1B-57 adds no step and retires none. It adds one scenario to the staging,
 `week_leftover`, below: the staged calendar holds an event UbU wrote in an
 earlier run, and the capture must name it and make no Task of it.
+
+P1B-58 adds no step here and retires none. It adds one scenario to the
+staging, `week_universe`, below: the staged store's UniverseState is read,
+one invented fact is set and read back, and a malformed mutation is refused
+with the state left as it was. The step names the seed so that it is checked
+before the step is printed. The step itself reads nothing from the
+UniverseState, and no staged Task waits on the fact. The new screen's step is
+in the live rehearsal, as its step 13. The staged store does hold that one
+invented fact, so the screen “UniverseState” in the staged app is not empty.
 
 One step. The sixth rule retired the three that P1B-55 printed: they passed
 with that ticket, and P1B-56 changes nothing they cover. They are in the
@@ -256,7 +294,7 @@ ledger below. The step that is left is what P1B-56 changed on the screen.
 
 | # | step | kept or new | staged by |
 |---|---|---|---|
-| 1 | The risk report says what it means: Today, “Generate Plan” | kept: P1B-57 retires nothing | `week_colours`, `week_calendar`, `week_leftover`, `week_routine`, `week_night`, `week_backlog`, `week_risk` |
+| 1 | The risk report says what it means: Today, “Generate Plan” | kept: P1B-57 and P1B-58 retire nothing | `week_colours`, `week_calendar`, `week_leftover`, `week_routine`, `week_night`, `week_backlog`, `week_universe`, `week_risk` |
 
 It reads the badge beside “Plan risk”, the bold names of the findings under
 it, and the three affect rows of “Plan-quality signals”, which on a store
@@ -364,6 +402,7 @@ what the operator looks at. Every title in it is invented and says so.
 | `week_night` | the **Asleep** routine: daily, 23:00, 480 minutes, category `sleep` | read back from the store: this computer's timezone, daily, `nominal_start` 23:00:00, 28800 seconds, Static, occupying capacity, category `sleep` |
 | `week_backlog` | six Dynamic Tasks, one too long to fit anywhere, and a Preference | all six are active and Dynamic, and the Preference is listed |
 | `week_leftover` | nothing more: the staged calendar holds one event UbU wrote in an earlier run, carrying its stamp, and `week_calendar` ran the capture | the capture named it once as `capture_stale_export`, by id; no Task was made of it; the Tasks from the calendar are one fewer than its events |
+| `week_universe` | one invented fact, `facts.invented.kettle_descaled`, set through `PATCH /universe-state` on a store that had no UniverseState | before the edit the read answered the empty state with a null version; the edit answered with the one fact at version 2; a later read is exactly what the edit answered with; a malformed mutation sent behind a good one is refused as `universe_mutation_invalid`; and after the refusal the state is unchanged |
 | `week_risk` | one Plan of the staged week, generated over HTTP | no affect finding; the Plan-quality state is `neutral` and its first suggestion is the stand-in sentence; every coverage boundary is inside the next hour, and no uncovered mass is reported without one; nothing is High except `low_coverage` with a commitment in scope; `unplaced_work` is named |
 
 The week's calendar is a file the mock Calendar observes, written before the

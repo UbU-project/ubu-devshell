@@ -1733,6 +1733,85 @@ const scenarios = [
       same((await listTasks(o)).length, 4, "and through all of it there are still four Tasks");
       return "uncoloured events become Dynamic Tasks that do not collide and are moved by the preview with no colour; coloured ones stay commitments; an event of no length and an all-day event make no Task; and one Task goes Static and back as its event gains and loses a colour";
     }
+  },
+  {
+    // P1B-58: the UniverseState screen, at the HTTP layer. Every request here is one the screen
+    // makes, in the body `editUniverseState` sends, except the Task's precondition: ubu-ui authors
+    // none, and the Task route accepts one. Every fact is invented.
+    name: "the UniverseState screen",
+    async run(o) {
+      const read = () => call(o.base, "GET", endpoints.UNIVERSE_STATE_PATH);
+      const edit = (mutations, expect = 200) =>
+        call(o.base, "PATCH", endpoints.UNIVERSE_STATE_PATH, { schema_version: endpoints.UNIVERSE_STATE_SCHEMA_VERSION, mutations }, expect);
+      const COLLECTIONS = ["facts", "numeric_values", "set_memberships", "event_markers"];
+      const collections = (state) => Object.fromEntries(COLLECTIONS.map((name) => [name, state[name]]));
+      const blockedIds = async () =>
+        ((await call(o.base, "POST", endpoints.PLANNING_GENERATE_PATH, { schema_version: endpoints.PLANNING_SCHEMA_VERSION, request: null })).blocked_tasks ?? []).map(
+          (task) => task.task_id
+        );
+
+      // Entry on a new store: the empty state, with nothing stored.
+      const empty = await read();
+      same(empty.schema_version, endpoints.UNIVERSE_STATE_SCHEMA_VERSION, "the read answers the schema version ubu-ui sends on an edit");
+      same(empty.version, null, "a new store has no UniverseState, and the read says so with a null version");
+      same(collections(empty), { facts: {}, numeric_values: {}, set_memberships: {}, event_markers: {} }, "all four collections are present, and empty");
+      same((await read()).version, null, "reading again stored nothing");
+
+      // A Task that waits on a fact. Today shows it as not ready, and links here.
+      const fact = "facts.invented.kettle_descaled";
+      const waiting = await captureTask(o, {
+        title: "Synthetic: make the invented tea",
+        duration_estimate: fixed(20),
+        preconditions: { target: fact, predicate: "equals", expected: true }
+      });
+      await captureTask(o, { title: "Synthetic: rinse the invented cup", duration_estimate: fixed(10) });
+      same(await blockedIds(), [waiting.task_id], "with nothing recorded, the Task that waits on the fact is blocked");
+
+      // Set the fact, as the screen's “Set fact” does. The first edit creates the state.
+      const set = await edit([{ operation: "set_fact", target: fact, payload: true }]);
+      same({ version: set.version, facts: set.facts }, { version: 2, facts: { "invented.kettle_descaled": true } }, "the first edit seeds version 1 and answers with version 2, the fact under its key");
+      same(await read(), set, "a later entry reads exactly what the edit answered with");
+      same(await blockedIds(), [], "and the Task is blocked no longer");
+
+      // A number is set by sending the difference: up, then down.
+      const jars = "numeric_values.invented.jars";
+      same((await edit([{ operation: "increment_numeric", target: jars, payload: 5 }])).numeric_values, { "invented.jars": 5 }, "a number that is not there counts from zero");
+      const lowered = await edit([{ operation: "decrement_numeric", target: jars, payload: 3.5 }]);
+      same({ version: lowered.version, numbers: lowered.numeric_values }, { version: 4, numbers: { "invented.jars": 1.5 } }, "the difference down lands on the value asked for, and each edit is one version");
+
+      // A set: members are added and removed as the values they are.
+      const toolbox = "set_memberships.invented.toolbox";
+      await edit([{ operation: "add_membership", target: toolbox, payload: "spanner" }]);
+      const two = await edit([{ operation: "add_membership", target: toolbox, payload: 7 }]);
+      same([...two.set_memberships["invented.toolbox"]].sort(), [7, "spanner"], "a set holds the text and the number as themselves");
+      const one = await edit([{ operation: "remove_membership", target: toolbox, payload: 7 }]);
+      same(one.set_memberships, { "invented.toolbox": ["spanner"] }, "the number is removed as the number");
+      same((await edit([{ operation: "remove_membership", target: toolbox, payload: "spanner" }])).set_memberships, {}, "a set that loses its last member is gone");
+
+      // A refusal changes nothing: not the bad mutation, and not a good one sent with it.
+      const before = await read();
+      const good = { operation: "set_fact", target: "facts.invented.cup_rinsed", payload: true };
+      const refusals = [
+        [{ operation: "set_fact", target: "facts.invented..descaled", payload: true }, "mutation 1: malformed target `facts.invented..descaled`"],
+        [{ operation: "polish_fact", target: fact, payload: true }, "mutation 1: unknown operation `polish_fact`"],
+        [{ operation: "clear_fact", target: fact, payload: true }, "mutation 1: clear_fact does not accept a payload"],
+        [{ operation: "add_membership", target: toolbox, payload: ["spanner"] }, "mutation 1: payload must be a JSON scalar"],
+        [{ operation: "increment_numeric", target: fact, payload: 1 }, "mutation 1: operation target must be in the numeric_values collection"]
+      ];
+      for (const [bad, message] of refusals) {
+        const refused = await edit([good, bad], 400);
+        same(refused.diagnostics, [{ code: "universe_mutation_invalid", message }], `a list holding ${bad.operation} on ${bad.target} is refused whole`);
+      }
+      same((await edit([], 400)).diagnostics[0].code, "universe_mutations_empty", "an edit of nothing is refused");
+      same(await read(), before, "after six refusals the state is what it was, version and all");
+
+      // Clear the fact, as the screen's “Clear” does: no payload. The Task waits again.
+      const cleared = await edit([{ operation: "clear_fact", target: fact }]);
+      same({ version: cleared.version, facts: cleared.facts }, { version: before.version + 1, facts: {} }, "the clear is the next version, and the fact is gone");
+      same(await blockedIds(), [waiting.task_id], "and the Task is blocked again");
+      same(collections(await read()).event_markers, {}, "nothing the screen does appends an event marker");
+      return "a new store reads as the empty state; a fact set over PATCH /universe-state unblocks the Task that waits on it and clearing it blocks it again; numbers move by a difference; set members come and go; and six refused edits change nothing";
+    }
   }
 ];
 

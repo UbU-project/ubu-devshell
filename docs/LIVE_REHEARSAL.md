@@ -13,8 +13,8 @@ Each step says what to **open**, what to **click** and what to **read**. A
 step asks you to **copy back** only where this run can show something that
 has not already been shown. From P1B-55 a verification that has passed live
 is retired, and recorded in the ledger in [ACCEPTANCE.md](ACCEPTANCE.md).
-This document once asked for fourteen things back. It now asks for seven.
-There are thirteen steps. The steps whose copy-back went are still here, as
+This document once asked for fourteen things back. It now asks for eight.
+There are fourteen steps. The steps whose copy-back went are still here, as
 instructions, because the later steps need what they set up.
 
 When a step cannot be completed, write down what the screen said and go on to
@@ -51,6 +51,17 @@ coverage”, “affect margin” and “post plan depletion” all absent. Step 
 still asks for the badge and for every finding's name and severity, in the
 order the panel lists them, so that nobody has to scan a list and conclude
 that something is not in it.
+
+**The preview counts itself.** Until P1B-58 step 11 asked for three counts
+that no screen showed, and a preview of ninety operations could only be
+tallied by eye. The Preview panel now says the counts in one line, and step
+11 asks for that line.
+
+**What a Task can wait for has a screen.** A Task can ask that something be
+true before UbU will plan it. From P1B-58 the screen “UniverseState” shows
+what is recorded, and step 13 opens it. This run records nothing there, so on
+this store it will say that nothing is recorded yet. That is the expected
+reading and not a fault.
 
 ## Before you start
 
@@ -247,9 +258,17 @@ Read: six counters appear: “captured”, “updated”, “unchanged”, “sk
   - `calendar_event_skipped`, `capture_event_invalid`: an event that was not
     captured, and why.
 
-Copy back: the six counters with their numbers; the sentence that begins “N
-events had no colour.”; and every line in the grey box, each sentence with
-its code. The list of uncoloured events itself is not needed.
+Copy back three things, and only these:
+
+- the six counters with their numbers;
+- the sentence that begins “N events had no colour.”;
+- every line in the grey box, each sentence with its code.
+
+**Do not copy back the list under that sentence.** The lines there, one for
+each uncoloured event, are not in the grey box and are not wanted, whether
+they are showing or behind “The N events with no colour”. Each of them also
+carries a code, `capture_colour_absent`. That code is not one of the grey
+box's.
 
 ## Plan
 
@@ -287,7 +306,9 @@ name and severity, in order as the panel lists them.
 **11. Take a preview.** Open **Calendar**. Under the heading “1. Preview”,
 click “Take preview”. This calls nothing and writes nothing.
 
-Read: one operation for each event UbU would write.
+Read: above the operations, one line: “Operations proposed: N. Create N,
+update N, delete N.” The first number is the total. Then one operation for
+each event UbU would write.
 
 - An operation headed “Update:” that reads “Placement: Dynamic” is one of
   your uncoloured events. Its “Window:” line is the time UbU chose for it, in
@@ -301,9 +322,9 @@ Read: one operation for each event UbU would write.
   Busy event on your calendar. That is deliberate.
 - No operation is proposed for an instance of a recurring event.
 
-Copy back: the number of operations headed “Create:”, the number headed
-“Update:”, the number headed “Delete:”, and the whole of the first operation
-headed “Update:” that reads “Placement: Dynamic”.
+Copy back: the line that begins “Operations proposed:”, exactly as it
+appears, and the whole of the first operation headed “Update:” that reads
+“Placement: Dynamic”. Do not count the operations yourself.
 
 **12. Decide whether to approve. Read this before you press it.**
 
@@ -328,9 +349,37 @@ run: N of N”.
 
 Copy back: those two lines. Or the words “I did not approve”.
 
+## What a Task can wait for
+
+**13. Read the UniverseState.** Open **UniverseState**, in the navigation
+between “Routines” and “Review”. Click nothing on it.
+
+Read, in this order:
+
+- the heading “UniverseState”, and under it a sentence that begins “A Task
+  can ask that something be true before UbU will plan it.”;
+- in the first panel, the sentence that begins “Nothing is recorded here
+  yet.” This store is new, and nothing in this run records anything here, so
+  that is what it should say;
+- under it, one line that begins “Entries:”. It names the four collections,
+  `facts`, `numeric_values`, `set_memberships` and `event_markers`, each
+  followed by how many entries it holds. On this store each number is 0;
+- four panels headed “Facts”, “Numbers”, “Sets” and “Event markers”, reading
+  “No facts.”, “No numbers.”, “No sets.” and “No event markers.”
+
+Copy back: the line that begins “Entries:”, exactly as it appears. If any
+of its numbers is not 0, copy the line back all the same.
+
+**That line, and nothing else from this screen.** It holds the names of the
+collections and a count for each, and no value. A UniverseState is where
+facts about your own life are recorded: health, money, your household. No
+step in this document asks for a value from this screen, a key from it or
+any row of its tables, and none ever may. Anyone who edits this step must
+leave that as it is.
+
 ## Finish
 
-**13. Stop.** In the first terminal, press Ctrl-C. The store at
+**14. Stop.** In the first terminal, press Ctrl-C. The store at
 `/tmp/ubu-live-rehearsal.db` is a rehearsal store and can be left or removed.
 
 If you approved, the calendar now holds what that store created and moved.
@@ -342,15 +391,17 @@ calendar, at its step 8, so there is nothing to clean up after this one.
 1. From step 5: every row of the table “Colour to category at capture”.
 2. From step 9: the six counters with their numbers, the sentence that
    begins “N events had no colour.”, and every line in the grey box with its
-   code.
+   code. Not the list of uncoloured events under that sentence.
 3. From step 10: the first sentence of any box above “Timed placements”, the
    number of “Skeleton” placements, and the whole section “Not in this Plan”
    or the words “no such section”.
 4. From step 10: the words on the badge beside “Plan risk”, and every
    finding's name and severity, in order.
-5. From step 11: the three counts, and the whole of the first operation
-   headed “Update:” that reads “Placement: Dynamic”.
+5. From step 11: the line that begins “Operations proposed:”, and the whole
+   of the first operation headed “Update:” that reads “Placement: Dynamic”.
 6. From step 12: the two approval lines, or “I did not approve”.
-7. And one answer, in your own words: is what it chose to schedule what you
+7. From step 13: the line that begins “Entries:”. The names and the counts
+   only, never a value.
+8. And one answer, in your own words: is what it chose to schedule what you
    would have chosen, and is this a store you would plan tomorrow on? If
    not, what is missing?

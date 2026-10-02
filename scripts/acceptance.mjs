@@ -95,6 +95,8 @@ const inHorizon = (event) => Date.parse(event.start_at) < Date.now() + HORIZON_S
 const REACTIVE_HORIZON_SECONDS = 3_600;
 const captureCalendar = () =>
   call("POST", endpoints.CALENDAR_CAPTURE_PATH, { schema_version: endpoints.CALENDAR_CAPTURE_SCHEMA_VERSION, export_mode: "mock" });
+// The one fact the harness records in the staged UniverseState. Invented, and nothing waits on it.
+const UNIVERSE_FACT_KEY = "invented.kettle_descaled";
 // What every seed made and how its check described it, for the step titles.
 const staged = {};
 
@@ -273,6 +275,57 @@ const SEEDS = {
       return `“${week.leftover.summary}” (${week.leftover.id}) is on the staged calendar with UbU's stamp; capture took ${fromCalendar.length} of the ${onCalendar} events, skipped ${captured.skipped}, and named it as capture_stale_export`;
     }
   },
+  // ---- P1B-58: one scenario at the HTTP layer, on this staged store. The UniverseState is read,
+  // one invented fact is set, it is read back changed, and a malformed mutation is refused with the
+  // state left as it was. No staged Task waits on the fact, so the Plan below is not changed by it.
+  week_universe: {
+    what: "the staged store's UniverseState, read and edited over HTTP: one invented fact is set and read back, and a malformed mutation is refused and changes nothing",
+    async make() {
+      const before = await call("GET", endpoints.UNIVERSE_STATE_PATH);
+      const written = await call("PATCH", endpoints.UNIVERSE_STATE_PATH, {
+        schema_version: endpoints.UNIVERSE_STATE_SCHEMA_VERSION,
+        mutations: [{ operation: "set_fact", target: `facts.${UNIVERSE_FACT_KEY}`, payload: true }]
+      });
+      return { before, written };
+    },
+    async check({ before, written }) {
+      const collections = (state) => JSON.stringify(["facts", "numeric_values", "set_memberships", "event_markers"].map((name) => state[name]));
+      // Read: a staged store has no UniverseState until this seed makes one.
+      if (before.version !== null || collections(before) !== JSON.stringify([{}, {}, {}, {}])) {
+        throw new StagingFailure(`the staged store held a UniverseState before this seed set anything: ${JSON.stringify(before)}`);
+      }
+      // Set: the edit answered with the fact, at the version after the seed.
+      if (written.version !== 2 || written.facts[UNIVERSE_FACT_KEY] !== true || Object.keys(written.facts).length !== 1) {
+        throw new StagingFailure(`the set_fact did not answer with the one fact at version 2: ${JSON.stringify(written)}`);
+      }
+      // Read back changed: a later read is what the edit answered with.
+      const after = await call("GET", endpoints.UNIVERSE_STATE_PATH);
+      if (JSON.stringify(after) !== JSON.stringify(written)) {
+        throw new StagingFailure(`the UniverseState read back is not what the edit answered with: ${JSON.stringify(after)}`);
+      }
+      // Refused: a malformed mutation, behind a good one, and the state is unchanged.
+      const refused = await call(
+        "PATCH",
+        endpoints.UNIVERSE_STATE_PATH,
+        {
+          schema_version: endpoints.UNIVERSE_STATE_SCHEMA_VERSION,
+          mutations: [
+            { operation: "set_fact", target: "facts.invented.cup_rinsed", payload: true },
+            { operation: "set_fact", target: "facts.invented..kettle", payload: true }
+          ]
+        },
+        400
+      );
+      if (refused.diagnostics?.[0]?.code !== "universe_mutation_invalid") {
+        throw new StagingFailure(`a malformed mutation was not refused as universe_mutation_invalid: ${JSON.stringify(refused)}`);
+      }
+      const still = await call("GET", endpoints.UNIVERSE_STATE_PATH);
+      if (JSON.stringify(still) !== JSON.stringify(after)) {
+        throw new StagingFailure(`a refused edit changed the UniverseState: ${JSON.stringify(still)}`);
+      }
+      return `the UniverseState is at version ${still.version} and holds one invented fact, facts.${UNIVERSE_FACT_KEY}, set over HTTP and read back; a malformed mutation sent behind a good one was refused as universe_mutation_invalid and neither was applied`;
+    }
+  },
   // ---- P1B-56: two scenarios at the HTTP layer, on this staged store. One Plan is generated
   // here, last, so that every other seed is in it. The operator generates another in the step.
   week_risk: {
@@ -347,9 +400,11 @@ const T = {
 // P1B-55 left, which passed with that ticket and which P1B-56 does not touch; each has a line in the
 // ledger in docs/ACCEPTANCE.md. What is left is what P1B-56 changed on the screen: the risk report,
 // and the Plan-quality rows of a Plan made with no Snapshot.
+// P1B-57 and P1B-58 add no step and retire none. Each adds one seed that is an HTTP scenario,
+// `week_leftover` and `week_universe`, and the step names both so that they are checked before it is printed.
 const STEPS = [
   {
-    needs: ["week_colours", "week_calendar", "week_leftover", "week_routine", "week_night", "week_backlog", "week_risk"],
+    needs: ["week_colours", "week_calendar", "week_leftover", "week_routine", "week_night", "week_backlog", "week_universe", "week_risk"],
     name: "The risk report says what it means",
     open: "Today, in the navigation.",
     click: "The button “Generate Plan”.",
