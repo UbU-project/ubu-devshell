@@ -117,18 +117,20 @@ export function rehearsalWeek(nowMs, zone) {
     /// rather than left to the defaults. The fourth frees a colour: every one of
     /// Google's eleven is mapped by default, so a colour is only ever unmapped
     /// after the operator has moved a category off it. It moves onto 5, not 8:
-    /// colour 8 is kept as the default palette has it, with `location` alone,
-    /// so that what `sleepColour` does to it can be seen.
+    /// colour 8 is kept as the default palette has it, with `sleep` alone.
     settings: [
       ["calendar.color.work", "9"],
       ["calendar.color.personal", "3"],
       ["calendar.color.grocery", "2"],
       ["calendar.color.entertainment", "5"]
     ],
-    /// Graphite. Not one of the week's Settings: `sleep` is a category of its
-    /// own, and its colour is the operator's choice. The default palette gives
-    /// colour 8 to `location`, so setting this makes Graphite a collision.
-    sleepColour: { setting: "calendar.color.sleep", colour: "8", sharedWith: "location" },
+    /// Graphite. From P1B-54 the default palette gives colour 8 to `sleep`, so
+    /// the night needs no Setting: it exports in Graphite, and a real Graphite
+    /// event is captured as `sleep`. `setting` is how the operator would choose
+    /// another colour, and `other` is one to try. `retired` is the category
+    /// that held colour 8 until P1B-54: an operator's own Setting for it is
+    /// still honoured, and on colour 8 it shares Graphite with `sleep`.
+    sleepColour: { setting: "calendar.color.sleep", colour: "8", other: "10", retired: { setting: "calendar.color.location", category: "location" } },
     categoryOfColour: { 9: "work", 3: "personal", 2: "grocery" },
     unmappedColour: "1",
 

@@ -179,7 +179,7 @@ harness prints `none`.
 | 4 | Complete, then undo: Next Task | no | `completable` |
 | 5 | A Plan with one Task that did not fit: Today, “Generate Plan” | no | `week_calendar`, `week_routine`, `week_night`, `week_backlog` |
 | 6 | The preview, and where the night is: Calendar, “Take preview” | no | `week_calendar`, `week_colours` |
-| 7 | Sleep's colour, and what it collides with: Setup, “Reload colours” | no | `week_night`, `week_sleep_colour` |
+| 7 | Sleep's colour, with no Setting: Setup, “Reload colours” | no | `week_night`, `week_sleep_colour` |
 | 8 | Clarify, with the selector left alone: Review, “Run Clarify” | **yes** | `interview`, `described`, `advisory` |
 | 9 | Clarify again, with the Task chosen: Review, “Run Clarify” | **yes** | `interview`, `advisory` |
 
@@ -195,11 +195,13 @@ work is placed in the night and that no preview names an event UbU does not
 own are asserted by the runner's rehearsal scenario. What is left for a human
 is how Today, Calendar and Setup show it.
 
-**Step 5 tells the operator not to read the dates and times on Today.** They
-are wrong on that screen: `ubu-ui` formats a placement's Unix seconds as if
-they were minutes. That is a defect found while writing these steps, written
-down in the P1B-53 report and not fixed there. The true times are on
-Calendar, in each operation's “Window:” line, which step 6 reads.
+**Step 5 is where the operator reads the times.** Today shows each
+placement's start and end in the operator's own timezone, and names the
+timezone above the placements. The night is staged at 23:00 to 07:00 in that
+zone, so each “Asleep” placement reads 11:00 PM and, the next day, 7:00 AM.
+Step 6 reads the same instants on Calendar, in each operation's “Window:”
+line, in UTC. Until P1B-54 Today formatted a placement's Unix seconds as if
+they were minutes, and this step told the operator not to read them.
 
 ## The staged week
 
@@ -214,7 +216,7 @@ what the operator looks at. Every title in it is invented and says so.
 | `week_calendar` | the week's calendar, captured in Mock | every event inside the horizon is one Static Task with its colour's category; the unowned instances were reported once, as one `capture_occupancy_only`; a second capture admits nothing |
 | `week_routine` | one daily routine, at noon | it is listed |
 | `week_night` | the **Asleep** routine: daily, 23:00, 480 minutes, category `sleep` | read back from the store: this computer's timezone, daily, `nominal_start` 23:00:00, 28800 seconds, Static, occupying capacity, category `sleep` |
-| `week_sleep_colour` | `calendar.color.sleep = "8"`, the operator's own Setting | the palette has it as a Setting, and the inverse table reports colour 8 as a `collision` between `location` and `sleep` |
+| `week_sleep_colour` | nothing: the default palette is checked as it stands | `sleep` is on colour 8 with origin `default`, `location` is not in the palette, and the inverse table reports colour 8 as `mapped` with `sleep` alone |
 | `week_backlog` | six Dynamic Tasks, one too long to fit anywhere, and a Preference | all six are active and Dynamic, and the Preference is listed |
 
 The week's calendar is a file the mock Calendar observes, written before the

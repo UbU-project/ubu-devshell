@@ -1198,16 +1198,16 @@ const scenarios = [
         const desired = proposed.events.map((event) => event.task_id);
         ok(owned.every((id) => desired.includes(id)), `${tag} both events UbU can own are in the desired set`);
         ok(placed.every((key) => desired.includes(ids[key])) && occurrences.every((step) => desired.includes(step.task_id)), `${tag} so is every placed Task and every routine occurrence`);
-        // The night is exported, as a Busy block. With calendar.color.sleep unset it has no colour. On record, not a surprise.
+        // The night is exported, as a Busy block, in Graphite. No Setting says so: `sleep` holds colour 8 in the default palette.
         const nightEvents = (previewed) => nights.map((night) => previewed.events.find((event) => event.task_id === night.task_id));
         same(
           nightEvents(proposed).map((event) => [event?.summary, event?.color_id, event?.transparent]),
-          nights.map(() => [week.asleep.title, null, false]),
-          `${tag} with calendar.color.sleep unset, each Asleep occurrence is a desired event with no colour and transparent false: a Busy block`
+          nights.map(() => [week.asleep.title, week.sleepColour.colour, false]),
+          `${tag} with ${week.sleepColour.setting} unset, each Asleep occurrence is a desired event in colour ${week.sleepColour.colour}, the default for sleep, and transparent false: a Busy block`
         );
         // P1B-53: the preview says what the placement is, and does not leave it to the colour.
         const placementOf = (taskId) => proposed.operations.find((operation) => operation.event?.task_id === taskId)?.static_anchor;
-        same(nights.map((night) => placementOf(night.task_id)), nights.map(() => true), `${tag} each of them is created as Static, though it has no colour`);
+        same(nights.map((night) => placementOf(night.task_id)), nights.map(() => true), `${tag} each of them is created as Static, which the preview says and no colour implies`);
         same(placed.map((key) => placementOf(ids[key])), placed.map(() => false), `${tag} and every placed backlog Task is created as Dynamic`);
         same(
           nights.map((night) => proposed.operations.filter((operation) => operation.kind === "create" && operation.event.task_id === night.task_id).length),
@@ -1225,18 +1225,31 @@ const scenarios = [
           `${tag} the preview reports each unowned step as calendar_event_id_unmappable, and nothing else`
         );
 
-        // ---- sleep is a category; its colour is the operator's own Setting, and Graphite collides
+        // ---- sleep is a category of the default palette, and Graphite is its alone
         const settings = () => call(o.base, "GET", endpoints.SETTINGS_LIST_PATH);
-        const graphite = async () => (await settings()).inverse.find((entry) => entry.color_id === week.sleepColour.colour);
-        same(await graphite(), { color_id: week.sleepColour.colour, categories: [week.sleepColour.sharedWith], status: "mapped" }, `${tag} by default colour ${week.sleepColour.colour} belongs to ${week.sleepColour.sharedWith} alone`);
-        await putSetting(o, week.sleepColour.setting, week.sleepColour.colour);
-        same(nightEvents(await preview(o)).map((event) => event?.color_id), nights.map(() => week.sleepColour.colour), `${tag} with ${week.sleepColour.setting} set, the Asleep events export in that colour`);
-        const collided = await graphite();
-        say(`Settings inverse entry for colour ${week.sleepColour.colour}, with ${week.sleepColour.setting} set`, collided);
-        same(collided, { color_id: week.sleepColour.colour, categories: [week.sleepColour.sharedWith, week.asleep.category], status: "collision" }, `${tag} and the inverse table reports that colour as a collision: a real event of that colour would now capture with no category`);
+        const inverseOf = async (colour) => (await settings()).inverse.find((entry) => entry.color_id === colour);
+        const graphite = () => inverseOf(week.sleepColour.colour);
+        const mappedAlone = { color_id: week.sleepColour.colour, categories: [week.asleep.category], status: "mapped" };
+        say(`Settings inverse entry for colour ${week.sleepColour.colour}, with no Setting for sleep`, await graphite());
+        say("Settings inverse entry for colour 2", await inverseOf("2"));
+        same(await graphite(), mappedAlone, `${tag} by default colour ${week.sleepColour.colour} belongs to ${week.asleep.category} alone: Graphite is not a collision`);
+        same(await inverseOf("2"), { color_id: "2", categories: ["grocery"], status: "mapped" }, `${tag} and colour 2 belongs to grocery alone`);
+        const palette = (await settings()).palette;
+        same(palette.find((entry) => entry.category === week.asleep.category), { category: week.asleep.category, color_id: week.sleepColour.colour, origin: "default" }, `${tag} sleep is in the palette by default, so the app's Colours card and Category select offer it`);
+        ok(!palette.some((entry) => entry.category === week.sleepColour.retired.category), `${tag} and ${week.sleepColour.retired.category}, which held that colour, is in the palette no longer`);
+        // The colour is still the operator's to choose.
+        await putSetting(o, week.sleepColour.setting, week.sleepColour.other);
+        same(nightEvents(await preview(o)).map((event) => event?.color_id), nights.map(() => week.sleepColour.other), `${tag} with ${week.sleepColour.setting} set to ${week.sleepColour.other}, the Asleep events export in that colour`);
+        same(await graphite(), { color_id: week.sleepColour.colour, categories: [], status: "unmapped" }, `${tag} and colour ${week.sleepColour.colour} is then mapped to nothing`);
         await call(o.base, "DELETE", fill(endpoints.SETTING_DELETE_PATH, { name: week.sleepColour.setting }), undefined, 204);
-        same(nightEvents(await preview(o)).map((event) => event?.color_id), nights.map(() => null), `${tag} with the Setting removed, the colour returns to none`);
-        same((await graphite()).status, "mapped", `${tag} and colour ${week.sleepColour.colour} is ${week.sleepColour.sharedWith}'s alone again`);
+        same(nightEvents(await preview(o)).map((event) => event?.color_id), nights.map(() => week.sleepColour.colour), `${tag} with the Setting removed, the colour returns to the default`);
+        // Retiring a default deletes no record: an operator's own Setting for the retired category is honoured.
+        await putSetting(o, week.sleepColour.retired.setting, week.sleepColour.colour);
+        const shared = await graphite();
+        say(`Settings inverse entry for colour ${week.sleepColour.colour}, with ${week.sleepColour.retired.setting} set by the operator`, shared);
+        same(shared, { color_id: week.sleepColour.colour, categories: [week.sleepColour.retired.category, week.asleep.category], status: "collision" }, `${tag} an operator's own ${week.sleepColour.retired.setting} is still honoured, and on colour ${week.sleepColour.colour} it shares Graphite with sleep`);
+        await call(o.base, "DELETE", fill(endpoints.SETTING_DELETE_PATH, { name: week.sleepColour.retired.setting }), undefined, 204);
+        same(await graphite(), mappedAlone, `${tag} and with that Setting removed, colour ${week.sleepColour.colour} is ${week.asleep.category}'s alone again`);
 
         // ---- 5. approve in Mock: applied, with no write for an unowned Task
         // The previews above stored previews of their own; the one approved is taken now.
@@ -1364,6 +1377,120 @@ const scenarios = [
       ok(sevenDays.total > day.total, `so one week accounts for more Static time: ${sevenDays.total} seconds against ${day.total}`);
       ok(day.reason !== sevenDays.reason, `the too-long Task is left out for a different stated reason: ${day.reason} at one day, ${sevenDays.reason} at one week`);
       return `the daily loop holds over an invented week at one day and at one week: ${day.captured} and ${sevenDays.captured} events captured, ${day.placed.length} of ${week.backlog.length} backlog Tasks placed at both, the unowned windows never overlapped and never written`;
+    }
+  },
+  {
+    name: "a fresh store",
+    seeded: true,
+    // The hazard of a store reset. UbU recognises the events it exported by two things: the applied record,
+    // and the Tasks its own event ids map back to. Both are in the store. A new store on a calendar that
+    // still holds those events knows neither, so it captures them as if they were someone else's.
+    // One day of horizon, so there is one occurrence of the routine and the output can be read.
+    async run(first) {
+      await first.stop();
+      const say = (what, value) => console.log(`  ${what}: ${JSON.stringify(value)}`);
+      const start = (name, events) => {
+        const dir = join(first.dir, name);
+        mkdirSync(dir, { recursive: true });
+        const seed = join(dir, "mock-calendar-events.json");
+        writeFileSync(seed, JSON.stringify(events, null, 2));
+        return startOrchestrator(dir, { UBU_CALENDAR_MOCK_EVENTS: seed, UBU_PLANNING_HORIZON_SECONDS: "86400" });
+      };
+      const REVIEW = "Synthetic evening review";
+      const ERRAND = "Synthetic flexible errand";
+      const routine = {
+        schema_version: endpoints.OBJECTIVE_SCHEMA_VERSION,
+        mode: "evergreen",
+        title: REVIEW,
+        recurrence: { timezone: "UTC", rule: { kind: "daily" } },
+        routine_instance_template: { title: REVIEW, duration_estimate: fixed(30), nominal_start: timeOfDay(3), placement: "static", occupies_capacity: true, tags: [], reminder_minutes: [] }
+      };
+      const generate = (o) => call(o.base, "POST", endpoints.PLANNING_GENERATE_PATH, { schema_version: endpoints.PLANNING_SCHEMA_VERSION, request: null });
+      const counts = (result) => ({ captured: result.captured, updated: result.updated, unchanged: result.unchanged, skipped: result.skipped });
+
+      // ---- 1. the old store: nothing captured, one routine and one Dynamic Task, exported in Mock
+      let old = await start("old-store", []);
+      same(counts(await capture(old)), { captured: 0, updated: 0, unchanged: 0, skipped: 0 }, "on an empty calendar, capture takes nothing");
+      await call(old.base, "POST", endpoints.OBJECTIVE_CREATE_PATH, routine, 201);
+      const errand = (await captureTask(old, { title: ERRAND, duration_estimate: fixed(30) })).task_id;
+      const oldPlan = await generatePlan(old);
+      const occurrence = oldPlan.steps.find((step) => step.summary === REVIEW);
+      ok(occurrence?.static_anchor === true, "the Plan holds the routine's occurrence, Static");
+      const proposed = await preview(old);
+      same(proposed.operations.map((operation) => [operation.kind, operation.event.summary]).sort(), [["create", REVIEW], ["create", ERRAND]], "the preview creates one event for the occurrence and one for the Dynamic Task");
+      const approved = await approve(old, proposed.preview_id);
+      same(approved.status, "applied", "the Mock approve applies: UbU now owns two events");
+      const exported = approved.applied_events;
+      const idOf = Object.fromEntries(exported.map((event) => [event.summary, event.external_id]));
+      same(`task_${idOf[ERRAND]}`, errand, "an event UbU exports carries its Task's id: that mapping is how UbU knows its own");
+
+      // ---- 2. the calendar holds them, and the store that exported them knows them
+      old = await restartObserving(old, exported);
+      same(counts(await capture(old)), { captured: 0, updated: 0, unchanged: 2, skipped: 0 }, "a second capture on the same store takes both as unchanged, not as new");
+      const oldTasks = await listTasks(old);
+      same(oldTasks.map((task) => task.title).sort(), [REVIEW, ERRAND], "and there are still two Tasks");
+      await old.stop();
+
+      // ---- 3. the reset: a new orchestrator on a new store, and the same calendar
+      const fresh = await start("new-store", exported);
+      same(await listTasks(fresh), [], "the new store holds no Task");
+
+      // ---- 4. capture: UbU's own events are now foreign
+      const taken = await capture(fresh);
+      say("what the fresh store captured", { ...counts(taken), diagnostics: taken.diagnostics });
+      same(counts(taken), { captured: 2, updated: 0, unchanged: 0, skipped: 0 }, "the new store captures both of UbU's own events as new");
+      const copies = await listTasks(fresh);
+      say("the Tasks it made", copies.map((task) => ({ title: task.title, task_id: task.task_id, placement: task.placement, is_routine_occurrence: task.is_routine_occurrence })));
+      same(copies.map((task) => [task.title, task.placement]).sort(), [[REVIEW, "static"], [ERRAND, "static"]], "each became a Static Task: a fixed commitment, as any foreign event would");
+      for (const copy of copies) {
+        const stored = (await readTask(fresh, copy.task_id)).payload;
+        same(stored.provenance.source, { source_kind: "google_calendar", source_id: idOf[copy.title] }, `“${copy.title}” is keyed by the Google id of the event UbU exported`);
+        ok(!oldTasks.some((task) => task.task_id === copy.task_id), `its handle is new: ${copy.task_id} is no Task of the old store`);
+      }
+      // ---- 5. the routine is authored again, as it would be on a new store, and meets its own copy
+      await call(fresh.base, "POST", endpoints.OBJECTIVE_CREATE_PATH, routine, 201);
+      const replanned = await generate(fresh);
+      ok(replanned.plan !== null && replanned.plan !== undefined, "with the routine and its captured copy at the same time, the Plan is still built");
+      const copyOf = Object.fromEntries(copies.map((task) => [task.title, task.task_id]));
+      const reviews = replanned.plan.steps.filter((step) => step.summary === REVIEW);
+      same(reviews.map((step) => [step.start_at, step.end_at, step.static_anchor]), Array(2).fill([occurrence.start_at, occurrence.end_at, true]), "the Plan holds the review twice at the same time: the routine's own occurrence, and the copy captured from the calendar");
+      const regenerated = reviews.find((step) => step.task_id !== copyOf[REVIEW]).task_id;
+      const overlaps = (planned) => planned.diagnostics.filter((diagnostic) => ["routine_occurrence_overlaps_commitment", "static_task_collision"].includes(diagnostic.code));
+      say("what collided after one reset", overlaps(replanned));
+      same(
+        overlaps(replanned),
+        [{ code: "routine_occurrence_overlaps_commitment", message: `Routine occurrence \`${regenerated}\` shares its time with commitment \`${copyOf[REVIEW]}\`; both stay on the Calendar and the whole span is busy` }],
+        "the routine's occurrence collides with the copy of itself, and the warning says so"
+      );
+      const duplicating = await preview(fresh);
+      same(duplicating.operations.map((operation) => [operation.kind, operation.event.summary]), [["create", REVIEW]], "and the next preview would create the review's event a second time: the copy on the calendar is not this store's occurrence");
+
+      // ---- 6. approve that, and reset once more: the calendar now holds the review twice
+      const doubled = await approve(fresh, duplicating.preview_id);
+      same(doubled.status, "applied", "the approve applies");
+      const calendarNow = [...new Map([...exported, ...doubled.applied_events].map((event) => [event.external_id, event])).values()];
+      same(calendarNow.map((event) => event.summary).sort(), [REVIEW, REVIEW, ERRAND], "the calendar holds three events: the errand, and the review twice at the same time");
+      await fresh.stop();
+      const newer = await start("newer-store", calendarNow);
+      const takenAgain = await capture(newer);
+      same(counts(takenAgain), { captured: 3, updated: 0, unchanged: 0, skipped: 0 }, "a third store captures all three as new");
+      const work = (await captureTask(newer, { title: "Synthetic: sort the button jar", duration_estimate: fixed(30) })).task_id;
+      const collided = await generate(newer);
+      ok(collided.plan !== null && collided.plan !== undefined, "two fixed copies of one event collide, and the Plan is still built: before P1B-54 there was no Plan at all here");
+      const twins = (await listTasks(newer)).filter((task) => task.title === REVIEW).map((task) => task.task_id).sort();
+      say("what collided after two resets", overlaps(collided));
+      same(
+        overlaps(collided),
+        [{ code: "static_task_collision", message: `Static Tasks “${REVIEW}” (\`${twins[0]}\`) and “${REVIEW}” (\`${twins[1]}\`) overlap; both keep their fixed windows and stay on the Calendar, and the whole span is busy` }],
+        "the warning is static_task_collision, and it names both by title and by id: the duplicated title is the symptom"
+      );
+      const twinSteps = collided.plan.steps.filter((step) => step.summary === REVIEW);
+      same(twinSteps.map((step) => [step.start_at, step.end_at, step.static_anchor]), Array(2).fill([occurrence.start_at, occurrence.end_at, true]), "both copies keep their window");
+      const placedWork = collided.plan.steps.find((step) => step.task_id === work);
+      ok(placedWork !== undefined && placedWork.static_anchor === false, "the Dynamic Task is in the Plan");
+      ok(placedWork.end <= twinSteps[0].start || placedWork.start >= twinSteps[0].end, `and it is placed outside the span the two copies cover: ${placedWork.start_at} to ${placedWork.end_at}`);
+      return "a store that exported two events recognises them; a new store on the same calendar captures them as foreign Static Tasks, a routine collides with its own copy, and a second reset leaves two copies that collide: the Plan is built each time";
+
     }
   }
 ];

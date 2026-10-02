@@ -1,7 +1,7 @@
 # The scenario runner
 
 `scripts/check-ui-contract.sh` builds the real `ubu-orchestrator` and walks
-the daily loop against it over HTTP, in nineteen scenarios. It needs no
+the daily loop against it over HTTP, in twenty scenarios. It needs no
 webview, no Google account and no model. A full walk takes about ten seconds
 once the orchestrator is built.
 
@@ -46,7 +46,7 @@ at that time:
 
 Those two assertions are still scenario 1, and still run first.
 
-## The nineteen scenarios
+## The twenty scenarios
 
 Every scenario starts its own orchestrator on its own ephemeral loopback
 port with its own empty store. Nothing is carried from one to the next. All
@@ -73,6 +73,7 @@ calendar requests ask for `export_mode: "mock"`.
 | 17 | description | A Task is captured with a multi-line `Q:`/`A:` description and read back byte for byte. A PATCH to a longer narrative reads back exactly; a PATCH of `description` to `null` removes it; a description of blank lines, tabs and non-ASCII text is accepted and returned unchanged. |
 | 18 | time by category | Six Tasks are staged: a Static Task overlapping the range's start, a completed Dynamic Task with an observed window from a coloured event, one with a Fixed estimate and no observed window, one with a stochastic estimate, one with neither, and one with no category. `GET /reports/time-by-category` returns every row with the expected seconds, the `unmeasured` entry with its title, rows in seconds-descending then category-ascending order, the total, an `Uncategorized` row, the seven-day default range, and a 400 `time_by_category_invalid_range` when `from` is after `to`. A Task completed, reopened and completed again contributes its seconds once. |
 | 19 | a realistic week | *Seeded.* The switch rehearsal. One invented week, `scripts/rehearsal-week.mjs`: seven daily instances of a recurring commitment UbU cannot own, two one-off events it can, one with a colour mapped to nothing, a daily routine, an Asleep routine for the night, a Dynamic backlog of six Tasks across three categories with one too long to fit anywhere, a Preference, and `calendar.color.*` Settings. The whole loop is walked on its own store at each of two planning horizons, one day and one week: capture, generate, the no-overlap and night checks, preview, a Mock approve, reconcile, Next Task and a completion, the time-by-category report, and a second full pass. See [the rehearsal](#the-rehearsal). |
+| 20 | a fresh store | *Seeded.* The hazard of a store reset, on three stores and one calendar. A store exports a routine's occurrence and a Dynamic Task, and a second capture on that store takes both as `unchanged`. **A new store on the same calendar captures both as new**: each becomes a foreign Static Task under a new handle, keyed by the Google id of the event UbU exported. The routine, authored again, collides with its own copy: `routine_occurrence_overlaps_commitment`, and the Plan is built. Its preview creates the event a second time. After an approve and a second reset, the third store captures two copies of one event at one time: **`static_task_collision`, naming both by title and by id, and the Plan is still built**, with the Dynamic Task outside the span. See [the fresh store](#the-fresh-store). |
 
 The seeded scenarios first apply a day with no seed, then restart the
 orchestrator on the same store with a fixture built from the events that
@@ -103,7 +104,7 @@ The timeout step takes five seconds, because five seconds is the floor of
 ## The rehearsal
 
 Scenario 19 is the rehearsal for the switch to mainline planning. It answers
-one question the other eighteen do not: what does a week that looks like a
+one question the others do not: what does a week that looks like a
 real one do to the whole loop, end to end, on one store?
 
 **The week is invented and says so.** It is `scripts/rehearsal-week.mjs`. It
@@ -161,12 +162,14 @@ instance beyond the horizon is not seen until the horizon reaches it.
    `transparent: false`**, a Busy block. That export is a decision on record,
    see [availability](AVAILABILITY.md), and is asserted so that it is not a
    surprise. Each create says what its placement is: `static_anchor` is true
-   for a night, though it has no colour, and false for a placed backlog Task.
-   **Sleep's colour is the operator's own Setting.** With
-   `calendar.color.sleep` unset the nights export with no colour. Set to `8`
-   they export in it, and the Settings inverse table reports colour `8` as a
-   `collision` with `location`, which has it by default. Removed, the colour
-   is none again.
+   for a night and false for a placed backlog Task, and no colour implies it.
+   **Sleep's colour is Graphite by default.** With no Setting the nights
+   export in colour `8`, the Settings inverse table reports colour `8` as
+   `mapped` with `sleep` alone and colour `2` as `mapped` with `grocery`
+   alone, and `location` is not in the palette. With `calendar.color.sleep`
+   set to another colour the nights export in that one; removed, they return
+   to `8`. An operator's own `calendar.color.location` is still honoured: set
+   to `8` it makes Graphite a `collision` between `location` and `sleep`.
 5. **approve in Mock**: applied, with no operation result and no applied event
    naming an unowned event or its Task.
    **Two Plans back to back**: the Plan starts on a whole minute, and an
@@ -217,6 +220,40 @@ then one line comparing the two.
 **The rehearsal reports; it does not fix.** What it shows that nobody
 anticipated is written down as a gap, in the ticket's report, and is not
 patched in the scenario. `acceptance.sh` stages the same week for the app.
+
+## The fresh store
+
+Scenario 20 asserts a hazard instead of describing it.
+
+UbU knows which calendar events are its own from two things: the applied
+record, and the Tasks its own event ids map back to. **Both are in the
+store.** Start a new store while the calendar still holds events UbU
+exported, and the new store knows neither. On its next capture those events
+are foreign, exactly as a stranger's would be: each becomes a new Static
+Task. That is correct behaviour given a reset. It is not fixed, because there
+is nothing in an event that a store could trust to say "this was mine".
+
+What follows from it, in the order the scenario walks it:
+
+1. **After one reset**, whatever still generates the event collides with the
+   copy. A routine's occurrence over the captured copy of itself is
+   `routine_occurrence_overlaps_commitment`. UbU has always planned around
+   that pair, so there is a Plan, with the title in it twice.
+2. The preview then creates the occurrence's event again, because the copy on
+   the calendar is not this store's occurrence. Approve it and the calendar
+   holds the event twice.
+3. **After a second reset**, the two copies are two fixed commitments at the
+   same time, neither of them a routine occurrence. That is
+   `static_task_collision`. Until P1B-54 it meant no Plan at all. Now the Plan
+   is built, both copies are in it, their time is busy, and the warning names
+   both by title.
+
+A Dynamic Task's exported event comes back the same way, as a Static Task
+pinned where the old Plan happened to put it.
+
+The remedy is the operator's, and it is step 10 of
+[the live rehearsal](LIVE_REHEARSAL.md): before capturing into a new store,
+delete from the calendar the events an earlier store created.
 
 ## The stage this runner replaced
 
@@ -307,10 +344,10 @@ scenario 7 of 16: colour means done (seeded mock calendar)
 PASS  7 colour means done: a colour on an applied Dynamic event completes its Task at capture, and only that Task
 ```
 
-A complete walk ends with nineteen `PASS` lines, two `SKIP` lines and:
+A complete walk ends with twenty `PASS` lines, two `SKIP` lines and:
 
 ```text
-RESULT: 19 of 19 scenarios passed, 0 failed, 2 skipped, 312 requests, all to 127.0.0.1
+RESULT: 20 of 20 scenarios passed, 0 failed, 2 skipped, 347 requests, all to 127.0.0.1
 ```
 
 The walk stops at the first failure. The `FAIL` line names the scenario and
@@ -336,7 +373,7 @@ Two scripts, one boundary.
 | | `check-ui-contract.sh` | `acceptance.sh` |
 |---|---|---|
 | Covers | The HTTP layer: what the orchestrator does with a request. | The rendered layer: what a human sees in the app. |
-| Asserts | Everything it checks, in nineteen scenarios, each on its own store. | Nothing about behaviour. It stages a store and prints steps. |
+| Asserts | Everything it checks, in twenty scenarios, each on its own store. | Nothing about behaviour. It stages a store and prints steps. |
 | Store | One throwaway store per scenario, and two for the rehearsal, on ephemeral ports. | One throwaway store on the app's default port, held until Ctrl-C. |
 | Preconditions | Each scenario stages exactly what it asserts. | Each step declares the seeds it needs; each seed checks itself over HTTP. |
 | A human | Reads PASS and FAIL lines. | Opens the app and follows the steps. |

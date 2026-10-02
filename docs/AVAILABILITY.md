@@ -75,37 +75,35 @@ so the operator sees it on Today.
 
 ## The colour of sleep
 
-`sleep` is a category. It has **no colour unless you give it one**: the
-default palette does not include it, and it is not going to.
+`sleep` is a category of the default palette, and its colour is Graphite,
+colour `8`. That is so from P1B-54. Until then colour `8` belonged to
+`location`, which is retired: where you are is a fact for `UniverseState`,
+not a category.
 
-- With nothing set, each night is exported with no colour.
-- To colour it, set `calendar.color.sleep` on Setup, in Colours. The
-  operator's choice is Graphite, which is colour `8`:
-  `calendar.color.sleep = "8"`.
+- With nothing set, each night is exported in Graphite.
+- A real event you have coloured Graphite is captured as `sleep`. Graphite is
+  one category, and Setup's inverse table shows colour `8` as `sleep` alone.
+- `sleep` is in the palette, so Setup's Colours card has a row for it and the
+  Routines form offers it under Category. Nothing has to be added by hand.
+- To give sleep another colour, change the row “sleep” on Setup, in Colours.
+  That is the Setting `calendar.color.sleep`. All eleven of Google's colours
+  are mapped by default, so any other colour is one another category already
+  has, and the inverse table will show that colour as a `collision`.
 
-**Graphite is already taken.** The default palette gives colour `8` to
-`location`. All eleven of Google's colours are mapped by default, so there is
-no free one. With `calendar.color.sleep = "8"`:
-
-- Graphite is a **collision**: two categories, `location` and `sleep`, on one
-  colour. Setup's inverse table shows colour `8` with both, as `collision`;
-- export is unaffected. Each night is created in Graphite;
-- **capture is affected.** A real event you have coloured Graphite can no
-  longer be given a category, because the colour names two. It is captured
-  with no category and says so, with `capture_colour_ambiguous`.
-
-That is why it is your Setting and not a default: the collision is your own
-choice, and visible on the screen where you made it. The remedies are to
-leave `calendar.color.sleep` unset, to pick a colour for it that you do not
-use on real events, or to give `location` a different colour with its own
-Setting, `calendar.color.location`.
+**If you had set `calendar.color.location` yourself, it is still honoured.**
+A Setting is your record, and retiring a default does not delete it. With it
+on colour `8`, Graphite is shared by `location` and `sleep`: the inverse table
+shows the collision, and a real Graphite event is captured with no category,
+with `capture_colour_ambiguous`. Reverting that Setting on Setup removes
+`location` from your palette and leaves Graphite to `sleep`.
 
 The colour is cosmetic. It changes no total in any report. The category is
 what fixes the report.
 
-The rehearsal asserts each of these: no colour with the Setting unset,
-colour `8` with it set, the inverse entry reading `collision`, and no colour
-again once it is removed.
+The rehearsal asserts each of these: colour `8` with no Setting, the inverse
+entry for colour `8` reading `mapped` with `sleep` alone, another colour with
+`calendar.color.sleep` set, the default again once it is removed, and the
+`collision` an operator's own `calendar.color.location` makes.
 
 ## What it is not
 

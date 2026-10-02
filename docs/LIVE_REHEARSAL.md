@@ -13,16 +13,13 @@ Each step says what to **open**, what to **click**, what to **read** and what
 to **copy back**. When a step cannot be completed, write down what the screen
 said and go on to the next step.
 
-Two things to know before you start:
+Two things changed in P1B-54, and this procedure follows them:
 
-- **The dates and times on Today are wrong.** Beside each placement, Today
-  prints a date and time computed as if the Plan's seconds were minutes. Do
-  not judge a Plan by them. The true times are on Calendar, in each
-  operation's “Window:” line, in UTC. This is a known defect, written down in
-  the P1B-53 report.
-- **The app cannot give `sleep` a colour or a category by itself.** Setup's
-  Colours card edits only categories the palette already has, and the
-  Routines form offers only those. One command in step 5 adds `sleep`.
+- **The times on Today are the times in the Plan.** Each placement shows when
+  it starts and ends in your own timezone, and the timezone is named above
+  the placements. Calendar shows the same instants in UTC.
+- **`sleep` is in the palette.** It has Graphite, colour `8`, by default, so
+  the app offers it and nothing has to be added by hand.
 
 ## Before you start
 
@@ -34,7 +31,7 @@ source ./scripts/env.sh
 ./scripts/acceptance.sh --stage-only
 ```
 
-Read: the first ends `RESULT: 19 of 19 scenarios passed, 0 failed, 2 skipped`.
+Read: the first ends `RESULT: 20 of 20 scenarios passed, 0 failed, 2 skipped`.
 The second ends `staged and checked 11 seed(s) for 9 step(s)`.
 
 Copy back: those two lines.
@@ -53,8 +50,9 @@ Read: the command prints nothing. If it says `No such file or directory`,
 you have no store yet; the orchestrator creates an empty one in step 3, and
 there is nothing to back up.
 
-A throwaway store is fine for a rehearsal. To use one, add this line to the
-exports in step 3, and say so when you copy back:
+A throwaway store is fine for a rehearsal. It is a new store, so step 10
+applies to it. To use one, add this line to the exports in step 3, and say so
+when you copy back:
 
 ```sh
 export UBU_DB_PATH=/tmp/ubu-live-rehearsal.db
@@ -107,38 +105,30 @@ Copy back: nothing.
 
 ## Tell UbU about your week
 
-**5. Add the `sleep` category.** In a third terminal:
+**5. Read the colour of sleep.** Open **Setup**. In the card headed
+“Colours”, click “Reload colours”.
 
-```sh
-curl -sS -X PUT http://127.0.0.1:7878/setting/calendar.color.sleep \
-  -H 'content-type: application/json' \
-  -d '{"schema_version":"ubu.orchestrator.setting.v1","value":"8"}'
-```
+Read: in the table “Category colours” there is a row “sleep”, with “8” in the
+column “Colour id” and “default” in the column “Origin”. In the table “Colour
+to category at capture”, the row for colour id “8” reads “sleep”.
 
-Read: one line of JSON that contains `"setting_id"` and `"version":1`.
+Colour `8` is Graphite. With this default, each night UbU exports is
+Graphite, and **a real event you have coloured Graphite is captured as
+sleep**. You have two choices, and step 15 asks which you took:
 
-Then, in the app: open **Setup**. In the card headed “Colours”, click
-“Reload colours”.
-
-Read: in the table “Category colours” there is now a row “sleep”, with “8”
-in the column “Colour id” and “setting” in the column “Origin”. In the table
-“Colour to category at capture”, the row for colour id “8” reads
-“Collision: location, sleep — no category assigned.”
-
-That collision is expected, and it is the cost of Graphite. Colour `8` is
-Graphite, and the default palette already gives it to `location`. With this
-Setting, **a real event you have coloured Graphite is captured with no
-category**, and capture says so. You have three choices, and step 14 asks
-which you took:
-
-- keep it, and do not colour real events Graphite;
+- keep it;
 - give sleep a colour you do not use on real events: in the row “sleep”,
-  type another colour id in the box and click “Save”;
-- have no colour for sleep: after step 6, click “Revert” in the row “sleep”.
-  The routine keeps its category, and its events are exported with no
-  colour.
+  type another colour id in the box and click “Save”. Every colour belongs to
+  some category by default, so the table “Colour to category at capture” will
+  then show that colour as “Collision: …”, and a real event of that colour is
+  captured with no category.
 
-Copy back: the JSON line, the row “sleep”, and the row for colour id “8”.
+If the row for colour id “8” reads “Collision: location, sleep — no category
+assigned.”, your store holds a Setting you made for `location`, a category
+that is now retired. It is still honoured. To give Graphite to sleep alone,
+click “Revert” in the row “location”.
+
+Copy back: the row “sleep”, and the row for colour id “8”.
 
 **6. Author your night.** Open **Routines**. Under the heading “Create a
 routine”, fill in the form with these values and your own hours:
@@ -202,7 +192,42 @@ Nothing reached Google before this step. From here, on the screen
 “Calendar”: “Run capture” and “Run reconciliation” READ your calendar, and
 “Approve preview” WRITES to it.
 
-**10. Capture.** Open **Calendar**. Under the heading “3. Capture”, click
+**10. Delete UbU's own events from the calendar, if this store is new.** If
+you are starting from an empty or throwaway store, first delete from the
+calendar every event UbU created in an earlier run. UbU recognises its own
+events from the store; a new store does not know them, so it will capture
+them as if they were yours, and a routine that still generates them will
+collide with the copy.
+
+In Google Calendar, delete every event an earlier “Approve preview” created
+in the coming week: each night “Asleep”, each occurrence of a routine, and
+each Task UbU placed. Leave your own events.
+
+If this is the store that created those events, do nothing: it knows them,
+and capture reports them as “unchanged”.
+
+This is what it looks like when the step was skipped, so that you can
+recognise it:
+
+- on **Tasks**, under “Backlog”, the same title twice or more, where you
+  have one routine or one Task;
+- on **Today**, after “Generate Plan”, a quiet grey box with
+  `routine_occurrence_overlaps_commitment` or `static_task_collision`, and
+  the sentence “Two fixed commitments overlap, or one depends on another
+  that ends too late.” The second code names both Tasks, and they have the
+  same title;
+- before P1B-54, `static_task_collision` meant there was no Plan at all:
+  “Timed placements” was empty.
+
+The Plan is still made now, with the duplicates in it and their time busy.
+The duplicates are not removed for you. To remove them, delete the events in
+Google and start again from a new store.
+
+Copy back: one sentence. “This store is new and I deleted N events”, “This
+store is new and the calendar held none of UbU's events”, or “This is the
+store that created them”.
+
+**11. Capture.** Open **Calendar**. Under the heading “3. Capture”, click
 “Run capture”.
 
 Read: six counters appear: “captured”, “updated”, “unchanged”, “skipped”,
@@ -230,34 +255,47 @@ cannot explain a low count; the lines are what say why.
 Then open **Tasks**. Under “Backlog” are the Tasks capture made.
 
 Copy back: the titles of any real commitments of the coming week that are on
-your calendar and are not in that list.
+your calendar and are not in that list. And any title that is in the list
+more than once.
 
 ## Plan
 
-**11. Generate a Plan.** Open **Today**. Click “Generate Plan”.
+**12. Generate a Plan.** Open **Today**. Click “Generate Plan”.
 
 Read, in this order:
 
 - any box between the two buttons and the heading “Timed placements”. A
-  quiet grey box is something that happened. A red box is a failure;
-- under “Timed placements”, the titles. Your captured events, your routines
-  and “Asleep” carry the badge “Static anchor”. Work the planner placed
-  carries the badge “Skeleton”. **Do not read the dates and times beside
-  them: they are wrong on this screen;**
+  quiet grey box is something that happened. A red box is a failure. If a
+  grey box begins “Two fixed commitments overlap”, two of your fixed
+  commitments are at the same time. Both are in the Plan and their time is
+  busy; the line under it names them. A real calendar can be double-booked,
+  and that is not a fault in UbU. Two with the same title mean step 10 was
+  skipped;
+- the line “Each placement shows when it starts and when it ends, in your
+  timezone, …”. It names your timezone;
+- under “Timed placements”, the titles and the two times beside each: when
+  it starts, and when it ends. **These are the times in the Plan.** Your
+  captured events, your routines and “Asleep” carry the badge “Static
+  anchor”, and each “Asleep” starts at the time you entered in step 6 and
+  ends the next day. Work the planner placed carries the badge “Skeleton”;
 - below the placements, the section headed “Not in this Plan”, if there is
-  one. It names each Task the Plan left out, by title, with the reason and,
-  under “What can be done:”, what to do about it. With no such section,
-  everything was placed.
+  one. It names each Task that did not fit, by title, with the reason and,
+  under “What can be done:”, what to do about it. A Task that reads “Not
+  ready” did not fail to fit: it is waiting for something to be so, and the
+  section says what. With no such section, everything was placed.
 
-Copy back: any box above “Timed placements”, whole. The whole section “Not
-in this Plan”, or the words “no such section”. And the number of placements
-carrying the badge “Skeleton”.
+Copy back: any box above “Timed placements”, whole. The line that names your
+timezone. The two times beside the first “Asleep”. The title and the two
+times of the first placement carrying the badge “Skeleton”. The whole section
+“Not in this Plan”, or the words “no such section”. And the number of
+placements carrying the badge “Skeleton”.
 
-**12. Take a preview.** Open **Calendar**. Under the heading “1. Preview”,
+**13. Take a preview.** Open **Calendar**. Under the heading “1. Preview”,
 click “Take preview”. This calls nothing and writes nothing.
 
 Read: one operation for each event UbU would write. Each has a “Window:”
-line with its true start and end, in UTC, and a “Placement:” line.
+line with its start and end in UTC, and a “Placement:” line. The instants
+are the ones Today showed in your timezone.
 
 - “Create: Asleep” operations read “Placement: Static”. Asleep is exported:
   each night becomes a Busy event on your calendar. That is deliberate.
@@ -270,10 +308,10 @@ line with its true start and end, in UTC, and a “Placement:” line.
 
 Copy back: the number of operations headed “Create:”, the number headed
 “Update:”, the number headed “Delete:”, the whole grey box above them, and
-the “Window:” line of the first operation that reads “Placement: Dynamic”.
-That line is when the day's work would start.
+the “Window:” line of the operation for the “Skeleton” placement you copied
+in step 12.
 
-**13. Decide whether to approve. You do not have to.** “Approve preview”,
+**14. Decide whether to approve. You do not have to.** “Approve preview”,
 under “2. Approve”, WRITES to your real calendar. It creates an event for
 every placed Task, every routine occurrence and every night. It updates an
 event only when its Task changed in UbU, and it deletes only events UbU
@@ -287,20 +325,24 @@ run: N of N”.
 
 Copy back: those two lines. Or the words “I did not approve”.
 
-To put your calendar back afterwards, delete in Google the events the
-approval created.
+**The events it creates are the ones step 10 is about.** If you used a
+throwaway store, delete them in Google when you are done: the next store
+will not know them. If you used your own store and keep it, leave them.
 
 ## Finish
 
-**14. Stop.** In the first terminal, press Ctrl-C. If you used your own
+**15. Stop.** In the first terminal, press Ctrl-C. If you used your own
 store and want it as it was, copy the backup from step 2 back over it:
 
 ```sh
 cp -a ~/ubu-orchestrator.db.before-live-rehearsal ../ubu-orchestrator/ubu-orchestrator.db
 ```
 
-Copy back: one sentence saying which of the three choices in step 5 you
-took for the colour of sleep.
+A store put back from a backup taken before the approval does not know the
+events that approval created. Delete them in Google, as in step 10.
+
+Copy back: one sentence saying which of the two choices in step 5 you took
+for the colour of sleep.
 
 ## What to copy back, in order
 
@@ -308,20 +350,23 @@ took for the colour of sleep.
 2. From step 2: the sentence saying which store you used.
 3. From step 3: the block from `This is the LIVE run.` to the `token cache`
    line, or the `REFUSED:` line.
-4. From step 5: the JSON line, the row “sleep”, and the row for colour id
-   “8”.
+4. From step 5: the row “sleep”, and the row for colour id “8”.
 5. From step 6: your Timezone, Duration (minutes) and Nominal start.
 6. From step 7: every row of “Colour to category at capture”.
 7. From step 9: the lines “accepted” and “enabled”.
-8. From step 10: the six counters with their numbers, every line in the box
-   under them with its code, and the titles of real commitments that did not
-   come in.
-9. From step 11: any box above “Timed placements”, the whole section “Not in
-   this Plan” or the words “no such section”, and the number of “Skeleton”
-   placements.
-10. From step 12: the three counts, the grey box, and the “Window:” line of
-    the first “Placement: Dynamic” operation.
-11. From step 13: the two approval lines, or “I did not approve”.
-12. From step 14: which choice you took for the colour of sleep.
-13. And one answer, in your own words: is that store one you would plan
+8. From step 10: the sentence saying whether the store is new and what you
+   deleted.
+9. From step 11: the six counters with their numbers, every line in the box
+   under them with its code, the titles of real commitments that did not
+   come in, and any title that is in the list more than once.
+10. From step 12: any box above “Timed placements”, the line that names your
+    timezone, the two times beside the first “Asleep”, the title and two
+    times of the first “Skeleton” placement, the whole section “Not in this
+    Plan” or the words “no such section”, and the number of “Skeleton”
+    placements.
+11. From step 13: the three counts, the grey box, and the “Window:” line of
+    the operation for that “Skeleton” placement.
+12. From step 14: the two approval lines, or “I did not approve”.
+13. From step 15: which choice you took for the colour of sleep.
+14. And one answer, in your own words: is that store one you would plan
     tomorrow on, and if not, what is missing?

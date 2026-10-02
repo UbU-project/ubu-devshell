@@ -325,23 +325,24 @@ const SEEDS = {
     }
   },
   week_sleep_colour: {
-    what: "calendar.color.sleep, the operator's own Setting: Graphite for the night, which the default palette already gives to location",
+    what: "the colour of sleep with no Setting at all: Graphite, colour 8, which the default palette gives to sleep alone from P1B-54",
+    // Nothing is staged: that is the point. The default palette is checked as it stands.
     async make() {
-      return putSetting(week.sleepColour.setting, week.sleepColour.colour);
+      return null;
     },
     async check() {
       const listed = await call("GET", endpoints.SETTINGS_LIST_PATH);
       const entry = listed.palette.find((candidate) => candidate.category === week.asleep.category);
-      if (entry?.color_id !== week.sleepColour.colour || entry?.origin !== "setting") {
-        throw new StagingFailure(`${week.sleepColour.setting} is not the Setting that was staged: ${JSON.stringify(entry)}`);
+      if (entry?.color_id !== week.sleepColour.colour || entry?.origin !== "default") {
+        throw new StagingFailure(`${week.asleep.category} is not on colour ${week.sleepColour.colour} by default: ${JSON.stringify(entry)}`);
       }
-      // Judgment call 1, on record: the colour is shared, so it is a collision, and the inverse table says so.
+      const retired = listed.palette.find((candidate) => candidate.category === week.sleepColour.retired.category);
+      if (retired) throw new StagingFailure(`the retired category is still in the palette: ${JSON.stringify(retired)}`);
       const inverse = listed.inverse.find((candidate) => candidate.color_id === week.sleepColour.colour);
-      const shared = [week.sleepColour.sharedWith, week.asleep.category].sort().join();
-      if (inverse?.status !== "collision" || [...inverse.categories].sort().join() !== shared) {
-        throw new StagingFailure(`colour ${week.sleepColour.colour} is not reported as a collision between ${shared}: ${JSON.stringify(inverse)}`);
+      if (inverse?.status !== "mapped" || inverse.categories.join() !== week.asleep.category) {
+        throw new StagingFailure(`colour ${week.sleepColour.colour} is not mapped to ${week.asleep.category} alone: ${JSON.stringify(inverse)}`);
       }
-      return `${week.asleep.category} on colour ${week.sleepColour.colour}, Graphite; that colour is now a collision with ${week.sleepColour.sharedWith}`;
+      return `${week.asleep.category} on colour ${week.sleepColour.colour}, Graphite, by default; that colour maps to ${week.asleep.category} and nothing else`;
     }
   },
   week_backlog: {
@@ -443,8 +444,8 @@ const STEPS = [
     name: "A Plan with one Task that did not fit",
     open: "Today, in the navigation.",
     click: "The button “Generate Plan”.",
-    read: `Under “Timed placements” every placement titled “Asleep” carries the badge “Static anchor”, and every placement whose title begins “Invented:” carries the badge “Skeleton”. Below the placements is a section headed “Not in this Plan”. It names “${T.fence}”, says “It is longer than any free interval in the planning horizon.”, and under “What can be done:” lists sentences, not code words. Nothing on the screen is red. DO NOT READ THE DATES AND TIMES beside the placements: they are wrong on this screen, which is a known defect written down in the P1B-53 report. The true times are in the next step. What is staged: {week_calendar}; {week_routine}; {week_night}; {week_backlog}.`,
-    copy: "The whole section “Not in this Plan”. Any box that appears between the two buttons and the heading “Timed placements”. And the two times printed beside the first placement, exactly as shown, wrong as they are.",
+    read: `Above the placements a line reads “Each placement shows when it starts and when it ends, in your timezone, ${ZONE}.” Under “Timed placements” every placement titled “Asleep” carries the badge “Static anchor” and shows two times: the first ends “11:00 PM” (or “23:00”), and the second is the next day and ends “7:00 AM” (or “07:00”). That is the night as staged, 23:00 to 07:00 in ${ZONE}. Every placement whose title begins “Invented:” carries the badge “Skeleton” and shows the two times it starts and ends. THE TIMES ON THIS SCREEN ARE THE TIMES IN THE PLAN: the next step shows the same instants in UTC. Below the placements is a section headed “Not in this Plan”. It names “${T.fence}”, says “It is longer than any free interval in the planning horizon.”, and under “What can be done:” lists sentences, not code words. Nothing on the screen is red. What is staged: {week_calendar}; {week_routine}; {week_night}; {week_backlog}.`,
+    copy: "The line that names your timezone. The two times beside the first placement titled “Asleep”. The title and the two times of the first placement whose title begins “Invented:”. The whole section “Not in this Plan”. And any box that appears between the two buttons and the heading “Timed placements”.",
     codes: [
       "no box above “Timed placements”: expected at the one-week horizon, which is the default. “Not in this Plan” still names the Task",
       "task_unplaceable, in a quiet grey box with the sentence first and the code in small print after it: expected at the one-day horizon. It is not an error"
@@ -455,8 +456,8 @@ const STEPS = [
     name: "The preview, and where the night is",
     open: "Calendar, in the navigation.",
     click: "The button “Take preview”, under the heading “1. Preview”.",
-    read: `Every operation is headed “Create:”. Each one headed “Create: Asleep” has four lines: a “Window:” line with two times that are eight hours apart, “Placement: Static”, “Colour means: its category”, and “Window change means: move — the window follows the event”. Each one headed “Create: Invented:” reads “Placement: Dynamic”. The times on the “Window:” lines are true, and are in UTC. No operation is headed “${T.council}”: UbU does not own it and never writes to it. Above the operations is a quiet grey box, not a red one, with one sentence for each instance of “${T.council}”, each ending “cannot produce a valid Calendar event id; step skipped”.`,
-    copy: "The first operation headed “Create: Asleep”, all four of its lines. The first operation headed “Create: Invented:”, all four of its lines. And the whole grey box above the operations.",
+    read: `Every operation is headed “Create:”. Each one headed “Create: Asleep” has four lines: a “Window:” line with two times that are eight hours apart, “Placement: Static”, “Colour means: its category”, and “Window change means: move — the window follows the event”. Each one headed “Create: Invented:” reads “Placement: Dynamic”. The times on the “Window:” lines are in UTC. They are the same instants Today showed in your timezone: the operation for the first “Invented:” placement you copied in the last step starts and ends at the same moments. No operation is headed “${T.council}”: UbU does not own it and never writes to it. Above the operations is a quiet grey box, not a red one, with one sentence for each instance of “${T.council}”, each ending “cannot produce a valid Calendar event id; step skipped”.`,
+    copy: "The first operation headed “Create: Asleep”, all four of its lines. The operation for the “Invented:” placement you copied in the last step, all four of its lines. And the whole grey box above the operations.",
     codes: [
       `calendar_event_id_unmappable, in small print in the grey box: expected, once for each instance of “${T.council}” inside the horizon. It is the exclusion working, not a fault`,
       "calendar_mock_seed_with_live_export, in a red box: “Approve preview”, “Run capture” or “Run reconciliation” was clicked. THE REQUEST DID NOT RUN: this staged orchestrator refuses a Live calendar request, and nothing was written. Go on to the next step"
@@ -464,10 +465,10 @@ const STEPS = [
   },
   {
     needs: ["week_night", "week_sleep_colour"],
-    name: "Sleep's colour, and what it collides with",
+    name: "Sleep's colour, with no Setting",
     open: "Setup, in the navigation.",
     click: "In the card headed “Colours”, the button “Reload colours”.",
-    read: "In the table “Category colours”, the row “sleep” shows “8” in the column “Colour id” and “setting” in the column “Origin”. In the table “Colour to category at capture”, the row for colour id “8” reads “Collision: location, sleep — no category assigned.” That is {week_sleep_colour}. It is the consequence of the Setting and is expected: with it set, a real Graphite event is captured with no category.",
+    read: "In the table “Category colours” there is a row “sleep”. It shows “8” in the column “Colour id” and “default” in the column “Origin”. There is no row “location”. In the table “Colour to category at capture”, the row for colour id “8” reads “sleep”, and no row in that table begins “Collision:”. That is {week_sleep_colour}. Nothing was set to make it so: a routine in the sleep category exports in Graphite, and a real Graphite event is captured as sleep.",
     copy: "The row “sleep” from the first table, and the row for colour id “8” from the second.",
     codes: []
   },
