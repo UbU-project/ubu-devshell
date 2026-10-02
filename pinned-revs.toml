@@ -18,9 +18,9 @@
 ubu_schemas         = "4974166aeaf344c43fed5c8ab10dfa1c9139bb7d"  # R_schemas (P1B-37a A: decomposition Container schemas, schema reference bundling fixed)
 ubu_core            = "c77c0a2d1c3e206b8c18c023bb8b4ee0d06eb2d0"  # R_core (P1B-37a B: validated Containers, derived segments and completion)
 ubu_store           = "7b24cd82d78b70eea9c49f8816778a10b320b8ed"  # R_store (P1B-37a F: Container admission, required limits recorded)
-ubu_planning_kernel = "84b6d0d9b621ca9a9df10034a8f8dc660baaca5d"  # R_planning (P1B-37a E: pinned to the published Container core revision)
+ubu_planning_kernel = "ed742967f0d8cb60b5088fa0959d81a0d42c6ed6"  # R_planning (P1B-56 A: the continuation walk is scoped to the reactive horizon, so coverage_estimate answers the span it is named after; the kernel's first change of its own in Phase 1b; 83 tests)
 ubu_github_adapter  = "4c7e3b6d31008a3bd64f28c303b8aa01bca3e2a0"  # R_adapter (P1B-37a E: pinned to the published Container core revision)
-ubu_orchestrator    = "3b77b1d90ff0b18491d8d2aeaf02d06ff7fc0fab"  # P1B-55 D: at capture an uncoloured event is a Dynamic Task and a coloured one a Static commitment, a captured Task follows its event's colour, and the mock seed can hold an all-day and a zero-length event; 475 tests, 55 OpenAPI paths, no new property
-ubu_ui              = "5ad37e9aa6ae4cc4d7ea11ea9a65aa6c4e41a99c"  # P1B-55 C: the Capture panel states the capture rule, uncoloured events are counted as information, and the preview says what a colour means for a to-do from the calendar; 126 tests, 42 path constants
+ubu_orchestrator    = "a6a82413e3ad6851cc7cab2ac4d20920667732f4"  # P1B-56 C: pins the scoped kernel, and an affect observation nobody recorded raises no finding and projects nothing; 480 tests, 55 OpenAPI paths, no new property
+ubu_ui              = "f8f7ae7d8547793121c0fe224d799b542b0d6983"  # P1B-56 D: the Plan-quality panel reads "not recorded" for affect figures that were a stand-in; 130 tests, 42 path constants
 ubu_design          = "f7c4a1dbe2979fa498ae115bb2ee74e6772d4c2c"  # P1B-41 H: unchanged design baseline; inventory previously unset
 ubu_brand           = "faf2005a8bd9e64742dd76ee6d1f91f45223946b"  # P1B-41 H: unchanged brand baseline; inventory previously unset
