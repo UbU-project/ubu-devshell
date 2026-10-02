@@ -33,14 +33,17 @@ calendar:
 The whole rule, in both directions, is in
 [COLOUR_CONVENTION.md](COLOUR_CONVENTION.md).
 
-**The week will not hold everything, and that is not a failure.** Last time
-about sixty of your events had no colour. They are now sixty pieces of work
-to place in a week that already holds about a hundred and fifty commitments
-and seven nights. They will not all fit. The section “Not in this Plan” on
-Today will be long. Until now UbU could only show a week of fixed blocks. It
-will now say what does not fit, which is the question the tool exists to
-answer. The thing to judge is not whether everything fits. It is whether
-**what it chose to schedule is what you would have chosen**.
+**Nearly everything has fitted, so do not expect a long list of what did
+not.** This document used to say that the week would not hold everything and
+that the section “Not in this Plan” on Today would be long. The runs showed
+the opposite. In the P1B-57 run 85 events had no colour, 84 of them were
+placed, and one Task was left out. In the P1B-58 run nothing was left out.
+So expect “Not in this Plan” to hold one Task or two, or not to be on the
+screen at all, and “no such section” is an ordinary thing to copy back at
+step 10. When something is left out, that section is UbU saying what the
+week cannot hold, which is the question the tool exists to answer. The thing
+to judge is not whether everything fits. It is whether **what it chose to
+schedule is what you would have chosen**.
 
 **The risk report says what it means.** Every Plan until P1B-56 arrived
 under a high-risk report, for reasons that were defects in the report: a
@@ -233,8 +236,8 @@ other event. One with a colour is captured as a commitment, beside the
 routine that still generates it: the same title twice on Tasks, and on Today
 a grey box with `routine_occurrence_overlaps_commitment` or
 `static_task_collision`. One with no colour is captured as work to schedule: a
-to-do you did not write. Leftovers are what put 81 colliding pairs in the last
-run.
+to-do you did not write. Leftovers are what put 81 colliding pairs in the
+P1B-55 run.
 
 **9. Capture.** Open **Calendar**. Under the heading “3. Capture”, click
 “Run capture”.
@@ -280,16 +283,17 @@ Read, in this order:
   quiet grey box is something that happened. A red box is a failure. A box
   that begins “N pairs of fixed commitments overlap” is about commitments of
   yours that are double-booked: both are in the Plan, and their time is busy.
-  There were 81 such pairs last time, many of them between an event and a
-  leftover copy of itself. On a reset calendar there should be fewer;
+  The P1B-55 run had 81 such pairs, many of them between an event and a
+  leftover copy of itself. On a reset calendar the P1B-57 run had about 45;
 - under “Timed placements”, the titles and the two times beside each. Your
   coloured events, your routines and “Asleep” carry the badge “Static
   anchor”. **Your uncoloured events carry the badge “Skeleton”, and the times
   beside them are the ones UbU chose**;
-- below the placements, **the section headed “Not in this Plan”**. It names
+- below the placements, **the section headed “Not in this Plan”**, when there
+  is one. It is on the screen only when something was left out, and it names
   each piece of work that did not fit, by title, with the reason and what can
-  be done. This time it will be long, and it is the most useful thing on the
-  screen: it is what the week cannot hold.
+  be done. The last two runs had one Task in it and then none, so it may not
+  be there at all.
 
 Then read the panel headed “Plan risk”, above the placements. The badge
 beside the heading reads “low risk”, “medium risk” or “high risk”. Under it,
@@ -329,7 +333,9 @@ appears, and the whole of the first operation headed “Update:” that reads
 **12. Decide whether to approve. Read this before you press it.**
 
 **Approving will move every uncoloured event that was placed to the time UbU
-chose.** That was about sixty events last time. Each one leaves the slot you
+chose.** The line you copied in step 11 says how many: its “update” number.
+In the P1B-58 run that line read “Operations proposed: 27. Create 7, update
+20, delete 0.” Each event that moves leaves the slot you
 parked it in and appears where the Plan put it, still with no colour, and
 marked Busy. This is the feature working, and it is the most surprising
 thing this change does. Your coloured events are not moved. Nothing is
@@ -366,6 +372,9 @@ Read, in this order:
   followed by how many entries it holds. On this store each number is 0;
 - four panels headed “Facts”, “Numbers”, “Sets” and “Event markers”, reading
   “No facts.”, “No numbers.”, “No sets.” and “No event markers.”
+
+From P1B-59 a number on this screen can be set and cleared outright, and each
+entry says in one word beside its value whether it was measured or asserted.
 
 Copy back: the line that begins “Entries:”, exactly as it appears. If any
 of its numbers is not 0, copy the line back all the same.

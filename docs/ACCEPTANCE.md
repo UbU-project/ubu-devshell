@@ -179,6 +179,21 @@ down what the screen said and go on to the next step. Every step is done.**
    one of them. A copy-back says what is not wanted when something beside it
    looks like what is.
 
+   **A `READ` that predicts must be true, and a prediction the runs
+   contradicted is rewritten from the runs.** The rule says `READ` quotes the
+   words the screen will show. The live rehearsal went further and told the
+   operator what to expect: that the week would not hold everything, that
+   “Not in this Plan” would be long, and that about sixty events would move.
+   The P1B-57 run left one Task out, and the P1B-58 run left none. A document
+   that tells the operator to expect the opposite of what they will see is
+   worse than one that says nothing: a correct screen then reads as a fault.
+   P1B-57's report flagged it and left it, because that ticket did not ask.
+   P1B-59 rewrote the paragraph and the three sentences in steps 10 and 12
+   from what the runs recorded: 85 uncoloured events and 84 placed in the
+   P1B-57 run, nothing left out in the P1B-58 run, and “Operations proposed:
+   27. Create 7, update 20, delete 0.” A sentence about a past run now names
+   the run, and never says “last time”, which goes stale with the next one.
+
    **A copy-back never asks for a private value.** The step P1B-58 added, for
    the screen “UniverseState”, asks for one line: the names of the four
    collections and a count for each. A UniverseState holds facts about the
@@ -273,7 +288,7 @@ down what the screen said and go on to the next step. Every step is done.**
 A step with no diagnostic to meet says so: its `codes` is `[]` and the
 harness prints `none`.
 
-### The list from P1B-56, unchanged by P1B-57 and by P1B-58
+### The list from P1B-56, unchanged by P1B-57, P1B-58 and P1B-59
 
 P1B-57 adds no step and retires none. It adds one scenario to the staging,
 `week_leftover`, below: the staged calendar holds an event UbU wrote in an
@@ -288,13 +303,23 @@ UniverseState, and no staged Task waits on the fact. The new screen's step is
 in the live rehearsal, as its step 13. The staged store does hold that one
 invented fact, so the screen “UniverseState” in the staged app is not empty.
 
+P1B-59 adds no step here and retires none. It adds one scenario to the
+staging, `week_measured`, below: a number is set outright and read back
+exactly, it is cleared and its key is gone, and a Task that waits on a number
+with `at_least` is not ready until the number is set above the value and is
+in the next Plan once it is. That last part is the whole chain of that
+ticket, schema to planner, proved over HTTP. The staged store ends with one
+measured number beside the asserted fact, so the staged screen shows both
+words. The live rehearsal's step 13 gained one sentence and its copy-back is
+unchanged: names and counts, never a value.
+
 One step. The sixth rule retired the three that P1B-55 printed: they passed
 with that ticket, and P1B-56 changes nothing they cover. They are in the
 ledger below. The step that is left is what P1B-56 changed on the screen.
 
 | # | step | kept or new | staged by |
 |---|---|---|---|
-| 1 | The risk report says what it means: Today, “Generate Plan” | kept: P1B-57 and P1B-58 retire nothing | `week_colours`, `week_calendar`, `week_leftover`, `week_routine`, `week_night`, `week_backlog`, `week_universe`, `week_risk` |
+| 1 | The risk report says what it means: Today, “Generate Plan” | kept: P1B-57, P1B-58 and P1B-59 retire nothing | `week_colours`, `week_calendar`, `week_leftover`, `week_routine`, `week_night`, `week_backlog`, `week_universe`, `week_measured`, `week_risk` |
 
 It reads the badge beside “Plan risk”, the bold names of the findings under
 it, and the three affect rows of “Plan-quality signals”, which on a store
@@ -403,6 +428,7 @@ what the operator looks at. Every title in it is invented and says so.
 | `week_backlog` | six Dynamic Tasks, one too long to fit anywhere, and a Preference | all six are active and Dynamic, and the Preference is listed |
 | `week_leftover` | nothing more: the staged calendar holds one event UbU wrote in an earlier run, carrying its stamp, and `week_calendar` ran the capture | the capture named it once as `capture_stale_export`, by id; no Task was made of it; the Tasks from the calendar are one fewer than its events |
 | `week_universe` | one invented fact, `facts.invented.kettle_descaled`, set through `PATCH /universe-state` on a store that had no UniverseState | before the edit the read answered the empty state with a null version; the edit answered with the one fact at version 2; a later read is exactly what the edit answered with; a malformed mutation sent behind a good one is refused as `universe_mutation_invalid`; and after the refusal the state is unchanged |
+| `week_measured` | a number set to 0.7 and then to 0.1 through `set_numeric`, cleared through `clear_numeric`; one Task, “Invented: water the imaginary bench”, with the precondition `numeric_values.invented.tank_level` `at_least` 25; that number set to 24 and then to 40, as `measured`; and a Plan generated at each stage | the number set to 0.1 is exactly 0.1 in the edit's answer and in a later read, which the difference P1B-58's screen sent was not; the cleared key and its provenance are gone; the Task is in `blocked_tasks` and in no step with no number recorded and at 24, and is in a step of the Plan made at 40; the level's provenance is `measured` and the fact's `asserted`; and no provenance entry is left for a value that is gone |
 | `week_risk` | one Plan of the staged week, generated over HTTP | no affect finding; the Plan-quality state is `neutral` and its first suggestion is the stand-in sentence; every coverage boundary is inside the next hour, and no uncovered mass is reported without one; nothing is High except `low_coverage` with a commitment in scope; `unplaced_work` is named |
 
 The week's calendar is a file the mock Calendar observes, written before the
@@ -433,7 +459,8 @@ night as an event to create: Asleep is exported to the calendar as a Busy
 block, on purpose.
 
 **One Plan is staged**, by `week_risk`, last, so that every other seed is in
-it. It is what the two HTTP scenarios are asserted on. The operator generates
+it. `week_measured` generates three before it, to show its Task not ready
+and then planned; each is superseded by the next. It is what the two HTTP scenarios are asserted on. The operator generates
 another in the step, so the Plan on the screen is one made while they watch.
 
 **Checks run after every seed is made**, in a second pass, so a check sees

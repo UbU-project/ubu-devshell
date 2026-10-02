@@ -97,6 +97,15 @@ const captureCalendar = () =>
   call("POST", endpoints.CALENDAR_CAPTURE_PATH, { schema_version: endpoints.CALENDAR_CAPTURE_SCHEMA_VERSION, export_mode: "mock" });
 // The one fact the harness records in the staged UniverseState. Invented, and nothing waits on it.
 const UNIVERSE_FACT_KEY = "invented.kettle_descaled";
+// What P1B-59's scenario records there. Invented too. One Task waits on the level.
+const UNIVERSE_LITRES_KEY = "invented.litres";
+const UNIVERSE_LEVEL_KEY = "invented.tank_level";
+const UNIVERSE_LEVEL_NEEDED = 25;
+const UNIVERSE_LEVEL_SET = 40;
+const UNIVERSE_WAITING_TITLE = "Invented: water the imaginary bench";
+const readUniverse = () => call("GET", endpoints.UNIVERSE_STATE_PATH);
+const editUniverse = (mutations, expect = 200) =>
+  call("PATCH", endpoints.UNIVERSE_STATE_PATH, { schema_version: endpoints.UNIVERSE_STATE_SCHEMA_VERSION, mutations }, expect);
 // What every seed made and how its check described it, for the step titles.
 const staged = {};
 
@@ -278,17 +287,24 @@ const SEEDS = {
   // ---- P1B-58: one scenario at the HTTP layer, on this staged store. The UniverseState is read,
   // one invented fact is set, it is read back changed, and a malformed mutation is refused with the
   // state left as it was. No staged Task waits on the fact, so the Plan below is not changed by it.
+  // All of it happens in `make`, before the next seed edits the same state.
   week_universe: {
     what: "the staged store's UniverseState, read and edited over HTTP: one invented fact is set and read back, and a malformed mutation is refused and changes nothing",
     async make() {
-      const before = await call("GET", endpoints.UNIVERSE_STATE_PATH);
-      const written = await call("PATCH", endpoints.UNIVERSE_STATE_PATH, {
-        schema_version: endpoints.UNIVERSE_STATE_SCHEMA_VERSION,
-        mutations: [{ operation: "set_fact", target: `facts.${UNIVERSE_FACT_KEY}`, payload: true }]
-      });
-      return { before, written };
+      const before = await readUniverse();
+      const written = await editUniverse([{ operation: "set_fact", target: `facts.${UNIVERSE_FACT_KEY}`, payload: true }]);
+      const after = await readUniverse();
+      const refused = await editUniverse(
+        [
+          { operation: "set_fact", target: "facts.invented.cup_rinsed", payload: true },
+          { operation: "set_fact", target: "facts.invented..kettle", payload: true }
+        ],
+        400
+      );
+      const still = await readUniverse();
+      return { before, written, after, refused, still };
     },
-    async check({ before, written }) {
+    async check({ before, written, after, refused, still }) {
       const collections = (state) => JSON.stringify(["facts", "numeric_values", "set_memberships", "event_markers"].map((name) => state[name]));
       // Read: a staged store has no UniverseState until this seed makes one.
       if (before.version !== null || collections(before) !== JSON.stringify([{}, {}, {}, {}])) {
@@ -299,31 +315,90 @@ const SEEDS = {
         throw new StagingFailure(`the set_fact did not answer with the one fact at version 2: ${JSON.stringify(written)}`);
       }
       // Read back changed: a later read is what the edit answered with.
-      const after = await call("GET", endpoints.UNIVERSE_STATE_PATH);
       if (JSON.stringify(after) !== JSON.stringify(written)) {
         throw new StagingFailure(`the UniverseState read back is not what the edit answered with: ${JSON.stringify(after)}`);
       }
       // Refused: a malformed mutation, behind a good one, and the state is unchanged.
-      const refused = await call(
-        "PATCH",
-        endpoints.UNIVERSE_STATE_PATH,
-        {
-          schema_version: endpoints.UNIVERSE_STATE_SCHEMA_VERSION,
-          mutations: [
-            { operation: "set_fact", target: "facts.invented.cup_rinsed", payload: true },
-            { operation: "set_fact", target: "facts.invented..kettle", payload: true }
-          ]
-        },
-        400
-      );
       if (refused.diagnostics?.[0]?.code !== "universe_mutation_invalid") {
         throw new StagingFailure(`a malformed mutation was not refused as universe_mutation_invalid: ${JSON.stringify(refused)}`);
       }
-      const still = await call("GET", endpoints.UNIVERSE_STATE_PATH);
       if (JSON.stringify(still) !== JSON.stringify(after)) {
         throw new StagingFailure(`a refused edit changed the UniverseState: ${JSON.stringify(still)}`);
       }
-      return `the UniverseState is at version ${still.version} and holds one invented fact, facts.${UNIVERSE_FACT_KEY}, set over HTTP and read back; a malformed mutation sent behind a good one was refused as universe_mutation_invalid and neither was applied`;
+      return `one invented fact, facts.${UNIVERSE_FACT_KEY}, was set over HTTP at version ${written.version} and read back; a malformed mutation sent behind a good one was refused as universe_mutation_invalid and neither was applied`;
+    }
+  },
+  // ---- P1B-59: the whole chain, end to end over HTTP, on this staged store. A number is set
+  // outright and read back exactly; it is cleared and the key is gone; and a Task that waits on a
+  // number being at least a value is not ready until the number is set above it, and is in the
+  // next Plan once it is. Two Plans are generated here, and `week_risk` generates the staged one
+  // after them, with this Task in it.
+  week_measured: {
+    what: "a measured number as a first-class fact: set to exactly the value sent, cleared outright, and a Task waiting on it with at_least that is not ready below the value and is planned above it",
+    async make() {
+      const litres = `numeric_values.${UNIVERSE_LITRES_KEY}`;
+      const level = `numeric_values.${UNIVERSE_LEVEL_KEY}`;
+      await editUniverse([{ operation: "set_numeric", target: litres, payload: 0.7 }]);
+      const set = await editUniverse([{ operation: "set_numeric", target: litres, payload: 0.1 }]);
+      const readBack = await readUniverse();
+      const cleared = await editUniverse([{ operation: "clear_numeric", target: litres }]);
+      const afterClear = await readUniverse();
+
+      const task = await captureTask({
+        title: UNIVERSE_WAITING_TITLE,
+        duration_estimate: { type: "fixed", seconds: 600 },
+        preconditions: { target: level, predicate: "at_least", expected: UNIVERSE_LEVEL_NEEDED }
+      });
+      const generate = () => call("POST", endpoints.PLANNING_GENERATE_PATH, { schema_version: endpoints.PLANNING_SCHEMA_VERSION, request: null });
+      const absent = await generate();
+      await editUniverse([{ operation: "set_numeric", target: level, payload: UNIVERSE_LEVEL_NEEDED - 1, provenance_kind: "measured" }]);
+      const below = await generate();
+      const raised = await editUniverse([{ operation: "set_numeric", target: level, payload: UNIVERSE_LEVEL_SET, provenance_kind: "measured" }]);
+      const above = await generate();
+      return { set, readBack, cleared, afterClear, taskId: task.task_id, absent, below, raised, above };
+    },
+    async check({ set, readBack, cleared, afterClear, taskId, absent, below, raised, above }) {
+      // Set outright, read back exactly. This is the check that would have caught 0.09999999999999998.
+      const drifted = 0.7 - (0.7 - 0.1);
+      for (const [where, state] of [["the edit's answer", set], ["a later read", readBack]]) {
+        const value = state.numeric_values[UNIVERSE_LITRES_KEY];
+        if (value !== 0.1 || value === drifted) {
+          throw new StagingFailure(`a number set from 0.7 to 0.1 is ${value} in ${where}, not exactly 0.1`);
+        }
+      }
+      // Cleared: the key is gone, and so is its provenance.
+      for (const [where, state] of [["the edit's answer", cleared], ["a later read", afterClear]]) {
+        if (UNIVERSE_LITRES_KEY in state.numeric_values || `numeric_values.${UNIVERSE_LITRES_KEY}` in state.fact_provenance) {
+          throw new StagingFailure(`a cleared number, or its provenance, is still there in ${where}: ${JSON.stringify(state)}`);
+        }
+      }
+      // The whole chain: the same Task is not ready while the number is absent or below, and is planned once it is above.
+      const blocked = (planned) => (planned.blocked_tasks ?? []).map((task) => task.task_id);
+      const placed = (planned) => (planned.plan?.steps ?? []).some((step) => step.task_id === taskId);
+      for (const [when, planned] of [["no number is recorded", absent], [`the number is ${UNIVERSE_LEVEL_NEEDED - 1}`, below]]) {
+        if (!blocked(planned).includes(taskId) || placed(planned)) {
+          throw new StagingFailure(`the Task waiting on at_least ${UNIVERSE_LEVEL_NEEDED} was not left out as not ready when ${when}: ${JSON.stringify(planned.blocked_tasks)}`);
+        }
+      }
+      if (blocked(above).includes(taskId) || !placed(above)) {
+        throw new StagingFailure(`the Task waiting on at_least ${UNIVERSE_LEVEL_NEEDED} is not in the Plan made after the number was set to ${UNIVERSE_LEVEL_SET}: ${JSON.stringify(above.blocked_tasks)}`);
+      }
+      // What the staged screen shows beside each value: a measured number, and an asserted fact.
+      const words = raised.fact_provenance;
+      if (words[`numeric_values.${UNIVERSE_LEVEL_KEY}`]?.kind !== "measured" || words[`facts.${UNIVERSE_FACT_KEY}`]?.kind !== "asserted") {
+        throw new StagingFailure(`the staged UniverseState does not hold a measured number beside an asserted fact: ${JSON.stringify(words)}`);
+      }
+      const now = await readUniverse();
+      const stale = Object.keys(now.fact_provenance).filter((target) => {
+        const [collection, ...key] = target.split(".");
+        return !(key.join(".") in now[collection]);
+      });
+      if (stale.length > 0) throw new StagingFailure(`provenance outlived its value for ${stale.join(", ")}`);
+      return (
+        `a number set from 0.7 to 0.1 read back as exactly 0.1, and was then cleared with its key gone; ` +
+        `“${UNIVERSE_WAITING_TITLE}” (${taskId}) waits on numeric_values.${UNIVERSE_LEVEL_KEY} at_least ${UNIVERSE_LEVEL_NEEDED}: it was not ready with no number and at ${UNIVERSE_LEVEL_NEEDED - 1}, ` +
+        `and is in the Plan made after the number was set to ${UNIVERSE_LEVEL_SET}; the staged UniverseState holds that number as measured beside one asserted fact`
+      );
     }
   },
   // ---- P1B-56: two scenarios at the HTTP layer, on this staged store. One Plan is generated
@@ -400,11 +475,12 @@ const T = {
 // P1B-55 left, which passed with that ticket and which P1B-56 does not touch; each has a line in the
 // ledger in docs/ACCEPTANCE.md. What is left is what P1B-56 changed on the screen: the risk report,
 // and the Plan-quality rows of a Plan made with no Snapshot.
-// P1B-57 and P1B-58 add no step and retire none. Each adds one seed that is an HTTP scenario,
-// `week_leftover` and `week_universe`, and the step names both so that they are checked before it is printed.
+// P1B-57, P1B-58 and P1B-59 add no step and retire none. Each adds one seed that is an HTTP scenario,
+// `week_leftover`, `week_universe` and `week_measured`, and the step names all three so that they are
+// checked before it is printed.
 const STEPS = [
   {
-    needs: ["week_colours", "week_calendar", "week_leftover", "week_routine", "week_night", "week_backlog", "week_universe", "week_risk"],
+    needs: ["week_colours", "week_calendar", "week_leftover", "week_routine", "week_night", "week_backlog", "week_universe", "week_measured", "week_risk"],
     name: "The risk report says what it means",
     open: "Today, in the navigation.",
     click: "The button “Generate Plan”.",

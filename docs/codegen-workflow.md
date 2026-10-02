@@ -42,7 +42,12 @@ Command:
 ```
 
 The script copies the pinned OpenAPI file into the UI generated directory and
-writes a `README.md` noting the source. Run any repository-local client
+writes a `README.md` noting the source. That README is committed in `ubu-ui`,
+so it names the source relative to the directory that holds the sibling
+checkouts, `ubu-orchestrator/openapi/openapi.generated.json`, and never by an
+absolute path. Until P1B-59 it wrote the absolute path of the checkout it ran
+in, which named the machine and its user. A source outside the sibling
+checkouts is recorded by its file name alone. Run any repository-local client
 generator from `ubu-ui` after that if the UI repo defines one.
 
 The script fails clearly when:
@@ -100,7 +105,9 @@ Command:
 ```
 
 The script clears the destination directory, copies the first matching source
-candidate, and writes a `README.md` noting the source.
+candidate, and writes a `README.md` noting the source. Like the API client's
+README it names the source relative to the sibling checkouts,
+`ubu-schemas/generated/typescript`, and never by an absolute path.
 
 The script fails clearly when:
 - `ubu-schemas` repo directory is missing

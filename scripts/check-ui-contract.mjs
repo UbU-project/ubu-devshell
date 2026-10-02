@@ -103,8 +103,9 @@ function same(actual, expected, description) {
   console.log(`  ok: ${description}: ${a}`);
 }
 
-/// Every request of the run. `expect` is the status the scenario requires.
-async function call(base, method, path, body, expect = 200) {
+/// Every request of the run. `expect` is the status the scenario requires. `plain` is for the one
+/// kind of answer that is not JSON: the framework's own refusal of a body that is not the route's shape.
+async function call(base, method, path, body, expect = 200, plain = false) {
   const url = `${base}${path}`;
   const target = new URL(url);
   if (target.hostname !== "127.0.0.1" || !ownPorts.has(Number(target.port))) {
@@ -128,6 +129,9 @@ async function call(base, method, path, body, expect = 200) {
   }
   if (!text) {
     return null;
+  }
+  if (plain) {
+    return text;
   }
   try {
     return JSON.parse(text);
@@ -1735,9 +1739,11 @@ const scenarios = [
     }
   },
   {
-    // P1B-58: the UniverseState screen, at the HTTP layer. Every request here is one the screen
-    // makes, in the body `editUniverseState` sends, except the Task's precondition: ubu-ui authors
-    // none, and the Task route accepts one. Every fact is invented.
+    // The UniverseState screen, at the HTTP layer, from P1B-58, and from P1B-59 its real set and
+    // clear and the provenance it shows. Every request here is one the screen makes, in the body
+    // `editUniverseState` sends, except three the app does not send: a Task's precondition, which
+    // ubu-ui authors none of and the Task route accepts; a stated `provenance_kind`; and the
+    // malformed bodies. Every fact is invented.
     name: "the UniverseState screen",
     async run(o) {
       const read = () => call(o.base, "GET", endpoints.UNIVERSE_STATE_PATH);
@@ -1745,6 +1751,14 @@ const scenarios = [
         call(o.base, "PATCH", endpoints.UNIVERSE_STATE_PATH, { schema_version: endpoints.UNIVERSE_STATE_SCHEMA_VERSION, mutations }, expect);
       const COLLECTIONS = ["facts", "numeric_values", "set_memberships", "event_markers"];
       const collections = (state) => Object.fromEntries(COLLECTIONS.map((name) => [name, state[name]]));
+      // The word the screen shows beside each value: the kind, by target.
+      const words = (state) => Object.fromEntries(Object.entries(state.fact_provenance).map(([target, entry]) => [target, entry.kind]));
+      // No entry may outlive its value: every target with provenance resolves to a value.
+      const stale = (state) =>
+        Object.keys(state.fact_provenance).filter((target) => {
+          const [collection, ...key] = target.split(".");
+          return !(key.join(".") in state[collection]);
+        });
       const blockedIds = async () =>
         ((await call(o.base, "POST", endpoints.PLANNING_GENERATE_PATH, { schema_version: endpoints.PLANNING_SCHEMA_VERSION, request: null })).blocked_tasks ?? []).map(
           (task) => task.task_id
@@ -1755,6 +1769,7 @@ const scenarios = [
       same(empty.schema_version, endpoints.UNIVERSE_STATE_SCHEMA_VERSION, "the read answers the schema version ubu-ui sends on an edit");
       same(empty.version, null, "a new store has no UniverseState, and the read says so with a null version");
       same(collections(empty), { facts: {}, numeric_values: {}, set_memberships: {}, event_markers: {} }, "all four collections are present, and empty");
+      same(empty.fact_provenance, {}, "and so is the provenance map");
       same((await read()).version, null, "reading again stored nothing");
 
       // A Task that waits on a fact. Today shows it as not ready, and links here.
@@ -1770,23 +1785,53 @@ const scenarios = [
       // Set the fact, as the screen's “Set fact” does. The first edit creates the state.
       const set = await edit([{ operation: "set_fact", target: fact, payload: true }]);
       same({ version: set.version, facts: set.facts }, { version: 2, facts: { "invented.kettle_descaled": true } }, "the first edit seeds version 1 and answers with version 2, the fact under its key");
+      same(words(set), { [fact]: "asserted" }, "a write that states no kind is recorded as asserted, which is the word the screen shows");
+      ok(!Number.isNaN(Date.parse(set.fact_provenance[fact].recorded_at)), `and with the time it was written: ${set.fact_provenance[fact].recorded_at}`);
       same(await read(), set, "a later entry reads exactly what the edit answered with");
       same(await blockedIds(), [], "and the Task is blocked no longer");
 
-      // A number is set by sending the difference: up, then down.
-      const jars = "numeric_values.invented.jars";
-      same((await edit([{ operation: "increment_numeric", target: jars, payload: 5 }])).numeric_values, { "invented.jars": 5 }, "a number that is not there counts from zero");
-      const lowered = await edit([{ operation: "decrement_numeric", target: jars, payload: 3.5 }]);
-      same({ version: lowered.version, numbers: lowered.numeric_values }, { version: 4, numbers: { "invented.jars": 1.5 } }, "the difference down lands on the value asked for, and each edit is one version");
+      // A number is set outright, as the screen's “Set number” does: the value typed is the value sent.
+      const litres = "numeric_values.invented.litres";
+      same((await edit([{ operation: "set_numeric", target: litres, payload: 0.7 }])).numeric_values, { "invented.litres": 0.7 }, "a number that is not there is set to the value sent");
+      const lowered = await edit([{ operation: "set_numeric", target: litres, payload: 0.1 }]);
+      ok(lowered.numeric_values["invented.litres"] === 0.1, `from 0.7, a set to 0.1 is exactly 0.1: ${lowered.numeric_values["invented.litres"]}`);
+      ok(0.7 - (0.7 - 0.1) !== 0.1, `where the difference P1B-58's screen sent would have landed on ${0.7 - (0.7 - 0.1)}`);
+      same({ version: lowered.version, word: words(lowered)[litres] }, { version: 4, word: "asserted" }, "each edit is one version, and the number is asserted");
 
-      // A set: members are added and removed as the values they are.
+      // A reading states its kind. The app does not send one; a later instrument will.
+      const measured = await edit([{ operation: "set_numeric", target: litres, payload: 0.4, provenance_kind: "measured" }]);
+      same(words(measured), { [fact]: "asserted", [litres]: "measured" }, "a measured number and an asserted fact are different words");
+      same(words(await edit([{ operation: "set_numeric", target: litres, payload: 0.5 }]))[litres], "asserted", "set again on someone's word, it is asserted again");
+
+      // And cleared outright, as the screen's “Clear” on a number does: no payload.
+      const gone = await edit([{ operation: "clear_numeric", target: litres }]);
+      same({ numbers: gone.numeric_values, words: words(gone) }, { numbers: {}, words: { [fact]: "asserted" } }, "the number is gone, and its provenance with it");
+      same((await edit([{ operation: "clear_numeric", target: litres }])).numeric_values, {}, "clearing what is not there is not an error");
+
+      // A Task that waits on a number: not ready while it is absent or below, planned at or above.
+      const level = "numeric_values.invented.tank_level";
+      const thirsty = await captureTask(o, {
+        title: "Synthetic: water the invented bench",
+        duration_estimate: fixed(10),
+        preconditions: { target: level, predicate: "at_least", expected: 25 }
+      });
+      same(await blockedIds(), [thirsty.task_id], "a number that was never recorded satisfies no comparison: the Task is not ready, and nothing is malformed");
+      for (const [value, blocked] of [[24.5, true], [25, false], [40, false]]) {
+        await edit([{ operation: "set_numeric", target: level, payload: value, provenance_kind: "measured" }]);
+        same(await blockedIds(), blocked ? [thirsty.task_id] : [], `with the level at ${value}, at_least 25 ${blocked ? "does not hold" : "holds"}`);
+      }
+
+      // A set: members are added and removed as the values they are, and the set has one word.
       const toolbox = "set_memberships.invented.toolbox";
       await edit([{ operation: "add_membership", target: toolbox, payload: "spanner" }]);
       const two = await edit([{ operation: "add_membership", target: toolbox, payload: 7 }]);
       same([...two.set_memberships["invented.toolbox"]].sort(), [7, "spanner"], "a set holds the text and the number as themselves");
       const one = await edit([{ operation: "remove_membership", target: toolbox, payload: 7 }]);
       same(one.set_memberships, { "invented.toolbox": ["spanner"] }, "the number is removed as the number");
-      same((await edit([{ operation: "remove_membership", target: toolbox, payload: "spanner" }])).set_memberships, {}, "a set that loses its last member is gone");
+      same(words(one)[toolbox], "asserted", "and the set that is left has its word");
+      const none = await edit([{ operation: "remove_membership", target: toolbox, payload: "spanner" }]);
+      same({ sets: none.set_memberships, word: words(none)[toolbox] ?? null }, { sets: {}, word: null }, "a set that loses its last member is gone, and its provenance with it");
+      same(stale(none), [], "no provenance entry is left for a value that is gone");
 
       // A refusal changes nothing: not the bad mutation, and not a good one sent with it.
       const before = await read();
@@ -1795,22 +1840,32 @@ const scenarios = [
         [{ operation: "set_fact", target: "facts.invented..descaled", payload: true }, "mutation 1: malformed target `facts.invented..descaled`"],
         [{ operation: "polish_fact", target: fact, payload: true }, "mutation 1: unknown operation `polish_fact`"],
         [{ operation: "clear_fact", target: fact, payload: true }, "mutation 1: clear_fact does not accept a payload"],
-        [{ operation: "add_membership", target: toolbox, payload: ["spanner"] }, "mutation 1: payload must be a JSON scalar"],
-        [{ operation: "increment_numeric", target: fact, payload: 1 }, "mutation 1: operation target must be in the numeric_values collection"]
+        [{ operation: "clear_numeric", target: level, payload: 0 }, "mutation 1: clear_numeric does not accept a payload"],
+        [{ operation: "clear_numeric", target: level, provenance_kind: "measured" }, "mutation 1: clear_numeric does not accept a provenance kind"],
+        [{ operation: "set_numeric", target: level, payload: "full" }, "mutation 1: payload must be a JSON number"],
+        [{ operation: "set_numeric", target: fact, payload: 1 }, "mutation 1: operation target must be in the numeric_values collection"],
+        [{ operation: "add_membership", target: toolbox, payload: ["spanner"] }, "mutation 1: payload must be a JSON scalar"]
       ];
       for (const [bad, message] of refusals) {
         const refused = await edit([good, bad], 400);
         same(refused.diagnostics, [{ code: "universe_mutation_invalid", message }], `a list holding ${bad.operation} on ${bad.target} is refused whole`);
       }
       same((await edit([], 400)).diagnostics[0].code, "universe_mutations_empty", "an edit of nothing is refused");
-      same(await read(), before, "after six refusals the state is what it was, version and all");
+      // A mutation has no `note`, and a kind is one of four words: neither body is the route's shape.
+      const misshapen = (mutation) =>
+        call(o.base, "PATCH", endpoints.UNIVERSE_STATE_PATH, { schema_version: endpoints.UNIVERSE_STATE_SCHEMA_VERSION, mutations: [mutation] }, 422, true);
+      ok((await misshapen({ ...good, note: "nowhere to go" })).includes("unknown field `note`"), "a mutation that carries a note is refused: the field is gone, not ignored");
+      ok((await misshapen({ ...good, provenance_kind: "guessed" })).includes("provenance_kind"), "a kind that is not one of the four is refused");
+      same(await read(), before, "after eleven refusals the state is what it was, version and all");
 
       // Clear the fact, as the screen's “Clear” does: no payload. The Task waits again.
       const cleared = await edit([{ operation: "clear_fact", target: fact }]);
       same({ version: cleared.version, facts: cleared.facts }, { version: before.version + 1, facts: {} }, "the clear is the next version, and the fact is gone");
-      same(await blockedIds(), [waiting.task_id], "and the Task is blocked again");
+      same(words(cleared), { [level]: "measured" }, "its provenance went with it, and the measured level keeps its own");
+      same(stale(cleared), [], "and still no entry is left for a value that is gone");
+      same(await blockedIds(), [waiting.task_id], "and the Task that waits on the fact is blocked again");
       same(collections(await read()).event_markers, {}, "nothing the screen does appends an event marker");
-      return "a new store reads as the empty state; a fact set over PATCH /universe-state unblocks the Task that waits on it and clearing it blocks it again; numbers move by a difference; set members come and go; and six refused edits change nothing";
+      return "a new store reads as the empty state; a fact set over PATCH /universe-state unblocks the Task that waits on it and clearing it blocks it again; a number is set to exactly the value sent and cleared outright; a Task waiting on at_least 25 is not ready below it and planned at it; each write is recorded as asserted unless it says measured, and no record outlives its value; and eleven refused edits change nothing";
     }
   }
 ];

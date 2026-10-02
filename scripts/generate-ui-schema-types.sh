@@ -8,6 +8,18 @@ SCHEMAS_DIR="${SCHEMAS_DIR:-$REPOS_DIR/ubu-schemas}"
 UI_DIR="${UI_DIR:-$REPOS_DIR/ubu-ui}"
 DEST_DIR="${UI_SCHEMA_GENERATED_DIR:-$UI_DIR/src/types/generated}"
 
+# The README this script writes is committed in ubu-ui. It names the source
+# relative to the directory that holds the sibling checkouts: an absolute path
+# would name this machine and its user, and would differ on every other one.
+repo_relative() {
+  local relative
+  relative="$(realpath -m --relative-to="$REPOS_DIR" "$1")"
+  case "$relative" in
+    /* | .. | ../*) printf '%s (outside the sibling checkouts; its location is not recorded)' "$(basename "$1")" ;;
+    *) printf '%s' "$relative" ;;
+  esac
+}
+
 usage() {
   cat <<'USAGE'
 Usage: generate-ui-schema-types.sh
@@ -85,7 +97,7 @@ cat > "$DEST_DIR/README.md" <<EOF
 This directory was updated by ubu-devshell from:
 
 \`\`\`text
-$source_dir
+$(repo_relative "$source_dir")
 \`\`\`
 
 No network fetch was used.
