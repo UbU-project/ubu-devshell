@@ -158,6 +158,14 @@ instance beyond the horizon is not seen until the horizon reaches it.
 2. **generate**: every backlog Task is in the Plan or named in
    `unplaced_tasks`, and the two sets together are the whole backlog, each
    Task once. The Task left out has a reason, an explanation and alternatives.
+   **The risk report says what it means**, from P1B-56. The store has no
+   Snapshot, so no finding that reads the affect margin is raised, the
+   Plan-quality state is `neutral`, and its first suggestion says the figures
+   are a stand-in. Every boundary of the coverage figure starts inside the
+   next 60 minutes, and no uncovered mass is reported without one. Nothing is
+   High unless a commitment inside that hour is at stake. Until P1B-56 this
+   week reported high risk on every walk, from four findings; it now reports
+   medium, from `unplaced_work`.
 3. **no overlap**: no planned Dynamic step overlaps any Static window that
    occupies capacity, the unowned ones included.
    **The night**: Asleep materialises once for each day of the horizon; each

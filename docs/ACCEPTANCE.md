@@ -101,9 +101,10 @@ first made it first.
 ## Whether a step belongs in the list at all
 
 From P1B-50, three rules decide it, from P1B-51 a fourth, from P1B-53 a
-fifth, and from P1B-55 a sixth. A step that fails any one of them is not
-written; it is moved to the runner, dropped, moved to where it breaks nothing,
-rewritten until it says exactly what to do, or retired.
+fifth, from P1B-55 a sixth, and from P1B-56 a seventh. A step that fails any
+one of them is not written; it is moved to the runner, dropped, moved to where
+it breaks nothing, rewritten until it says exactly what to do, or retired. The
+seventh is about what a step may ask the operator to read at all.
 
 1. **A manual step may not verify what the runner or a `ubu-ui` test already
    asserts.** P1B-48's dependent-question check broke this rule: that a
@@ -200,37 +201,75 @@ down what the screen said and go on to the next step. Every step is done.**
    is a memory, and in six months nobody can say whether Google's consent
    flow was ever exercised against a real account.
 
+7. **A figure the operator is shown must be computed over the span it is
+   named after, and a value UbU manufactured in place of a measurement is
+   never presented as one.**
+
+   Each of the first six was written after a specific failure. This one was
+   written after four tickets of a report nobody believed. Every Plan from
+   P1B-53 to P1B-55 arrived as high risk, and the operator said so each time.
+   Both halves of the rule earned their place in the same week:
+
+   - **the span.** The risk report said “this Plan holds for 9% of the ways
+     the next 60 minutes could go”. The 9% was computed over the whole week.
+     The sentence named an hour. The kernel's continuation walk judged every
+     step of the Plan while its boundaries, its scope label and the sentence
+     were about the reactive horizon. The figure was right about the week and
+     false as shown;
+   - **the stand-in.** With no Snapshot, the orchestrator manufactures an
+     affect observation on each tolerance's own location. Its margin is
+     exactly zero by arithmetic. The report read that zero as a measurement
+     at its limit: “affect margin 0.000”, “depleted”, and two findings, on
+     every run, beside a Plan that was fine.
+
+   What it means for a step: a step never asks the operator to read a figure
+   and judge the Plan by it unless the figure is about what its label says,
+   and it never asks them to copy back a value that was not measured as if it
+   were one. A value that was not measured reads “not recorded”. A figure
+   about one span is not printed under the name of another.
+
+   What it means for a ticket: when a report is wrong on every run, that is
+   a defect in the report, to be investigated before the next feature, and
+   not a standing condition to work around.
+
 A step with no diagnostic to meet says so: its `codes` is `[]` and the
 harness prints `none`.
 
-### The list from P1B-55
+### The list from P1B-56
 
-Three steps. The sixth rule retired seven of the nine that P1B-53 and P1B-54
-printed; they are in the ledger below. None of the three depends on a model.
+One step. The sixth rule retired the three that P1B-55 printed: they passed
+with that ticket, and P1B-56 changes nothing they cover. They are in the
+ledger below. The step that is left is what P1B-56 changed on the screen.
 
 | # | step | kept or new | staged by |
 |---|---|---|---|
-| 1 | The uncoloured events are work, and the Plan places them: Today, “Generate Plan” | kept and rewritten | `week_calendar`, `week_routine`, `week_night`, `week_backlog` |
-| 2 | The preview moves them, and gives them no colour: Calendar, “Take preview” | kept and rewritten | `week_calendar`, `week_colours` |
-| 3 | The rule, where capture is run: Calendar, the panel “3. Capture”, then Setup, “Reload colours” | new | nothing |
+| 1 | The risk report says what it means: Today, “Generate Plan” | new | `week_colours`, `week_calendar`, `week_routine`, `week_night`, `week_backlog`, `week_risk` |
 
-Steps 1 and 2 are kept because P1B-55 changes what they show. The staged
-calendar now holds two uncoloured events, parked at overlapping times. Step 1
-reads them on Today as “Skeleton” placements at times the planner chose, with
-no box saying that fixed commitments overlap. Step 2 reads them on Calendar as
-two “Update:” operations, Dynamic, whose “Colour means” line says a colour
-would make each a commitment. Step 3 is new: it reads the sentence that
-states the capture rule, on the panel where capture is run, and the sentence
-on Setup that says an uncoloured event is not a fault.
+It reads the badge beside “Plan risk”, the bold names of the findings under
+it, and the three affect rows of “Plan-quality signals”, which on a store
+with no Snapshot read “not recorded”. Its `codes` name the one case in which
+“high risk” is a correct reading: a staged commitment starts within the next
+60 minutes with uncertain work placed in front of it. The harness stages in
+the computer's own timezone at whatever time it is run, so that case can
+happen, and it is the report doing its job.
 
-That the two become Dynamic Tasks with their lengths as durations, that they
-do not collide, and that the preview's windows are the Plan's, are asserted
-by the runner's scenarios 19 and 21. What is left for a human is how Today,
-Calendar and Setup show it.
+What the step relies on is checked over HTTP before it is printed, by the
+seed `week_risk`, which holds the two scenarios P1B-56 added:
 
-What each of these steps verified before, and no longer asks for, is in the
-ledger: the times of the night on Today, and the four lines of “Create:
-Asleep” on the preview.
+- **the risk report of the staged week names no affect finding and is not
+  high.** A Plan is generated. No finding has the category `affect_margin`,
+  `post_plan_depletion` or `destructive_pressure`; the Plan-quality report's
+  state is `neutral` and its first suggestion is the stand-in sentence; and
+  no finding is High except `low_coverage` with a commitment in scope;
+- **the coverage figure is absent or in scope.** If the selected candidate
+  carries `coverage`, every `boundaries[].start_at` is inside the next hour,
+  and the figure is not below its target with no boundary to attribute that
+  to. The second clause is the defect as it showed: 65% with nothing in the
+  hour to explain it.
+
+These two are the one place this harness asserts behaviour. They are here
+because the operator's own run is what exercises them, and the same
+assertions are in the runner's scenario 19.
 
 ## The ledger of retired verifications
 
@@ -256,13 +295,14 @@ Step numbers are the ones the document had in P1B-54.
 | step 9, the copy-back: the lines “accepted true” and “enabled true” | that Google's consent flow and the session enablement work against the operator's real account | P1B-54, and first in P1B-52 | the P1B-55 ticket: "passed: accepted and enabled"; the P1B-53 ticket: "the live rehearsal started against a real calendar for the first time" | P1B-55, 2026-10-02 |
 | step 15, the copy-back: which choice was taken for the colour of sleep | nothing of its own: it belonged to step 5 | P1B-54 | retired with step 5 | P1B-55, 2026-10-02 |
 
-Three copy-backs went from that document **without having been proven**. They
-are not retirements, and they are written down so that nobody takes them for
-one:
+Three copy-backs and one instruction went from that document **without
+having been proven**. They are not retirements, and they are written down so
+that nobody takes them for one:
 
 | dropped | why | what covers it now |
 |---|---|---|
 | step 2, the sentence saying which store was used | there is no longer a choice to state: the step always starts a fresh store | the instruction itself |
+| step 8 as P1B-55 numbered it, the whole instruction: delete UbU's own events from the calendar by hand. It had no copy-back of its own | dropped in P1B-56. It was never run live: the operator declined the hand deletion in the P1B-55 run as too slow. **The hazard it guarded is still real**, and 81 colliding pairs in that run came from it | the calendar reset that replaces it as step 8, and the runner's scenario 20, which asserts the hazard that no live run has. The remedy has moved; the hazard has not gone |
 | step 10, the sentence saying whether the store was new and what was deleted | the P1B-55 ticket: "the check ran but the hazard was never exercised live". The instruction stays | the runner's scenario 20 asserts the hazard; no live run has |
 | step 11, the titles of commitments that did not come in, and of any title listed twice | it asked the operator to compare two lists and draw a conclusion, which the fifth rule forbids | the capture counters and the grey box, which are still copied back |
 
@@ -282,7 +322,16 @@ Step numbers are the ones the harness printed in P1B-54.
 | step 8, Clarify with the selector left alone: Review, “Run Clarify” | that a real model's interview runs in the app, names its round, and that a decline reads as a result | P1B-52 | the P1B-53 ticket: "Clarify ran two rounds with the round named" | P1B-55, 2026-10-02 |
 | step 9, Clarify again with the Task chosen: Review, “Run Clarify” | that the selector interviews the chosen Task, and that the second round is named | P1B-52 | the same line of the P1B-53 ticket | P1B-55, 2026-10-02 |
 
-With those steps went the seeds only they needed: `completable`, `interview`,
+Retired in P1B-56, on 2026-10-02. Step numbers are the ones the harness
+printed in P1B-55.
+
+| retired | what it proved | proved in | on record | retired |
+|---|---|---|---|---|
+| step 1, the uncoloured events are work and the Plan places them: Today, “Generate Plan” | that an uncoloured event is shown as a “Skeleton” placement at a time the planner chose, with no collision box | P1B-55 | accepted with that ticket as a whole. The P1B-56 ticket quotes the live run, 62 Skeleton placements from 63 uncoloured events, and not the harness step | P1B-56, 2026-10-02 |
+| step 2, the preview moves them and gives them no colour: Calendar, “Take preview” | that each is one “Update:” operation, Dynamic, with what a colour would mean | P1B-55 | accepted with that ticket as a whole. The P1B-56 ticket records 65 of 65 operations applied in the live run | P1B-56, 2026-10-02 |
+| step 3, the rule where capture is run: Calendar, “3. Capture”, then Setup | that the screen states the capture rule, and that an uncoloured event is not a fault | P1B-55 | accepted with that ticket as a whole; no ticket names it | P1B-56, 2026-10-02 |
+
+With the P1B-55 retirements went the seeds only those steps needed: `completable`, `interview`,
 `described`, `spent`, `advisory` and `week_sleep_colour`. What they staged is
 still asserted where it always was: Clarify, undo, notes and the report by the
 runner's scenarios 15 to 18, and the default colour of sleep by scenario 19.
@@ -301,6 +350,7 @@ what the operator looks at. Every title in it is invented and says so.
 | `week_routine` | one daily routine, at noon | it is listed |
 | `week_night` | the **Asleep** routine: daily, 23:00, 480 minutes, category `sleep` | read back from the store: this computer's timezone, daily, `nominal_start` 23:00:00, 28800 seconds, Static, occupying capacity, category `sleep` |
 | `week_backlog` | six Dynamic Tasks, one too long to fit anywhere, and a Preference | all six are active and Dynamic, and the Preference is listed |
+| `week_risk` | one Plan of the staged week, generated over HTTP | no affect finding; the Plan-quality state is `neutral` and its first suggestion is the stand-in sentence; every coverage boundary is inside the next hour, and no uncovered mass is reported without one; nothing is High except `low_coverage` with a commitment in scope; `unplaced_work` is named |
 
 The week's calendar is a file the mock Calendar observes, written before the
 orchestrator starts and named by `UBU_CALENDAR_MOCK_EVENTS`. With that set, a
@@ -329,15 +379,16 @@ not at midnight, and the Generate Plan step says so. Take preview shows each
 night as an event to create: Asleep is exported to the calendar as a Busy
 block, on purpose.
 
-**No Plan is staged.** The operator generates it, in step 1, so that the
-Plan on the screen is one made while they watch.
+**One Plan is staged**, by `week_risk`, last, so that every other seed is in
+it. It is what the two HTTP scenarios are asserted on. The operator generates
+another in the step, so the Plan on the screen is one made while they watch.
 
 **Checks run after every seed is made**, in a second pass, so a check sees
 the whole staged store and not only what was made before it.
 
 ## How to add a step
 
-1. Check the step against the six rules above, and decide where in the
+1. Check the step against the seven rules above, and decide where in the
    order it goes: before the first model-dependent step unless it is one.
 2. Write the step in `STEPS`, in order, with `needs` naming every seed it
    relies on, `open`, `click`, `read` and `copy` in the words the app uses,

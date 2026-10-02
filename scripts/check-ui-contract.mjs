@@ -1172,6 +1172,26 @@ const scenarios = [
         say("unplaced", planned.unplaced_tasks.map(({ task_id, summary, reason, explanation, safe_alternatives }) => ({ task_id, summary, reason, explanation, alternatives: safe_alternatives.map((alternative) => alternative.action) })));
         say("planning diagnostics", planned.diagnostics);
         say("risk report", { level: planned.risk_report?.level, findings: (planned.risk_report?.findings ?? []).map(({ category, severity, detail }) => ({ category, severity, detail })) });
+        // ---- P1B-56: the risk report says what it means
+        // This store has no Snapshot, so its affect observation is a stand-in. Nothing that reads the
+        // stand-in's margin is reported, and nothing is projected from it.
+        const riskCategories = (planned.risk_report?.findings ?? []).map((finding) => finding.category);
+        same(riskCategories.filter((category) => ["affect_margin", "post_plan_depletion", "destructive_pressure"].includes(category)), [], `${tag} the risk report names no affect finding: nothing was recorded, so nothing is reported as at its limit`);
+        ok(riskCategories.includes("unplaced_work"), `${tag} it names the work that did not fit`);
+        same(
+          { state: planned.human_complete_plan_quality.post_plan_state_delta, first: planned.human_complete_plan_quality.revision_suggestions[0].split(":")[0] },
+          { state: "neutral", first: "Record how you are feeling" },
+          `${tag} the Plan-quality report projects nothing from the stand-in, and says first that the figures are one`
+        );
+        // The coverage figure is about the next hour. Every boundary it names starts inside it, and
+        // uncovered mass has a boundary there to be attributed to. Before P1B-56 it was about the week.
+        const coverage = planned.selected_candidate?.coverage ?? null;
+        const scopeEnd = Date.now() + 60_000 + 3_600_000;
+        say("coverage", coverage && { scope: coverage.scope, estimate: coverage.estimate, below_threshold: coverage.below_threshold, boundaries: coverage.boundaries.map((boundary) => [boundary.summary, boundary.start_at, boundary.uncovered_mass]) });
+        ok(coverage === null || coverage.boundaries.every((boundary) => Date.parse(boundary.start_at) <= scopeEnd), `${tag} every boundary of the coverage figure starts inside the next 60 minutes`);
+        ok(coverage === null || !coverage.below_threshold || coverage.boundaries.length > 0, `${tag} and it reports no uncovered mass without a commitment in that hour to attribute it to`);
+        const high = (planned.risk_report?.findings ?? []).filter((finding) => finding.severity === "high").map((finding) => finding.category);
+        ok(high.every((category) => category === "low_coverage") && (high.length === 0 || coverage.boundaries.length > 0), `${tag} the risk level is ${planned.risk_report.level}: not high, unless a commitment inside the next hour is at stake`);
         const { placed, unplaced } = partition(planned, week.backlog.map((task) => task.key));
         same(unplaced, [fenceKey], `${tag} the one Task too long for any free interval is the one left out`);
         same(planned.status, "partial", `${tag} and the Plan says it is partial`);

@@ -91,6 +91,8 @@ const local = (instant) => {
 const HORIZON_SECONDS = Number(process.env.UBU_PLANNING_HORIZON_SECONDS ?? 604_800);
 const HORIZON = HORIZON_SECONDS % 86_400 === 0 ? `${HORIZON_SECONDS / 86_400}-day` : `${HORIZON_SECONDS}-second`;
 const inHorizon = (event) => Date.parse(event.start_at) < Date.now() + HORIZON_SECONDS * 1000;
+// The kernel's default reactive horizon, which the orchestrator always sends: the span the coverage figure is about.
+const REACTIVE_HORIZON_SECONDS = 3_600;
 const captureCalendar = () =>
   call("POST", endpoints.CALENDAR_CAPTURE_PATH, { schema_version: endpoints.CALENDAR_CAPTURE_SCHEMA_VERSION, export_mode: "mock" });
 // What every seed made and how its check described it, for the step titles.
@@ -237,10 +239,58 @@ const SEEDS = {
       }
       return `${week.backlog.length} Dynamic Tasks, among them “${week.backlog.find((task) => task.tooLong).title}” at 30 hours; “${title(week.preference.before)}” is preferred to “${title(week.preference.after)}”`;
     }
+  },
+  // ---- P1B-56: two scenarios at the HTTP layer, on this staged store. One Plan is generated
+  // here, last, so that every other seed is in it. The operator generates another in the step.
+  week_risk: {
+    what: "a Plan of the staged week, generated over HTTP: its risk report names no affect finding and is not high, and its coverage figure is about the next hour",
+    async make() {
+      const planned = await call("POST", endpoints.PLANNING_GENERATE_PATH, { schema_version: endpoints.PLANNING_SCHEMA_VERSION, request: null });
+      // No later than this did the Plan start: generation rounds the start up to a whole minute.
+      return { planned, latestStartMs: Date.now() + 60_000 };
+    },
+    async check({ planned, latestStartMs }) {
+      if (!planned?.plan) throw new StagingFailure(`planning produced no Plan: ${JSON.stringify(planned?.diagnostics)}`);
+      const findings = planned.risk_report?.findings ?? [];
+      const named = findings.map((finding) => finding.category);
+
+      // Scenario one. The staged week has no Snapshot, so its affect observation is a stand-in.
+      // None of the findings that read the stand-in's margin may be raised, and the Plan-quality
+      // report says nothing was projected.
+      const affect = named.filter((category) => ["affect_margin", "post_plan_depletion", "destructive_pressure"].includes(category));
+      if (affect.length > 0) throw new StagingFailure(`the risk report of a week with no Snapshot names an affect finding: ${JSON.stringify(affect)}`);
+      const quality = planned.human_complete_plan_quality;
+      if (quality?.post_plan_state_delta !== "neutral" || !quality.revision_suggestions[0]?.startsWith("Record how you are feeling:")) {
+        throw new StagingFailure(`the Plan-quality report presents the stand-in as a measurement: ${JSON.stringify(quality)}`);
+      }
+
+      // Scenario two. The coverage figure is absent, or it is about the reactive horizon: every
+      // boundary it names starts inside the next hour, and mass it calls uncovered has a boundary
+      // in that hour to be attributed to. Before P1B-56 it was a figure about the whole week.
+      const coverage = planned.selected_candidate?.coverage ?? null;
+      const scopeEndMs = latestStartMs + REACTIVE_HORIZON_SECONDS * 1000;
+      if (coverage) {
+        const outside = coverage.boundaries.filter((boundary) => Date.parse(boundary.start_at) > scopeEndMs);
+        if (outside.length > 0) throw new StagingFailure(`the coverage figure names a boundary outside the next ${REACTIVE_HORIZON_SECONDS / 60} minutes: ${JSON.stringify(outside)}`);
+        if (coverage.below_threshold && coverage.boundaries.length === 0) {
+          throw new StagingFailure(`the coverage figure is ${coverage.estimate} with no commitment in the next ${REACTIVE_HORIZON_SECONDS / 60} minutes to attribute it to`);
+        }
+      }
+
+      // The level is not high. The one finding that may make it so is `low_coverage`, and only
+      // when a commitment really is inside the next hour: then it is the report doing its job.
+      const high = findings.filter((finding) => finding.severity === "high").map((finding) => finding.category);
+      if (high.some((category) => category !== "low_coverage") || (high.length > 0 && !(coverage?.boundaries.length > 0))) {
+        throw new StagingFailure(`the risk report of the staged week is high for a reason other than a commitment in the next hour: ${JSON.stringify(findings)}`);
+      }
+      if (!named.includes("unplaced_work")) throw new StagingFailure(`the risk report does not name the Task that did not fit: ${JSON.stringify(named)}`);
+
+      const covered = coverage
+        ? `coverage ${Math.round(coverage.estimate * 100)}% over the next ${REACTIVE_HORIZON_SECONDS / 60} minutes, with ${coverage.boundaries.length} commitment(s) in them`
+        : "no coverage figure";
+      return `risk ${planned.risk_report.level}; findings: ${[...new Set(named)].join(", ")}; no affect finding; post-plan state ${quality.post_plan_state_delta}; ${covered}`;
+    }
   }
-  // No Plan is staged. Next Task with no Plan recommends the earliest ready Task,
-  // which is what `completable` promises; a staged Plan would make it recommend the
-  // Plan's first placement instead. The operator generates the Plan in a step.
 };
 
 // --------------------------------------------------------------- the steps
@@ -257,53 +307,26 @@ const SEEDS = {
 // and what to COPY BACK, and none asks the operator to infer. "Report" is never
 // used as a verb here: "Report:" has twice been read as the name of a screen.
 const T = {
-  fence: week.backlog.find((task) => task.tooLong).title,
-  council: week.recurring[0].summary,
-  globe: week.parked[0].summary,
-  duck: week.parked[1].summary,
-  mapped: week.mapped.summary,
-  unmapped: week.unmapped.summary
+  fence: week.backlog.find((task) => task.tooLong).title
 };
-// From P1B-55 the sixth rule prunes this list: a verification that has passed live is retired unless
-// the ticket changes something that could affect it. Seven of the nine steps this printed until then
-// are retired, each with a line in the ledger in docs/ACCEPTANCE.md, and the seeds only they needed
-// are gone with them. What is left is what P1B-55 changed: what capture makes of an uncoloured event,
-// how the Plan and the preview show it, and where the screen states the rule.
+// The sixth rule prunes this list: a verification that has passed live is retired unless the ticket
+// changes something that could affect it. P1B-55 retired seven of nine. P1B-56 retires the three
+// P1B-55 left, which passed with that ticket and which P1B-56 does not touch; each has a line in the
+// ledger in docs/ACCEPTANCE.md. What is left is what P1B-56 changed on the screen: the risk report,
+// and the Plan-quality rows of a Plan made with no Snapshot.
 const STEPS = [
   {
-    needs: ["week_calendar", "week_routine", "week_night", "week_backlog"],
-    name: "The uncoloured events are work, and the Plan places them",
+    needs: ["week_colours", "week_calendar", "week_routine", "week_night", "week_backlog", "week_risk"],
+    name: "The risk report says what it means",
     open: "Today, in the navigation.",
     click: "The button “Generate Plan”.",
-    read: `Under “Timed placements” there is a placement titled “${T.globe}” and one titled “${T.duck}”. Each carries the badge “Skeleton”, which is Dynamic work, and not the badge “Static anchor”. They are two events on the staged calendar that have no colour, parked at ${local(week.parked[0].start_at)} and ${local(week.parked[1].start_at)}, where they overlapped. The two times beside each are the ones the planner chose, and the two do not overlap. The placements titled “${T.mapped}”, “${T.unmapped}” and “${T.council}” carry “Static anchor”: those events have a colour, so they are commitments at their own times. No box above “Timed placements” says that fixed commitments overlap. Below the placements the section “Not in this Plan” names “${T.fence}”. Nothing on the screen is red. What is staged: {week_calendar}; {week_routine}; {week_night}; {week_backlog}.`,
-    copy: `For “${T.globe}” and for “${T.duck}”: the title, the badge, and the two times beside it. Any box that appears between the two buttons and the heading “Timed placements”. And the whole section “Not in this Plan”.`,
+    read: `The panel headed “Plan risk” has a badge beside its heading. It reads “medium risk”. Under it each finding has a name in bold. One is named “unplaced work”, for “${T.fence}”. None is named “affect margin” or “post plan depletion”, and none is named “low coverage” unless a staged commitment starts within the next 60 minutes. Under the heading “Plan-quality signals”, the rows “Affect margin”, “Stretch pressure” and “Post-Plan state delta” each read “not recorded”, and one line under the rows begins “No Snapshot of how you are feeling has been taken”. Under “Model repair suggestions” the first line begins “Record how you are feeling:”. What was checked over HTTP before this was printed: {week_risk}.`,
+    copy: "The words on the badge beside “Plan risk”. The bold name of every finding under it. And the three rows “Affect margin”, “Stretch pressure” and “Post-Plan state delta”, each with what it reads.",
     codes: [
-      "no box above “Timed placements”: expected at the one-week horizon, which is the default",
-      "task_unplaceable, in a quiet grey box: expected at the one-day horizon. It is not an error",
-      "static_task_collision, in a quiet grey box that begins “Two fixed commitments overlap”: NOT EXPECTED HERE. The two uncoloured events were taken as commitments. Copy the whole box back"
-    ]
-  },
-  {
-    needs: ["week_calendar", "week_colours"],
-    name: "The preview moves them, and gives them no colour",
-    open: "Calendar, in the navigation.",
-    click: "The button “Take preview”, under the heading “1. Preview”.",
-    read: `Two operations are headed “Update:”, one for “${T.globe}” and one for “${T.duck}”. Each has four lines: a “Window:” line whose two times are the ones Today showed for that placement, written in UTC; “Placement: Dynamic”; “Colour means: a commitment at the time it then has, in that colour's category”; and “Window change means: resize — the duration changed”. No operation of any kind is headed with “${T.mapped}” or “${T.unmapped}”: those are commitments, and they stay where they are. Every other operation is headed “Create:”. No operation is headed “${T.council}”: UbU does not own it. Above the operations is a quiet grey box, not a red one, with one sentence for each instance of “${T.council}”, each ending “cannot produce a valid Calendar event id; step skipped”.`,
-    copy: "The two operations headed “Update:”, all four lines of each. The number of operations headed “Create:”. And the whole grey box above the operations.",
-    codes: [
-      `calendar_event_id_unmappable, in small print in the grey box: expected, once for each instance of “${T.council}” inside the horizon. It is the exclusion working, not a fault`,
-      "calendar_mock_seed_with_live_export, in a red box: “Approve preview”, “Run capture” or “Run reconciliation” was clicked. THE REQUEST DID NOT RUN: this staged orchestrator refuses a Live calendar request, and nothing was written. Go on to the next step"
-    ]
-  },
-  {
-    needs: [],
-    name: "The rule, where capture is run",
-    open: "Calendar, in the navigation. Then Setup.",
-    click: "Nothing on Calendar: read the panel headed “3. Capture”, and do not click “Run capture”. On Setup, in the card headed “Colours”, the button “Reload colours”.",
-    read: "On Calendar, the panel “3. Capture” has this sentence: “An event with no colour is taken as work for UbU to schedule. An event with a colour is taken as a commitment at its own time, and the colour is its category.” On Setup, under the heading “Colour to category at capture”, a sentence begins “An event with no colour is not a row here.”",
-    copy: "The sentence from the panel “3. Capture”, and the sentence from Setup that begins “An event with no colour is not a row here.”",
-    codes: [
-      "calendar_mock_seed_with_live_export, in a red box: “Run capture” was clicked. THE REQUEST DID NOT RUN: this staged orchestrator refuses a Live calendar request, and nothing was written. The sentence is still on the panel; copy it back"
+      "“medium risk”, with “unplaced work” and no affect finding: expected",
+      "“high risk”, with a finding named “low coverage” whose sentence names a commitment and “the next 60 minutes”: a staged commitment starts within the hour and uncertain work is placed in front of it. That is the report doing its job. Copy the whole finding back",
+      "“high risk” for any other reason, or a finding named “affect margin” or “post plan depletion”: NOT EXPECTED. Copy the whole panel back",
+      "a row that reads “0.000”, “depleted” or “sustainable stretch” where “not recorded” is expected: the panel is showing the stand-in as a measurement. Copy the three rows back"
     ]
   }
 ];
