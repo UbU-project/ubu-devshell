@@ -45,6 +45,9 @@ the operator's own store.
 
 Both live in `scripts/acceptance.mjs`, beside each other.
 
+The two examples here are from P1B-50's list. Both have since been retired
+by the sixth rule; the shape they show is unchanged.
+
 A **seed** has three parts:
 
 ```js
@@ -89,17 +92,18 @@ Two things are checked before anything is built:
 - a seed that no step names is reported, so a stale seed is visible.
 
 Every seed's `check` runs after every seed is made, so a check can see the
-whole staged store. That matters when two steps could collide: the check
-that Clarify's default picks the interview Task re-implements the selection
-predicate, first active non-occurrence Task with a blank description ordered
-by id, rather than trusting that creating it first made it first.
+whole staged store. That matters when two steps could collide. The check
+that Clarify's default picked the interview Task, a seed since retired,
+re-implemented the selection predicate, first active non-occurrence Task with
+a blank description ordered by id, rather than trusting that creating it
+first made it first.
 
 ## Whether a step belongs in the list at all
 
-From P1B-50, three rules decide it, from P1B-51 a fourth, and from P1B-53 a
-fifth. A step that fails any one of them is not written; it is moved to the
-runner, dropped, moved to where it breaks nothing, or rewritten until it
-says exactly what to do.
+From P1B-50, three rules decide it, from P1B-51 a fourth, from P1B-53 a
+fifth, and from P1B-55 a sixth. A step that fails any one of them is not
+written; it is moved to the runner, dropped, moved to where it breaks nothing,
+rewritten until it says exactly what to do, or retired.
 
 1. **A manual step may not verify what the runner or a `ubu-ui` test already
    asserts.** P1B-48's dependent-question check broke this rule: that a
@@ -166,42 +170,122 @@ down what the screen said and go on to the next step. Every step is done.**
    single source for the live sequence. A ticket that restates steps has two
    copies to keep true, and the operator follows the wrong one.
 
+6. **A step is either an instruction — start this, open that, stop — or a
+   verification, which asks the operator to read something and copy it back.
+   An instruction stays as long as the procedure needs it to reach the state
+   the verifications depend on. A verification is retired once it has passed
+   live, unless the ticket changes something that could affect it. Every
+   retirement is recorded in the ledger below, naming what was proven and in
+   which ticket, so that retiring a check is a record and not amnesia.**
+
+   The operator's rule, from P1B-55. The live rehearsal had reached fifteen
+   steps and fourteen copy-backs, and most of them re-proved something that
+   had already passed.
+
+   What makes the pruning mechanical and not a judgment each time:
+   - an **instruction** reaches a state. It has no copy-back, and it stays
+     while a later step needs that state. Authoring the night stays, because
+     a fresh store has no night;
+   - a **verification** asks for something to be read and copied back. Once
+     that has come back right from a live run, it is retired: where the step
+     is also an instruction, the instruction stays and only the copy-back
+     goes; where the step was nothing else, the step goes;
+   - **a ticket that changes what a retired verification covers brings it
+     back.** The ledger is where to look: each line says what was proven, so
+     a ticket that touches that thing can see which check to restore;
+   - the harness follows the same rule. A seed that only a retired step
+     needed goes with it; a seed another step needs stays.
+
+   The ledger is what makes the rule safe. Without it, "that was proven once"
+   is a memory, and in six months nobody can say whether Google's consent
+   flow was ever exercised against a real account.
+
 A step with no diagnostic to meet says so: its `codes` is `[]` and the
 harness prints `none`.
 
-### The list from P1B-53
+### The list from P1B-55
 
-| # | step | depends on a model | staged by |
+Three steps. The sixth rule retired seven of the nine that P1B-53 and P1B-54
+printed; they are in the ledger below. None of the three depends on a model.
+
+| # | step | kept or new | staged by |
 |---|---|---|---|
-| 1 | The app reaches this orchestrator: Setup, “Run self-check” | no | nothing |
-| 2 | A Task's notes: Tasks, “Notes for …” | no | `described` |
-| 3 | Time by category: Today, “Show report” | no | `spent` |
-| 4 | Complete, then undo: Next Task | no | `completable` |
-| 5 | A Plan with one Task that did not fit: Today, “Generate Plan” | no | `week_calendar`, `week_routine`, `week_night`, `week_backlog` |
-| 6 | The preview, and where the night is: Calendar, “Take preview” | no | `week_calendar`, `week_colours` |
-| 7 | Sleep's colour, with no Setting: Setup, “Reload colours” | no | `week_night`, `week_sleep_colour` |
-| 8 | Clarify, with the selector left alone: Review, “Run Clarify” | **yes** | `interview`, `described`, `advisory` |
-| 9 | Clarify again, with the Task chosen: Review, “Run Clarify” | **yes** | `interview`, `advisory` |
+| 1 | The uncoloured events are work, and the Plan places them: Today, “Generate Plan” | kept and rewritten | `week_calendar`, `week_routine`, `week_night`, `week_backlog` |
+| 2 | The preview moves them, and gives them no colour: Calendar, “Take preview” | kept and rewritten | `week_calendar`, `week_colours` |
+| 3 | The rule, where capture is run: Calendar, the panel “3. Capture”, then Setup, “Reload colours” | new | nothing |
 
-Step 4 comes before step 5 on purpose: both are deterministic, and once a
-Plan exists Next Task recommends the Plan's first placement and not the Task
-step 4 is staged for. Step 9 can be done whatever step 8 did; its codes name
-the round-one decline, the finished interview, and the run that interviewed
-another Task because the selector was left alone.
+Steps 1 and 2 are kept because P1B-55 changes what they show. The staged
+calendar now holds two uncoloured events, parked at overlapping times. Step 1
+reads them on Today as “Skeleton” placements at times the planner chose, with
+no box saying that fixed commitments overlap. Step 2 reads them on Calendar as
+two “Update:” operations, Dynamic, whose “Colour means” line says a colour
+would make each a commitment. Step 3 is new: it reads the sentence that
+states the capture rule, on the panel where capture is run, and the sentence
+on Setup that says an uncoloured event is not a fault.
 
-Steps 5, 6 and 7 are about what the screen shows. That the week's Plan
-accounts for every Task, that nothing overlaps an occupied window, that no
-work is placed in the night and that no preview names an event UbU does not
-own are asserted by the runner's rehearsal scenario. What is left for a human
-is how Today, Calendar and Setup show it.
+That the two become Dynamic Tasks with their lengths as durations, that they
+do not collide, and that the preview's windows are the Plan's, are asserted
+by the runner's scenarios 19 and 21. What is left for a human is how Today,
+Calendar and Setup show it.
 
-**Step 5 is where the operator reads the times.** Today shows each
-placement's start and end in the operator's own timezone, and names the
-timezone above the placements. The night is staged at 23:00 to 07:00 in that
-zone, so each “Asleep” placement reads 11:00 PM and, the next day, 7:00 AM.
-Step 6 reads the same instants on Calendar, in each operation's “Window:”
-line, in UTC. Until P1B-54 Today formatted a placement's Unix seconds as if
-they were minutes, and this step told the operator not to read them.
+What each of these steps verified before, and no longer asks for, is in the
+ledger: the times of the night on Today, and the four lines of “Create:
+Asleep” on the preview.
+
+## The ledger of retired verifications
+
+One line for each retirement: what the check proved, the ticket whose
+acceptance run proved it, where that is on record, and when it was retired.
+A ticket that changes the thing a line names brings that check back.
+
+“On record” is exact about how good the record is. Some of these were named
+in a later ticket's own text, which quotes what the operator's run showed.
+Others passed only as part of an acceptance run that the next ticket calls
+accepted, with no line of their own. Those say so.
+
+### From `docs/LIVE_REHEARSAL.md`
+
+Step numbers are the ones the document had in P1B-54.
+
+| retired | what it proved | proved in | on record | retired |
+|---|---|---|---|---|
+| step 1, the whole step: run the scripted checks, copy back the `RESULT:` line and the `staged and checked` line | that the runner and the harness's staging pass on the operator's machine | P1B-53, P1B-54 | the P1B-55 ticket: a duplicate of each ticket's own acceptance steps 1 to 3, which still run both | P1B-55, 2026-10-02 |
+| step 3, the copy-back: the block from `This is the LIVE run.` to the `token cache` line | that `run-live.sh` names the store, the calendar and the horizon before it starts, and refuses each of its five bad configurations | P1B-53, P1B-54 | the P1B-55 ticket: "the banner and all five refusals passed in P1B-53 and P1B-54" | P1B-55, 2026-10-02 |
+| step 5, the whole step: read the colour of sleep, copy back the row “sleep” and the row for colour id “8” | that `sleep` holds colour 8 by default on a live store, and that Graphite maps to `sleep` alone | P1B-54 | the P1B-55 ticket: "passed: `sleep 8 default`" | P1B-55, 2026-10-02 |
+| step 6, the copy-back: the Timezone, Duration and Nominal start entered for the night | that a night authored in the app is planned at its own local hours | P1B-54 | the P1B-55 ticket: Today showed `Thu, Oct 1, 11:00 PM → Fri, Oct 2, 7:00 AM` in `America/New_York` | P1B-55, 2026-10-02 |
+| step 9, the copy-back: the lines “accepted true” and “enabled true” | that Google's consent flow and the session enablement work against the operator's real account | P1B-54, and first in P1B-52 | the P1B-55 ticket: "passed: accepted and enabled"; the P1B-53 ticket: "the live rehearsal started against a real calendar for the first time" | P1B-55, 2026-10-02 |
+| step 15, the copy-back: which choice was taken for the colour of sleep | nothing of its own: it belonged to step 5 | P1B-54 | retired with step 5 | P1B-55, 2026-10-02 |
+
+Three copy-backs went from that document **without having been proven**. They
+are not retirements, and they are written down so that nobody takes them for
+one:
+
+| dropped | why | what covers it now |
+|---|---|---|
+| step 2, the sentence saying which store was used | there is no longer a choice to state: the step always starts a fresh store | the instruction itself |
+| step 10, the sentence saying whether the store was new and what was deleted | the P1B-55 ticket: "the check ran but the hazard was never exercised live". The instruction stays | the runner's scenario 20 asserts the hazard; no live run has |
+| step 11, the titles of commitments that did not come in, and of any title listed twice | it asked the operator to compare two lists and draw a conclusion, which the fifth rule forbids | the capture counters and the grey box, which are still copied back |
+
+### From `scripts/acceptance.mjs`
+
+Step numbers are the ones the harness printed in P1B-54.
+
+| retired | what it proved | proved in | on record | retired |
+|---|---|---|---|---|
+| step 1, the app reaches this orchestrator: Setup, “Run self-check” | that the Tauri HTTP plugin transport and the capability scope reach the staged orchestrator: three reads answered | P1B-52, P1B-53, P1B-54 | accepted with each of those tickets as a whole; no ticket names it | P1B-55, 2026-10-02 |
+| step 2, a Task's notes: Tasks, “Notes for …” | that a description of `Q:` and `A:` lines is shown under the Task | P1B-51 and after | the P1B-52 ticket: the answers of a real interview "reached the Task's notes" | P1B-55, 2026-10-02 |
+| step 3, time by category: Today, “Show report” | that the panel shows the rows and the total for staged time | P1B-52, P1B-53, P1B-54 | accepted with each of those tickets as a whole; no ticket names it. The P1B-51 ticket records that until then nobody had looked at it | P1B-55, 2026-10-02 |
+| step 4, complete, then undo: Next Task | that a completion is undone from the app and the Task is recommended again | P1B-52, P1B-53, P1B-54 | accepted with each of those tickets as a whole; no ticket names it | P1B-55, 2026-10-02 |
+| step 5, the part that read the night's two times on Today | that Today shows a placement's real start and end in local time | P1B-54 | the P1B-55 ticket: `Thu, Oct 1, 11:00 PM → Fri, Oct 2, 7:00 AM` | P1B-55, 2026-10-02 |
+| step 6, the part that read the four lines of “Create: Asleep” and of “Create: Invented:” | that the preview says an operation's placement, and what a colour and a window change mean for it | P1B-53, P1B-54 | accepted with each of those tickets as a whole; the P1B-53 ticket records that Take preview "read as a result" in P1B-52's run | P1B-55, 2026-10-02 |
+| step 7, sleep's colour with no Setting: Setup, “Reload colours” | that the Colours card shows `sleep` on colour 8 by default, with no collision | P1B-54 | the P1B-55 ticket: "passed: `sleep 8 default`" | P1B-55, 2026-10-02 |
+| step 8, Clarify with the selector left alone: Review, “Run Clarify” | that a real model's interview runs in the app, names its round, and that a decline reads as a result | P1B-52 | the P1B-53 ticket: "Clarify ran two rounds with the round named" | P1B-55, 2026-10-02 |
+| step 9, Clarify again with the Task chosen: Review, “Run Clarify” | that the selector interviews the chosen Task, and that the second round is named | P1B-52 | the same line of the P1B-53 ticket | P1B-55, 2026-10-02 |
+
+With those steps went the seeds only they needed: `completable`, `interview`,
+`described`, `spent`, `advisory` and `week_sleep_colour`. What they staged is
+still asserted where it always was: Clarify, undo, notes and the report by the
+runner's scenarios 15 to 18, and the default colour of sleep by scenario 19.
 
 ## The staged week
 
@@ -216,7 +300,6 @@ what the operator looks at. Every title in it is invented and says so.
 | `week_calendar` | the week's calendar, captured in Mock | every event inside the horizon is one Task; a coloured event is Static, with its colour's category; each of the two uncoloured ones is Dynamic, and capture said it is work for UbU to schedule; the unowned instances were reported once, as one `capture_occupancy_only`; a second capture admits nothing |
 | `week_routine` | one daily routine, at noon | it is listed |
 | `week_night` | the **Asleep** routine: daily, 23:00, 480 minutes, category `sleep` | read back from the store: this computer's timezone, daily, `nominal_start` 23:00:00, 28800 seconds, Static, occupying capacity, category `sleep` |
-| `week_sleep_colour` | nothing: the default palette is checked as it stands | `sleep` is on colour 8 with origin `default`, `location` is not in the palette, and the inverse table reports colour 8 as `mapped` with `sleep` alone |
 | `week_backlog` | six Dynamic Tasks, one too long to fit anywhere, and a Preference | all six are active and Dynamic, and the Preference is listed |
 
 The week's calendar is a file the mock Calendar observes, written before the
@@ -246,20 +329,15 @@ not at midnight, and the Generate Plan step says so. Take preview shows each
 night as an event to create: Asleep is exported to the calendar as a Busy
 block, on purpose.
 
-**No Plan is staged.** With no Plan, Next Task recommends the earliest ready
-Task, which is what the `completable` seed promises and checks. With a Plan it
-recommends the Plan's first placement, which is a different Task. So the step
-that completes and undoes comes before the step in which the operator
-generates the Plan.
+**No Plan is staged.** The operator generates it, in step 1, so that the
+Plan on the screen is one made while they watch.
 
-**Checks run after every seed is made**, in a second pass. That was always the
-documented contract and from P1B-51 it is what the code does: what Next Task
-recommends and which Task Clarify picks depend on every Task in the store,
-not only on the ones made before that seed.
+**Checks run after every seed is made**, in a second pass, so a check sees
+the whole staged store and not only what was made before it.
 
 ## How to add a step
 
-1. Check the step against the five rules above, and decide where in the
+1. Check the step against the six rules above, and decide where in the
    order it goes: before the first model-dependent step unless it is one.
 2. Write the step in `STEPS`, in order, with `needs` naming every seed it
    relies on, `open`, `click`, `read` and `copy` in the words the app uses,

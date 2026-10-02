@@ -267,7 +267,7 @@ commitment with **no category** was also exported with no colour, so it comes
 back as Dynamic work. That is the one case the round trip does not close; see
 [the colour convention](COLOUR_CONVENTION.md).
 
-The remedy is the operator's, and it is step 10 of
+The remedy is the operator's, and it is step 8 of
 [the live rehearsal](LIVE_REHEARSAL.md): before capturing into a new store,
 delete from the calendar the events an earlier store created.
 
