@@ -444,3 +444,16 @@ could have been a scenario is a scenario that was not written.
 After the scripted checks and the staged acceptance steps comes the one thing
 no script here does: [the live rehearsal](LIVE_REHEARSAL.md), against the
 operator's own store and real calendar, started with `scripts/run-live.sh`.
+
+## P1B-60: what already matches
+
+Scenario 23 captures one synthetic uncoloured event, places it at its existing
+window, and asserts no operation and `matching_placements: 1` without approving
+an intermediate preview. The colour-completion scenario also regenerates a Plan
+and checks that retained history does not increase the matching count.
+
+The runner imports the pure wording functions used by Calendar and Today to
+check the matching clause and all four numeric comparison words. It does not
+render React: `ubu-ui` tests cover the rendered summary, fallback and nested
+preconditions. The acceptance harness only stages an already-matching placement
+in its throwaway mock calendar.

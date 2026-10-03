@@ -14,14 +14,21 @@ It sets two things, exports nothing else, and writes no file.
 
 ## How parallel: `CARGO_BUILD_JOBS`
 
-Default `4`. Override it by exporting `CARGO_BUILD_JOBS` before sourcing.
+Default `1`. Override it deliberately by exporting `CARGO_BUILD_JOBS` before sourcing.
 
 There is a cap because of what happens without one. A full `cargo test` of
 `ubu-orchestrator` links about 55 test binaries with debug information. Left
 to itself cargo runs one job for each core. On a 16-core machine with 30 GB
 of memory that peaked at 24.4 GB, and the out-of-memory killer took the
-whole terminal session with it, twice in one afternoon. Four jobs peak at a
-few gigabytes and finish.
+whole terminal session with it, twice in one afternoon. During P1B-60,
+concurrent orchestrator and store Cargo invocations each allowed four jobs;
+`systemd-oomd` killed the terminal scope under sustained memory pressure.
+
+The default is now one compile/link job per Cargo invocation. **Run Cargo
+invocations sequentially across repositories**: separate invocations each have
+their own job budget, so starting several defeats the intended total limit.
+This limits concurrent compiler/linker work, not the memory of one process or
+the number of test threads. It does not guarantee a single large build fits.
 
 ## Where: `UBU_TARGET_ROOT` and `CARGO_TARGET_DIR`
 

@@ -451,6 +451,36 @@ const SEEDS = {
         : "no coverage figure";
       return `risk ${planned.risk_report.level}; findings: ${[...new Set(named)].join(", ")}; no affect finding; post-plan state ${quality.post_plan_state_delta}; ${covered}`;
     }
+  },
+  week_matches: {
+    what: "a captured Dynamic event staged at its current Plan placement in the mock calendar",
+    async make() {
+      const steps = staged.week_risk.made.planned.plan.steps;
+      let placement;
+      for (const step of steps.filter((candidate) => !candidate.static_anchor)) {
+        const task = await readTask(step.task_id);
+        if (task.payload.provenance?.source?.source_kind === "google_calendar") {
+          placement = step;
+          break;
+        }
+      }
+      if (!placement) throw new StagingFailure("no captured Dynamic placement exists to stage");
+      // Stage the existing Plan in the throwaway mock calendar. Behavioural
+      // proof, including capture alone needing no approval, belongs to the runner.
+      const proposed = await call("GET", endpoints.CALENDAR_PREVIEW_PATH);
+      const applied = await call("POST", endpoints.CALENDAR_APPROVE_PATH, {
+        schema_version: endpoints.CALENDAR_APPROVAL_SCHEMA_VERSION,
+        preview_id: proposed.preview_id, authority_source: "user", export_mode: "mock"
+      });
+      return { placement, event: applied.applied_events.find((event) => event.task_id === placement.task_id) };
+    },
+    async check({ placement, event }) {
+      const task = await readTask(placement.task_id);
+      if (task.payload.static_window || !event || event.start_at !== placement.start_at || event.end_at !== placement.end_at) {
+        throw new StagingFailure("the staged captured Dynamic event is not at the Plan's window");
+      }
+      return "one captured Dynamic event is staged exactly at its Plan window; the runner checks its preview count and wording";
+    }
   }
 };
 
@@ -480,11 +510,11 @@ const T = {
 // checked before it is printed.
 const STEPS = [
   {
-    needs: ["week_colours", "week_calendar", "week_leftover", "week_routine", "week_night", "week_backlog", "week_universe", "week_measured", "week_risk"],
+    needs: ["week_colours", "week_calendar", "week_leftover", "week_routine", "week_night", "week_backlog", "week_universe", "week_measured", "week_risk", "week_matches"],
     name: "The risk report says what it means",
     open: "Today, in the navigation.",
     click: "The button “Generate Plan”.",
-    read: `The panel headed “Plan risk” has a badge beside its heading. It reads “medium risk”. Under it each finding has a name in bold. One is named “unplaced work”, for “${T.fence}”. None is named “affect margin” or “post plan depletion”, and none is named “low coverage” unless a staged commitment starts within the next 60 minutes. Under the heading “Plan-quality signals”, the rows “Affect margin”, “Stretch pressure” and “Post-Plan state delta” each read “not recorded”, and one line under the rows begins “No Snapshot of how you are feeling has been taken”. Under “Model repair suggestions” the first line begins “Record how you are feeling:”. What was checked over HTTP before this was printed: {week_risk}.`,
+    read: `The panel headed “Plan risk” has a badge beside its heading. It reads “medium risk”. Under it each finding has a name in bold. One is named “unplaced work”, for “${T.fence}”. None is named “affect margin” or “post plan depletion”, and none is named “low coverage” unless a staged commitment starts within the next 60 minutes. Under the heading “Plan-quality signals”, the rows “Affect margin”, “Stretch pressure” and “Post-Plan state delta” each read “not recorded”, and one line under the rows begins “No Snapshot of how you are feeling has been taken”. Under “Model repair suggestions” the first line begins “Record how you are feeling:”. What was checked over HTTP before this was printed: {week_risk}. Additional staging: {week_matches}.`,
     copy: "The words on the badge beside “Plan risk”. The bold name of every finding under it. And the three rows “Affect margin”, “Stretch pressure” and “Post-Plan state delta”, each with what it reads.",
     codes: [
       "“medium risk”, with “unplaced work” and no affect finding: expected",

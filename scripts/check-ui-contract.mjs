@@ -48,6 +48,10 @@ const only = process.env.UBU_CHECK_ONLY
   : null;
 
 const endpoints = await import(pathToFileURL(endpointsPath).href);
+// These pure functions are also used by the rendered UI. React rendering is
+// covered by ubu-ui's tests; this runner checks the HTTP value and its wording.
+const { matchingPlacementsSentence } = await import(new URL("../presentation/calendar-preview.ts", pathToFileURL(endpointsPath)).href);
+const { numericComparisonWords } = await import(new URL("../presentation/precondition.ts", pathToFileURL(endpointsPath)).href);
 
 // ubu-ui names no constant for these; they are orchestrator routes all the same.
 const ROUTES_WITHOUT_A_UI_CONSTANT = {
@@ -600,7 +604,12 @@ const scenarios = [
       same((await listTasks(o)).map((task) => task.task_id), [day.pinned], "the Static Task, whose colour is its category, is still active");
       const again = await capture(o);
       same({ updated: again.updated, unchanged: again.unchanged }, { updated: 0, unchanged: 2 }, "a second capture of the same calendar completes nothing again");
-      return "a colour on an applied Dynamic event completes its Task at capture, and only that Task";
+      await generatePlan(o);
+      const retained = await preview(o);
+      same(retained.matching_placements, 1, "only the Static placement matches; completed history does not add to the count");
+      same(retained.operations, [], "retained history produces no operation");
+      ok(retained.events.some((event) => event.task_id === day.flexible), "the completed calendar event is still retained");
+      return "a colour completes only the Dynamic Task, and its retained event is excluded from matching_placements";
     }
   },
   {
@@ -1866,6 +1875,46 @@ const scenarios = [
       same(await blockedIds(), [waiting.task_id], "and the Task that waits on the fact is blocked again");
       same(collections(await read()).event_markers, {}, "nothing the screen does appends an event marker");
       return "a new store reads as the empty state; a fact set over PATCH /universe-state unblocks the Task that waits on it and clearing it blocks it again; a number is set to exactly the value sent and cleared outright; a Task waiting on at_least 25 is not ready below it and planned at it; each write is recorded as asserted unless it says measured, and no record outlives its value; and eleven refused edits change nothing";
+    }
+  },
+  {
+    name: "what already matches and numeric precondition words",
+    seeded: true,
+    async run(first) {
+      const observed = observedEvent(FOREIGN_ID, "Synthetic already placed work", 2);
+      const o = await restartObserving(first, [observed]);
+      same((await capture(o)).captured, 1, "one uncoloured synthetic event is captured");
+      const tasks = await listTasks(o);
+      same(tasks.length, 1, "the store holds only that Task");
+      same(tasks[0].placement, "planned", "the captured Task is Dynamic");
+      const planned = await call(o.base, "POST", endpoints.PLANNING_GENERATE_PATH, {
+        schema_version: endpoints.PLANNING_SCHEMA_VERSION, request: null,
+        horizon: { start: observed.start_at, end: at(3) }
+      });
+      ok(planned.plan.steps.some((step) => step.task_id === tasks[0].task_id), "the captured Task has a placement in this Plan");
+      const matching = await preview(o);
+      same(matching.operations, [], "capture's applied snapshot already matches the placement, without an intervening approval");
+      same(matching.matching_placements, 1, "the response counts that matching placement");
+      same(matchingPlacementsSentence(matching.matching_placements), "1 placement already matches the calendar and needs no operation.", "the shared UI wording explains why no operation is needed");
+      same(matchingPlacementsSentence(14), "14 placements already match the calendar and need no operation.", "plural wording carries the server's number");
+      same(matchingPlacementsSentence(0), "", "zero adds no clause");
+      const comparisons = [["at_least", "is at least"], ["at_most", "is at most"], ["greater_than", "is greater than"], ["less_than", "is less than"]];
+      const waiting = [];
+      for (const [predicate, words] of comparisons) {
+        const task = await captureTask(o, {
+          title: `Synthetic comparison ${predicate}`, duration_estimate: fixed(5),
+          preconditions: { target: "numeric_values.invented.level", predicate, expected: 25 }
+        });
+        waiting.push({ id: task.task_id, predicate, words });
+      }
+      const blocked = await call(o.base, "POST", endpoints.PLANNING_GENERATE_PATH, { schema_version: endpoints.PLANNING_SCHEMA_VERSION, request: null });
+      for (const { id, predicate, words } of waiting) {
+        const leaf = blocked.blocked_tasks.find((task) => task.task_id === id)?.precondition;
+        same(leaf, { target: "numeric_values.invented.level", predicate, expected: 25 }, `HTTP returns the blocked ${predicate} precondition`);
+        same(numericComparisonWords(leaf.predicate), words, `the UI says the returned ${predicate} in words`);
+      }
+      same(numericComparisonWords("invented_unknown"), null, "unknown predicates leave the raw fallback in charge");
+      return "a captured Dynamic placement already matches with no operation, its count has the shared UI clause, and all four numeric predicates have words";
     }
   }
 ];

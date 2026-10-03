@@ -18,9 +18,11 @@
 # A full `cargo test` of ubu-orchestrator links about 55 test binaries with
 # debug info. Left to itself cargo runs one job per core; on a 16-core machine
 # with 30 GB that peaked at 24.4 GB, and the out-of-memory killer took the whole
-# terminal with it, twice. So there is a cap. Override it by exporting
-# CARGO_BUILD_JOBS before sourcing this file.
-export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-4}"
+# terminal with it. The terminal was killed under memory pressure while two
+# four-job invocations overlapped during P1B-60. Default to one compile/link job
+# and run Cargo invocations sequentially across repositories: this cap is per invocation,
+# not machine-wide. Override deliberately by exporting CARGO_BUILD_JOBS first.
+export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-1}"
 
 # ---- where
 #

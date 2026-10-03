@@ -13,9 +13,8 @@ Each step says what to **open**, what to **click** and what to **read**. A
 step asks you to **copy back** only where this run can show something that
 has not already been shown. From P1B-55 a verification that has passed live
 is retired, and recorded in the ledger in [ACCEPTANCE.md](ACCEPTANCE.md).
-This document once asked for fourteen things back. It now asks for eight.
-There are fourteen steps. The steps whose copy-back went are still here, as
-instructions, because the later steps need what they set up.
+There are twelve steps and seven copy-back items. The colour setup and
+colouring steps are retired in P1B-60; their preconditions are below.
 
 When a step cannot be completed, write down what the screen said and go on to
 the next step.
@@ -40,7 +39,7 @@ the opposite. In the P1B-57 run 85 events had no colour, 84 of them were
 placed, and one Task was left out. In the P1B-58 run nothing was left out.
 So expect “Not in this Plan” to hold one Task or two, or not to be on the
 screen at all, and “no such section” is an ordinary thing to copy back at
-step 10. When something is left out, that section is UbU saying what the
+step 8. When something is left out, that section is UbU saying what the
 week cannot hold, which is the question the tool exists to answer. The thing
 to judge is not whether everything fits. It is whether **what it chose to
 schedule is what you would have chosen**.
@@ -50,23 +49,33 @@ under a high-risk report, for reasons that were defects in the report: a
 coverage figure about the whole week printed as a statement about the next 60
 minutes, and an affect state nobody had recorded reported as exactly at its
 limit. Both were fixed in P1B-56, and its run read medium, with “low
-coverage”, “affect margin” and “post plan depletion” all absent. Step 10
+coverage”, “affect margin” and “post plan depletion” all absent. Step 8
 still asks for the badge and for every finding's name and severity, in the
 order the panel lists them, so that nobody has to scan a list and conclude
 that something is not in it.
 
-**The preview counts itself.** Until P1B-58 step 11 asked for three counts
+**The preview counts itself.** Until P1B-58 step 9 asked for three counts
 that no screen showed, and a preview of ninety operations could only be
 tallied by eye. The Preview panel now says the counts in one line, and step
-11 asks for that line.
+9 asks for that line.
 
 **What a Task can wait for has a screen.** A Task can ask that something be
 true before UbU will plan it. From P1B-58 the screen “UniverseState” shows
-what is recorded, and step 13 opens it. This run records nothing there, so on
+what is recorded, and step 11 opens it. This run records nothing there, so on
 this store it will say that nothing is recorded yet. That is the expected
 reading and not a fault.
 
 ## Before you start
+
+The rehearsal calendar must hold your events with your colours, and nothing
+UbU wrote. In Google Calendar, glance at that calendar's coming week after
+its reset: your coloured commitments and uncoloured to-dos must be there,
+with no leftover exports. UbU's colour-to-category Settings must also be in
+place: glance at Setup's “Colour to category at capture” table and check it
+matches your categories. These are preconditions, not copy-back items.
+Step 1 removes the previous rehearsal store, including its Settings; seed
+the mappings in the new store before capture. Settings in an old store do
+not carry over.
 
 **1. Start from a fresh store.** A store captured before P1B-55 holds every
 event as a fixed commitment, and nothing converts it. So this run does not
@@ -144,43 +153,46 @@ Click: “Create routine”.
 
 Read: the routine “Asleep” appears in the list headed “Routines”.
 
-**5. Set the colours you use.** A colour now does two things. It says an
-event is a commitment at its own time, and it says which category the
-commitment is in. Open **Setup**. In the card headed “Colours”, in the table
-“Category colours”, for each category you use: type its colour id in the box
-in that row and click “Save”.
+## Capture
 
-Read: the row's “Origin” becomes “setting”. Then read the table “Colour to
-category at capture”:
+**5. Enable the Google Calendar session.** Open **Setup**. In the card
+headed “Google Calendar session”, click “Enable Google Calendar session”.
 
-- a row that shows one category is a colour whose events are captured as
-  commitments in that category;
-- a row that reads “Collision: …” or “Unmapped — no category assigned.” is a
-  colour whose events are still captured as commitments at their own times,
-  with no category;
-- the row for colour id “8” reads “sleep”. Colour `8` is Graphite, so a real
-  event you have coloured Graphite is captured as a commitment in the sleep
-  category;
-- no row is for “no colour”. An event with no colour is not a commitment at
-  all, and the sentence under the heading says so.
+Read: the badge beside the heading changes to “enabled”. The first time,
+your browser opens for Google's consent; complete it.
 
-Copy back: every row of the table “Colour to category at capture”.
+Nothing reached Google before this step. From here, on the screen
+“Calendar”: “Run capture” and “Run reconciliation” READ your calendar, and
+“Approve preview” WRITES to it.
 
-**6. Colour your week, in Google Calendar. This step decides what UbU may
-move.** Go through the events of the coming week and give each one a colour,
-or leave it without one, by this rule:
+**6. Reset the rehearsal calendar.** When capture runs, the calendar UbU
+reads must hold **your events, and nothing UbU wrote**. Get it there by
+copying: reconstitute the rehearsal calendar from your own calendar, with the
+tooling you already use for that copy. Do not pick UbU's leftovers out of it
+by hand.
 
-- **A commitment gets a colour.** A meeting, an appointment, anything that
-  happens when it happens. Give it the colour of its category from step 5.
-  UbU will not move it.
-- **A to-do gets no colour. Leaving an event's colour as “Default” is how you
-  tell UbU to schedule it.** UbU keeps its length and discards its time. It
-  will be placed wherever in the week UbU chooses, and step 12 moves the
-  event there.
+Why a reset and not a clean-up: UbU knows which events it wrote only from its
+store, and this store is new. On the calendar itself an event UbU wrote in an
+earlier run cannot be told from one of yours, so there is nothing to detect
+and nothing to filter. A calendar that is copied fresh has none.
 
-The same rule runs the other way when UbU writes to the calendar: a
-commitment is written in its category's colour, and work UbU scheduled is
-written with no colour.
+From P1B-57 UbU stamps each event it creates, so a later run names those
+events and does not capture them: they appear in the capture's grey box in
+step 7 as `capture_stale_export`, with the count. Events on the calendar from
+before P1B-57 carry no stamp, which is why the reset is still the
+instruction.
+
+If the reset was incomplete, this is what you will see for an unstamped
+leftover, and it is the one thing that tells you. What a leftover becomes follows its colour, like any
+other event. One with a colour is captured as a commitment, beside the
+routine that still generates it: the same title twice on Tasks, and on Today
+a grey box with `routine_occurrence_overlaps_commitment` or
+`static_task_collision`. One with no colour is captured as work to schedule: a
+to-do you did not write. Leftovers are what put 81 colliding pairs in the
+P1B-55 run.
+
+**7. Capture.** Open **Calendar**. Under the heading “3. Capture”, click
+“Run capture”.
 
 Four things follow, and each is worth knowing before you capture:
 
@@ -197,50 +209,6 @@ Four things follow, and each is worth knowing before you capture:
   its event a colour and it becomes a commitment at the time it then has. To
   complete it, use “Complete” in the app. Only work you created in UbU is
   completed by colouring its event.
-
-## Capture
-
-**7. Enable the Google Calendar session.** Open **Setup**. In the card
-headed “Google Calendar session”, click “Enable Google Calendar session”.
-
-Read: the badge beside the heading changes to “enabled”. The first time,
-your browser opens for Google's consent; complete it.
-
-Nothing reached Google before this step. From here, on the screen
-“Calendar”: “Run capture” and “Run reconciliation” READ your calendar, and
-“Approve preview” WRITES to it.
-
-**8. Reset the rehearsal calendar.** When capture runs, the calendar UbU
-reads must hold **your events, and nothing UbU wrote**. Get it there by
-copying: reconstitute the rehearsal calendar from your own calendar, with the
-tooling you already use for that copy. Do not pick UbU's leftovers out of it
-by hand.
-
-The copy carries your colours, so make it after step 6. If you colour events
-on the rehearsal calendar and not on your own, make the copy before step 6.
-
-Why a reset and not a clean-up: UbU knows which events it wrote only from its
-store, and this store is new. On the calendar itself an event UbU wrote in an
-earlier run cannot be told from one of yours, so there is nothing to detect
-and nothing to filter. A calendar that is copied fresh has none.
-
-From P1B-57 UbU stamps each event it creates, so a later run names those
-events and does not capture them: they appear in the capture's grey box in
-step 9 as `capture_stale_export`, with the count. Events on the calendar from
-before P1B-57 carry no stamp, which is why the reset is still the
-instruction.
-
-If the reset was incomplete, this is what you will see for an unstamped
-leftover, and it is the one thing that tells you. What a leftover becomes follows its colour, like any
-other event. One with a colour is captured as a commitment, beside the
-routine that still generates it: the same title twice on Tasks, and on Today
-a grey box with `routine_occurrence_overlaps_commitment` or
-`static_task_collision`. One with no colour is captured as work to schedule: a
-to-do you did not write. Leftovers are what put 81 colliding pairs in the
-P1B-55 run.
-
-**9. Capture.** Open **Calendar**. Under the heading “3. Capture”, click
-“Run capture”.
 
 Read: six counters appear: “captured”, “updated”, “unchanged”, “skipped”,
 “moved” and “resized”. Under them:
@@ -275,7 +243,7 @@ box's.
 
 ## Plan
 
-**10. Generate a Plan.** Open **Today**. Click “Generate Plan”.
+**8. Generate a Plan.** Open **Today**. Click “Generate Plan”.
 
 Read, in this order:
 
@@ -307,12 +275,21 @@ number of placements carrying the badge “Skeleton”. And the whole section
 Copy back: the words on the badge beside “Plan risk”, and every finding's
 name and severity, in order as the panel lists them.
 
-**11. Take a preview.** Open **Calendar**. Under the heading “1. Preview”,
+**9. Take a preview.** Open **Calendar**. Under the heading “1. Preview”,
 click “Take preview”. This calls nothing and writes nothing.
 
 Read: above the operations, one line: “Operations proposed: N. Create N,
 update N, delete N.” The first number is the total. Then one operation for
-each event UbU would write.
+each event UbU would write. A positive matching count adds “N placements
+already match the calendar and need no operation.” (For one: “1 placement
+already matches the calendar and needs no operation.”)
+
+Read this beside the Skeleton count and “Not in this Plan” from step 8:
+when Skeleton is non-zero and no updates are proposed, the already-match
+clause identifies the placements already at their chosen times, with
+nothing to send for those placements. Any creates still need a write;
+unplaced work still belongs to “Not in this Plan”. Zero updates alone does
+not tell you how much work was planned.
 
 - An operation headed “Update:” that reads “Placement: Dynamic” is one of
   your uncoloured events. Its “Window:” line is the time UbU chose for it, in
@@ -330,10 +307,10 @@ Copy back: the line that begins “Operations proposed:”, exactly as it
 appears, and the whole of the first operation headed “Update:” that reads
 “Placement: Dynamic”. Do not count the operations yourself.
 
-**12. Decide whether to approve. Read this before you press it.**
+**10. Decide whether to approve. Read this before you press it.**
 
-**Approving will move every uncoloured event that was placed to the time UbU
-chose.** The line you copied in step 11 says how many: its “update” number.
+**Approving moves the uncoloured events that need updates to the time UbU
+chose. Already-matching placements need no operation.** The line you copied in step 9 says how many: its “update” number.
 In the P1B-58 run that line read “Operations proposed: 27. Create 7, update
 20, delete 0.” Each event that moves leaves the slot you
 parked it in and appears where the Plan put it, still with no colour, and
@@ -346,7 +323,7 @@ creates an event for every night and every routine occurrence. It never
 writes to an instance of a recurring event.
 
 You do not have to approve. If you want to see the moves first, read the
-“Update:” operations in step 11: they are exactly what will be written.
+“Update:” operations in step 9: they are exactly what will be written.
 
 If you click it:
 
@@ -357,7 +334,7 @@ Copy back: those two lines. Or the words “I did not approve”.
 
 ## What a Task can wait for
 
-**13. Read the UniverseState.** Open **UniverseState**, in the navigation
+**11. Read the UniverseState.** Open **UniverseState**, in the navigation
 between “Routines” and “Review”. Click nothing on it.
 
 Read, in this order:
@@ -388,29 +365,28 @@ leave that as it is.
 
 ## Finish
 
-**14. Stop.** In the first terminal, press Ctrl-C. The store at
+**12. Stop.** In the first terminal, press Ctrl-C. The store at
 `/tmp/ubu-live-rehearsal.db` is a rehearsal store and can be left or removed.
 
 If you approved, the calendar now holds what that store created and moved.
 The next store will not know those events. The next run begins from a reset
-calendar, at its step 8, so there is nothing to clean up after this one.
+calendar, at its step 6, so there is nothing to clean up after this one.
 
 ## What to copy back, in order
 
-1. From step 5: every row of the table “Colour to category at capture”.
-2. From step 9: the six counters with their numbers, the sentence that
+1. From step 7: the six counters with their numbers, the sentence that
    begins “N events had no colour.”, and every line in the grey box with its
-   code. Not the list of uncoloured events under that sentence.
-3. From step 10: the first sentence of any box above “Timed placements”, the
+   code. Do not expand or copy the list behind “The N events with no colour”.
+2. From step 8: the first sentence of any box above “Timed placements”, the
    number of “Skeleton” placements, and the whole section “Not in this Plan”
    or the words “no such section”.
-4. From step 10: the words on the badge beside “Plan risk”, and every
+3. From step 8: the words on the badge beside “Plan risk”, and every
    finding's name and severity, in order.
-5. From step 11: the line that begins “Operations proposed:”, and the whole
+4. From step 9: the line that begins “Operations proposed:”, and the whole
    of the first operation headed “Update:” that reads “Placement: Dynamic”.
-6. From step 12: the two approval lines, or “I did not approve”.
-7. From step 13: the line that begins “Entries:”. The names and the counts
+5. From step 10: the two approval lines, or “I did not approve”.
+6. From step 11: the line that begins “Entries:”. The names and the counts
    only, never a value.
-8. And one answer, in your own words: is what it chose to schedule what you
+7. And one answer, in your own words: is what it chose to schedule what you
    would have chosen, and is this a store you would plan tomorrow on? If
    not, what is missing?
