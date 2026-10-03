@@ -15,12 +15,12 @@
 # each pinned commit is on a branch of origin. Push a branch before pinning it.
 
 [pinned]
-ubu_schemas         = "dadb5042ba8bfcd08381a3dbab68af9f3b4a9a68"  # R_schemas (P1B-59 A: set_numeric and clear_numeric, an optional provenance_kind on a mutation and no note, fact_provenance on a UniverseState, and four numeric comparison predicates)
-ubu_core            = "0e6be7660e4958aec003bccb073e452715cb70e3"  # R_core (P1B-59 B: a number is set, cleared and compared, a write records how the fact was established, and no record outlives its value; 157 tests)
-ubu_store           = "628eec531e90c57f1537d33d4e45c3549fdeae05"  # R_store (P1B-59 C: pinned to the core revision above; no source change, 108 tests)
-ubu_planning_kernel = "f918d050f03c7ab2990debe68156a70007fae20b"  # R_planning (P1B-59 C: pinned to the core revision above; no source change, 83 tests)
-ubu_github_adapter  = "b77a729f6f2a643a667e86aa81affe4330c911ff"  # R_adapter (P1B-59 C: pinned to the core revision above; no source change, 23 tests)
-ubu_orchestrator    = "929260571d1125483efa089dec7a5a93d85050c7"  # P1B-59 D: PATCH /universe-state sets and clears a number and records provenance, bootstrap writes its keys without their collection, and a Task waits on at_least over HTTP; 510 tests, 56 OpenAPI paths
-ubu_ui              = "a9434156c7671727f5972d0884efd02a9a58adb9"  # P1B-59 E: the UniverseState screen sends set_numeric and clear_numeric and shows each value's provenance word, and the generated READMEs hold no absolute path; 147 tests, 43 path constants
+ubu_schemas         = "6082ad50680e38a7140e52ed4d8b8377efbc3b2c"  # P1B-60 A: string summaries and a whole-state round-trip fixture
+ubu_core            = "8ffc936257331c50cd03773c9d1333a3344cf4cc"  # P1B-60 B: schema submodule and whole-state compatibility; 158 tests
+ubu_store           = "a6ae9b82170b03e231a196d1b9341bfa0e20fce8"  # P1B-60 C: core pin only; 108 tests
+ubu_planning_kernel = "072867285ba267bb9caee28a12fb33c6ede51c2b"  # P1B-60 C: core pin only; 83 tests
+ubu_github_adapter  = "999e0e2f50388db6c5b999449c8620c750f288cf"  # P1B-60 C: core pin only; 23 tests
+ubu_orchestrator    = "84c00c55f5a9782a85c35eac6b6b701e8af64491"  # P1B-60 C/D: matching placements exclude retained history; 513 tests, 56 paths
+ubu_ui              = "78eab141c5b1fd806385fd6ae5b2592a3b6f832f"  # P1B-60 E/F: matching-placement clause and numeric precondition words; 156 tests, 43 paths
 ubu_design          = "f7c4a1dbe2979fa498ae115bb2ee74e6772d4c2c"  # P1B-41 H: unchanged design baseline; inventory previously unset
 ubu_brand           = "faf2005a8bd9e64742dd76ee6d1f91f45223946b"  # P1B-41 H: unchanged brand baseline; inventory previously unset
