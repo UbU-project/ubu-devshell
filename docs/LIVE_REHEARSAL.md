@@ -280,13 +280,15 @@ click “Take preview”. This calls nothing and writes nothing.
 
 Read: above the operations, one line: “Operations proposed: N. Create N,
 update N, delete N.” The first number is the total. Then one operation for
-each event UbU would write. A positive matching count adds “N placements
-already match the calendar and need no operation.” (For one: “1 placement
-already matches the calendar and needs no operation.”)
+each event UbU would write. The same line says “N Dynamic placements
+already match the calendar and need no operation; Static commitments keep their
+fixed times.” For one, it says “1 Dynamic placement already matches the calendar
+and needs no operation; Static commitments keep their fixed times.” Zero is
+explicit. The matching count excludes Static commitments and completed history.
 
 Read this beside the Skeleton count and “Not in this Plan” from step 8:
 when Skeleton is non-zero and no updates are proposed, the already-match
-clause identifies the placements already at their chosen times, with
+clause identifies the Dynamic placements already at their chosen times, with
 nothing to send for those placements. Any creates still need a write;
 unplaced work still belongs to “Not in this Plan”. Zero updates alone does
 not tell you how much work was planned.
@@ -342,7 +344,7 @@ Read, in this order:
 - the heading “UniverseState”, and under it a sentence that begins “A Task
   can ask that something be true before UbU will plan it.”;
 - in the first panel, the sentence that begins “Nothing is recorded here
-  yet.” This store is new, and nothing in this run records anything here, so
+  yet.” This store is new, and nothing before this step records anything here, so
   that is what it should say;
 - under it, one line that begins “Entries:”. It names the four collections,
   `facts`, `numeric_values`, `set_memberships` and `event_markers`, each
@@ -363,9 +365,48 @@ step in this document asks for a value from this screen, a key from it or
 any row of its tables, and none ever may. Anyone who edits this step must
 leave that as it is.
 
+## Ask for a precondition
+
+**12. Author facts, then run the advisor.** This model-dependent step comes
+last, after the deterministic checks. Stay in **UniverseState**. Choose two or
+three facts relevant to your captured Tasks. Under “Facts”, enter a key and a
+value and click “Set fact”; or under “Numbers”, enter a key and a number and
+click “Set number”. Use names meaningful to you. What you enter stays private
+and is recorded as asserted. Do not copy any key, value or row back.
+
+Open **Review**. Under “Precondition advisor”, leave “Precondition Task limit”
+at 25 and click “Run precondition advisor”. It considers active Tasks with a
+description, including one with an existing precondition. A captured Task with
+no description is skipped; this step does not require an interview or promise
+any candidate.
+A replacement shows “Currently required” and “Proposed requirement” together,
+with a line saying that admitting replaces the first with the second.
+Read “Run status” and “Candidates enqueued”, then the first precondition proposal
+in the queue, if there is one. A first-time proposal says “Before this Task
+can be planned:” and the condition in words; a replacement uses the two labels
+above. **Leave it in Review for this rehearsal.** No admission
+is needed to read the proposal, and the Plan already approved is unchanged.
+
+Every outcome is something to copy back, not a reason to repeat until a model
+agrees. `precondition_missing_targets` means needed targets were not recorded
+and no candidate for that Task was enqueued. `precondition_task_skipped` means
+an occurrence or a missing description prevented selection. `precondition_no_facts` means no supported targets were available
+and no model was asked. `advisory_unconfigured` means set the named configuration
+in Setup; no model was asked. Connection, timeout, HTTP and malformed-result
+diagnostics mean the run failed; read its remedy, copy only the code, and go on
+to Stop. A valid result with zero candidates is also a result.
+
+Copy back: the candidate count and the words of the first precondition, **with
+every target name and expected value replaced by `[target]` and `[value]`**.
+Keep only the relationship words (such as “is at least”, “and”, “or”). A candidate
+can itself repeat private values or names, so its unredacted sentence is not a
+safe copy-back. Never copy a Task description or title, a fact's key or value,
+or diagnostic text that names a target. If there is no candidate, write “no
+candidate” and the diagnostic codes only, or “no diagnostics”.
+
 ## Finish
 
-**12. Stop.** In the first terminal, press Ctrl-C. The store at
+**13. Stop.** In the first terminal, press Ctrl-C. The store at
 `/tmp/ubu-live-rehearsal.db` is a rehearsal store and can be left or removed.
 
 If you approved, the calendar now holds what that store created and moved.
@@ -387,6 +428,10 @@ calendar, at its step 6, so there is nothing to clean up after this one.
 5. From step 10: the two approval lines, or “I did not approve”.
 6. From step 11: the line that begins “Entries:”. The names and the counts
    only, never a value.
-7. And one answer, in your own words: is what it chose to schedule what you
+7. From step 12: the candidate count and the first precondition’s words with
+   target names replaced by `[target]` and expected values by `[value]`; or
+   “no candidate” and diagnostic codes only. No descriptions, titles or private
+   keys or values.
+8. And one answer, in your own words: is what it chose to schedule what you
    would have chosen, and is this a store you would plan tomorrow on? If
    not, what is missing?

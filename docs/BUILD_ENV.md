@@ -24,7 +24,10 @@ whole terminal session with it, twice in one afternoon. During P1B-60,
 concurrent orchestrator and store Cargo invocations each allowed four jobs;
 `systemd-oomd` killed the terminal scope under sustained memory pressure.
 
-The default is now one compile/link job per Cargo invocation. **Run Cargo
+P1B-60 reduced the default from four jobs to one. During P1B-61, the operator
+requested a two-job trial, then reported another OOM and requested restoration
+of the known-good one-job configuration. The default remains one compile/link
+job per Cargo invocation. **Run Cargo
 invocations sequentially across repositories**: separate invocations each have
 their own job budget, so starting several defeats the intended total limit.
 This limits concurrent compiler/linker work, not the memory of one process or

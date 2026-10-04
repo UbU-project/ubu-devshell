@@ -563,3 +563,28 @@ Ctrl-C is how a session ends, so the interrupt path is the normal path. The
 harness stops the orchestrator and `acceptance.sh` removes the temp
 directory, on Ctrl-C, on `SIGTERM`, on a failed seed and on `--stage-only`.
 The last line says the store is gone.
+
+## P1B-61: a candidate must be evaluable
+
+9. **A candidate the operator can admit must be one the system can evaluate.**
+   Validate every precondition branch and its mode before enqueueing, and admit
+   only over targets that still exist. Otherwise a suggestion can silently
+   create work that cannot currently run. This does not change `absent`, which
+   is true for a missing key, or imply a missing fact can never be authored.
+
+Nothing is retired. `week_precondition` stages one invented fact and one Task
+with an invented description implying a precondition over that fact. Its check
+verifies those inputs, not advisor behavior. Scenario 24 in the runner asserts
+proposal, admission and planning as the fact changes. The live rehearsal has
+13 numbered steps and 8 numbered copy-back items. The new step is 12, after the
+UniverseState check and before Stop, following the operator-approved correction
+to §H's original middle-of-sequence placement. Step 9 states the Dynamic count.
+
+Copy-back preserves the count and predicate words, redacting target identifiers
+and expected values from a candidate sentence; that sentence can contain private
+facts too. No fact value or Task description is requested. Operator acceptance
+is not performed by the automated checks.
+
+The operator briefly requested a two-job Cargo default during this ticket,
+then reported another OOM and requested the known-good one-job configuration.
+The default is restored to one; invocations remain sequential. See BUILD_ENV.md.

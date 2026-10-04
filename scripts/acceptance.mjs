@@ -481,6 +481,23 @@ const SEEDS = {
       }
       return "one captured Dynamic event is staged exactly at its Plan window; the runner checks its preview count and wording";
     }
+  },
+  week_precondition: {
+    what: "a synthetic fact and a described Task ready for the precondition advisor",
+    async make() {
+      const target = "numeric_values.synthetic.orbital_teapot_charge";
+      await call("PATCH", endpoints.UNIVERSE_STATE_PATH, { schema_version: endpoints.UNIVERSE_STATE_SCHEMA_VERSION, mutations: [{ operation: "set_numeric", target, payload: 0 }] });
+      const task = await captureTask({ title: "Synthetic orbital teapot launch", description: "Synthetic orbital teapot launch requires at least 25 charge units.", duration_estimate: { type: "fixed", seconds: 600 } });
+      return { target, id: task.task_id };
+    },
+    async check({ target, id }) {
+      const universe = await call("GET", endpoints.UNIVERSE_STATE_PATH);
+      const task = await readTask(id);
+      if (universe.numeric_values[target.slice("numeric_values.".length)] !== 0 || task.payload.preconditions || task.payload.description !== "Synthetic orbital teapot launch requires at least 25 charge units.") {
+        throw new StagingFailure("synthetic precondition advisor inputs were not staged");
+      }
+      return `Synthetic orbital teapot launch (${id}) has a description and its fact exists; no advisor has run and no precondition has been admitted`;
+    }
   }
 };
 
@@ -510,11 +527,11 @@ const T = {
 // checked before it is printed.
 const STEPS = [
   {
-    needs: ["week_colours", "week_calendar", "week_leftover", "week_routine", "week_night", "week_backlog", "week_universe", "week_measured", "week_risk", "week_matches"],
+    needs: ["week_colours", "week_calendar", "week_leftover", "week_routine", "week_night", "week_backlog", "week_universe", "week_measured", "week_risk", "week_matches", "week_precondition"],
     name: "The risk report says what it means",
     open: "Today, in the navigation.",
     click: "The button “Generate Plan”.",
-    read: `The panel headed “Plan risk” has a badge beside its heading. It reads “medium risk”. Under it each finding has a name in bold. One is named “unplaced work”, for “${T.fence}”. None is named “affect margin” or “post plan depletion”, and none is named “low coverage” unless a staged commitment starts within the next 60 minutes. Under the heading “Plan-quality signals”, the rows “Affect margin”, “Stretch pressure” and “Post-Plan state delta” each read “not recorded”, and one line under the rows begins “No Snapshot of how you are feeling has been taken”. Under “Model repair suggestions” the first line begins “Record how you are feeling:”. What was checked over HTTP before this was printed: {week_risk}. Additional staging: {week_matches}.`,
+    read: `The panel headed “Plan risk” has a badge beside its heading. It reads “medium risk”. Under it each finding has a name in bold. One is named “unplaced work”, for “${T.fence}”. None is named “affect margin” or “post plan depletion”, and none is named “low coverage” unless a staged commitment starts within the next 60 minutes. Under the heading “Plan-quality signals”, the rows “Affect margin”, “Stretch pressure” and “Post-Plan state delta” each read “not recorded”, and one line under the rows begins “No Snapshot of how you are feeling has been taken”. Under “Model repair suggestions” the first line begins “Record how you are feeling:”. What was checked over HTTP before this was printed: {week_risk}. Additional staging: {week_matches}. Advisor input staging: {week_precondition}.`,
     copy: "The words on the badge beside “Plan risk”. The bold name of every finding under it. And the three rows “Affect margin”, “Stretch pressure” and “Post-Plan state delta”, each with what it reads.",
     codes: [
       "“medium risk”, with “unplaced work” and no affect finding: expected",

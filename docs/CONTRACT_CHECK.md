@@ -1,7 +1,7 @@
 # The scenario runner
 
 `scripts/check-ui-contract.sh` builds the real `ubu-orchestrator` and walks
-the daily loop against it over HTTP, in twenty-two scenarios. It needs no
+the daily loop against it over HTTP, in twenty-four scenarios. It needs no
 webview, no Google account and no model. A full walk takes about ten seconds
 once the orchestrator is built.
 
@@ -46,7 +46,7 @@ at that time:
 
 Those two assertions are still scenario 1, and still run first.
 
-## The twenty-two scenarios
+## The twenty-four scenarios
 
 Every scenario starts its own orchestrator on its own ephemeral loopback
 port with its own empty store. Nothing is carried from one to the next. All
@@ -76,6 +76,8 @@ calendar requests ask for `export_mode: "mock"`.
 | 20 | a fresh store | *Seeded.* The hazard of a store reset, on four stores and one calendar. A store exports a routine's occurrence in its category's colour, a Dynamic Task with no colour, and a commitment with no category, also with no colour. A second capture on that store takes all three as `unchanged`. **A new store on a calendar that holds them as UbU inserted them, stamped, captures none**: all three are skipped and named once as `capture_stale_export`, and the store holds no Task. **On the same calendar without the stamps**, which is every event from before P1B-57, a new store captures all three as new, each under a new handle, and the colour decides what each becomes: the coloured occurrence is a Static commitment again, the Dynamic Task is Dynamic work again, and the uncategorised commitment comes back as Dynamic work. The routine, authored again, collides with its own copy: `routine_occurrence_overlaps_commitment`, and the Plan is built. Its preview creates the event a second time. After an approve and a second reset, another store captures two coloured copies of one event at one time: `static_task_collision`, naming both by title and by id, and the Plan is still built. See [the fresh store](#the-fresh-store). |
 | 21 | a colour decides the placement | *Seeded.* Six invented events: two uncoloured at overlapping times, one in a colour mapped to one category, one in a colour two categories share, one uncoloured of no length, and one all-day. **Capture** makes the two uncoloured ones Dynamic Tasks with their lengths as durations and no `static_window`, the mapped one Static in its category, the shared-colour one Static with none; it refuses the one of no length with `capture_event_invalid` and skips the all-day one with `capture_all_day_unsupported`. **Generate** emits no `static_task_collision` and places both Dynamic Tasks at times it chose. **Preview** proposes two `update` operations with the new windows and no colour, and nothing for the commitments. One uncoloured event is then given a colour: its Task is Static at the event's own time, with a `static_window`. The colour is removed: the Task is Dynamic again and the `static_window` is gone. See [the colour convention](COLOUR_CONVENTION.md). |
 | 22 | the UniverseState screen | What the screen “UniverseState” does, request for request, in the body `editUniverseState` sends, and from P1B-59 its real set and clear and the provenance it shows. On a new store `GET /universe-state` answers the empty state: a null `version`, all four collections and `fact_provenance` present and empty, and reading stores nothing. A Task is captured with a precondition on an invented fact and is in `blocked_tasks`. **Set a fact**: `set_fact` through `PATCH /universe-state` answers with the fact under its key at version 2, the seed being version 1; a later read is exactly what the edit answered with; the Task is blocked no longer; and the write is recorded as `asserted`, with its time, which is the word the screen shows. **Set a number**: `set_numeric` to 0.7 and then to 0.1 gives exactly 0.1, where the difference P1B-58's screen sent landed on 0.09999999999999998. A set that states `measured` is recorded as measured beside the asserted fact, and one that states nothing is asserted again. **Clear a number**: `clear_numeric` with no payload removes the key and its provenance, and clearing what is not there is not an error. **A Task that waits on a number**: captured with `at_least` 25, it is not ready while the number was never recorded, not ready at 24.5, and planned at 25 and at 40. **Sets** hold the text and the number as themselves, a member is removed as the value it is, a set that loses its last member is gone with its provenance, and no entry is left for a value that is gone. **Refusals**: eight lists that each hold a good mutation and then a bad one, among them a clear with a payload, a clear with a provenance kind and a `set_numeric` that is not a number, are each refused 400 `universe_mutation_invalid` naming mutation 1; an empty list is refused `universe_mutations_empty`; a mutation that carries `note`, and one whose kind is not one of the four, are refused 422 as not the route's shape; and after all eleven the state is what it was, version included. **Clear a fact**: `clear_fact` removes the fact and its provenance, the measured number keeps its own, and the Task that waits on the fact is blocked again. Nothing the screen does appends an event marker. Three kinds of body here are not the app's: a Task's precondition, which `ubu-ui` authors none of and the Task route accepts; a stated `provenance_kind`; and the malformed ones. |
+| 23 | matching placements and numeric words | A captured Dynamic placement needs no operation; the shared UI wording states the Dynamic count and the four numeric comparisons in words. |
+| 24 | the precondition advisor | A stub proposal changes only candidate state. Explicit admission sets or replaces the reviewed condition, leaves facts unchanged, and the next Plan follows the recorded fact. |
 
 The seeded scenarios first apply a day with no seed, then restart the
 orchestrator on the same store with a fixture built from the events that
@@ -392,10 +394,10 @@ scenario 7 of 16: colour means done (seeded mock calendar)
 PASS  7 colour means done: a colour on an applied Dynamic event completes its Task at capture, and only that Task
 ```
 
-A complete walk ends with twenty-two `PASS` lines, two `SKIP` lines and:
+A complete walk ends with twenty-four `PASS` lines, two `SKIP` lines and:
 
 ```text
-RESULT: 22 of 22 scenarios passed, 0 failed, 2 skipped, 433 requests, all to 127.0.0.1
+RESULT: 24 of 24 scenarios passed, 0 failed, 2 skipped, 466 requests, all to 127.0.0.1
 ```
 
 The walk stops at the first failure. The `FAIL` line names the scenario and
@@ -421,7 +423,7 @@ Two scripts, one boundary.
 | | `check-ui-contract.sh` | `acceptance.sh` |
 |---|---|---|
 | Covers | The HTTP layer: what the orchestrator does with a request. | The rendered layer: what a human sees in the app. |
-| Asserts | Everything it checks, in twenty-two scenarios, each on its own store. | Nothing about behaviour. It stages a store and prints steps. |
+| Asserts | Everything it checks, in twenty-four scenarios, each on its own store. | Nothing about behaviour. It stages a store and prints steps. |
 | Store | One throwaway store per scenario, and two for the rehearsal, on ephemeral ports. | One throwaway store on the app's default port, held until Ctrl-C. |
 | Preconditions | Each scenario stages exactly what it asserts. | Each step declares the seeds it needs; each seed checks itself over HTTP. |
 | A human | Reads PASS and FAIL lines. | Opens the app and follows the steps. |
@@ -457,3 +459,22 @@ check the matching clause and all four numeric comparison words. It does not
 render React: `ubu-ui` tests cover the rendered summary, fallback and nested
 preconditions. The acceptance harness only stages an already-matching placement
 in its throwaway mock calendar.
+
+## P1B-61: precondition admission and Dynamic matches
+
+Scenario 24 uses the isolated loopback model stub. It stages an invented numeric
+fact and a described Task, runs `producer: "precondition"`, checks that only a
+candidate appeared, admits it through the existing route, and proves that the
+next Plan excludes the Task when false and includes it when true. Neither
+proposal nor admission changes UniverseState or provenance. No real model runs.
+
+Scenario 23's shared wording now calls the count Dynamic, including explicit
+zero; the retained-history scenario expects zero when only a Static commitment
+remains. Static, Dynamic and mixed-plan count cases are also in the orchestrator
+HTTP tests. Rendering and candidate action wiring remain covered by UI tests.
+There are 24 automated mock scenarios; the two live scenarios stay opt-in and
+are reported as skipped. The harness stages inputs and asserts no advisor behavior.
+
+Scenario 24 also proposes over the admitted precondition, checks both trees in
+the replacement candidate, and proves only explicit admission replaces it while
+facts remain untouched.

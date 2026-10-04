@@ -363,6 +363,10 @@ async function startModelStub() {
       } else if (stub.mode === "slow") {
         const timer = setTimeout(() => answer(200, { model: body.model, done: true, response: '{"proposals":[]}' }), stub.delayMs);
         response.on("close", () => clearTimeout(timer));
+      } else if (stub.mode === "precondition") {
+        const context = JSON.parse(body.prompt);
+        const proposals = context.tasks.map((task) => ({ id: task.id, precondition: { target: "numeric_values.synthetic.orbital_teapot_charge", predicate: "at_least", expected: stub.preconditionMinimum ?? 25 } }));
+        answer(200, { model: body.model, done: true, response: JSON.stringify({ proposals }) });
       } else if (stub.mode === "clarify") {
         const { round } = JSON.parse(body.prompt);
         const set = round === 1 ? { questions: ROUND_ONE, done: false } : round === 2 ? { questions: ROUND_TWO, done: false } : { questions: [], done: true };
@@ -606,7 +610,7 @@ const scenarios = [
       same({ updated: again.updated, unchanged: again.unchanged }, { updated: 0, unchanged: 2 }, "a second capture of the same calendar completes nothing again");
       await generatePlan(o);
       const retained = await preview(o);
-      same(retained.matching_placements, 1, "only the Static placement matches; completed history does not add to the count");
+      same(retained.matching_placements, 0, "the remaining match is Static; neither it nor completed history adds to the Dynamic count");
       same(retained.operations, [], "retained history produces no operation");
       ok(retained.events.some((event) => event.task_id === day.flexible), "the completed calendar event is still retained");
       return "a colour completes only the Dynamic Task, and its retained event is excluded from matching_placements";
@@ -1895,9 +1899,9 @@ const scenarios = [
       const matching = await preview(o);
       same(matching.operations, [], "capture's applied snapshot already matches the placement, without an intervening approval");
       same(matching.matching_placements, 1, "the response counts that matching placement");
-      same(matchingPlacementsSentence(matching.matching_placements), "1 placement already matches the calendar and needs no operation.", "the shared UI wording explains why no operation is needed");
-      same(matchingPlacementsSentence(14), "14 placements already match the calendar and need no operation.", "plural wording carries the server's number");
-      same(matchingPlacementsSentence(0), "", "zero adds no clause");
+      same(matchingPlacementsSentence(matching.matching_placements), "1 Dynamic placement already matches the calendar and needs no operation; Static commitments keep their fixed times.", "the shared UI wording explains why no operation is needed");
+      same(matchingPlacementsSentence(14), "14 Dynamic placements already match the calendar and need no operation; Static commitments keep their fixed times.", "plural wording carries the server's number");
+      same(matchingPlacementsSentence(0), "0 Dynamic placements already match the calendar and need no operation; Static commitments keep their fixed times.", "zero Dynamic matches is explicit without counting Static commitments");
       const comparisons = [["at_least", "is at least"], ["at_most", "is at most"], ["greater_than", "is greater than"], ["less_than", "is less than"]];
       const waiting = [];
       for (const [predicate, words] of comparisons) {
@@ -1915,6 +1919,50 @@ const scenarios = [
       }
       same(numericComparisonWords("invented_unknown"), null, "unknown predicates leave the raw fallback in charge");
       return "a captured Dynamic placement already matches with no operation, its count has the shared UI clause, and all four numeric predicates have words";
+    }
+  },
+  {
+    name: "advisor proposes a precondition over an existing fact",
+    async run(o) {
+      const target = "numeric_values.synthetic.orbital_teapot_charge";
+      const task = await captureTask(o, { title: "Synthetic orbital teapot launch", description: "Synthetic orbital teapot launch requires at least 25 charge units.", duration_estimate: fixed(10) });
+      await captureTask(o, { title: "Synthetic control task", duration_estimate: fixed(5) });
+      const edit = (value) => call(o.base, "PATCH", endpoints.UNIVERSE_STATE_PATH, { schema_version: endpoints.UNIVERSE_STATE_SCHEMA_VERSION, mutations: [{ operation: "set_numeric", target, payload: value }] });
+      const universe = await edit(0);
+      const before = await readTask(o, task.task_id);
+      const stub = await startModelStub(); stub.mode = "precondition";
+      await putSetting(o, "advisory.model", "synthetic-precondition-model");
+      await putSetting(o, "advisory.endpoint", stub.endpoint);
+      const proposed = await call(o.base, "POST", endpoints.ADVISORY_RUN_PATH, { schema_version: endpoints.ADVISORY_RUN_SCHEMA_VERSION, producer: "precondition", limit: 25 });
+      same(proposed.candidates_enqueued, 1, "one precondition candidate appears");
+      same(await readTask(o, task.task_id), before, "proposal leaves the Task untouched");
+      same(await call(o.base, "GET", endpoints.UNIVERSE_STATE_PATH), universe, "proposal leaves all facts and provenance untouched");
+      const queued = await call(o.base, "GET", endpoints.ADVISORY_QUEUE_PATH);
+      const candidate = queued.candidates[0].candidate;
+      same(candidate.candidate_kind, "precondition", "the queue names the new kind");
+      same(candidate.normalized_proposal, { target, predicate: "at_least", expected: 25 }, "the proposal is the precondition tree");
+      const admitted = await call(o.base, "POST", fill(endpoints.ADVISORY_ADMIT_PATH, { candidate_id: candidate.advisory_candidate_id }), { observed_version: candidate.version });
+      same(admitted.task.preconditions, candidate.normalized_proposal, "admission sets Task.preconditions");
+      same(await call(o.base, "GET", endpoints.UNIVERSE_STATE_PATH), universe, "admission authors no fact or provenance");
+      const blocked = await call(o.base, "POST", endpoints.PLANNING_GENERATE_PATH, { schema_version: endpoints.PLANNING_SCHEMA_VERSION, request: null });
+      same(blocked.blocked_tasks.map((task) => task.task_id), [task.task_id], "the false fact blocks this Task");
+      ok(!blocked.plan.steps.some((step) => step.task_id === task.task_id), "the blocked Task is not planned");
+      await edit(25);
+      const ready = await call(o.base, "POST", endpoints.PLANNING_GENERATE_PATH, { schema_version: endpoints.PLANNING_SCHEMA_VERSION, request: null });
+      ok(ready.plan.steps.some((step) => step.task_id === task.task_id), "recording the sufficient number includes the Task in the next Plan");
+      stub.preconditionMinimum = 50;
+      const taskBeforeReplacement = await readTask(o, task.task_id);
+      const factsBeforeReplacement = await call(o.base, "GET", endpoints.UNIVERSE_STATE_PATH);
+      const replacement = await call(o.base, "POST", endpoints.ADVISORY_RUN_PATH, { schema_version: endpoints.ADVISORY_RUN_SCHEMA_VERSION, producer: "precondition", limit: 25 });
+      same(replacement.candidates_enqueued, 1, "an existing precondition can receive a replacement proposal");
+      same(await readTask(o, task.task_id), taskBeforeReplacement, "replacement proposal also leaves the Task untouched");
+      const queueAfter = await call(o.base, "GET", endpoints.ADVISORY_QUEUE_PATH);
+      const replacing = queueAfter.candidates.find((entry) => entry.candidate.advisory_candidate_id === replacement.candidate_ids[0]).candidate;
+      same(replacing.normalized_proposal, { existing_precondition: { target, predicate: "at_least", expected: 25 }, proposed_precondition: { target, predicate: "at_least", expected: 50 } }, "review carries both current and proposed requirements");
+      const replaced = await call(o.base, "POST", fill(endpoints.ADVISORY_ADMIT_PATH, { candidate_id: replacing.advisory_candidate_id }), { observed_version: replacing.version });
+      same(replaced.task.preconditions, replacing.normalized_proposal.proposed_precondition, "explicit admission replaces only the reviewed condition");
+      same(await call(o.base, "GET", endpoints.UNIVERSE_STATE_PATH), factsBeforeReplacement, "replacement authors no facts");
+      return "stub proposals change only candidate state; explicit admission sets or visibly replaces the precondition; the next Plan excludes or includes the Task as the recorded fact changes";
     }
   }
 ];
