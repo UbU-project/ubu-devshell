@@ -15,12 +15,12 @@
 # each pinned commit is on a branch of origin. Push a branch before pinning it.
 
 [pinned]
-ubu_schemas         = "6082ad50680e38a7140e52ed4d8b8377efbc3b2c"  # P1B-60 A: string summaries and a whole-state round-trip fixture
-ubu_core            = "8ffc936257331c50cd03773c9d1333a3344cf4cc"  # P1B-60 B: schema submodule and whole-state compatibility; 158 tests
-ubu_store           = "a6ae9b82170b03e231a196d1b9341bfa0e20fce8"  # P1B-60 C: core pin only; 108 tests
-ubu_planning_kernel = "072867285ba267bb9caee28a12fb33c6ede51c2b"  # P1B-60 C: core pin only; 83 tests
-ubu_github_adapter  = "999e0e2f50388db6c5b999449c8620c750f288cf"  # P1B-60 C: core pin only; 23 tests
-ubu_orchestrator    = "84c00c55f5a9782a85c35eac6b6b701e8af64491"  # P1B-60 C/D: matching placements exclude retained history; 513 tests, 56 paths
-ubu_ui              = "78eab141c5b1fd806385fd6ae5b2592a3b6f832f"  # P1B-60 E/F: matching-placement clause and numeric precondition words; 156 tests, 43 paths
+ubu_schemas         = "3b2c93e65710b85a1b29b8c97278a72b87b22944"  # P1B-61 A: precondition and replacement candidate schemas
+ubu_core            = "c4b624d76f210f77f865c61801e02c89219763ce"  # P1B-61 B: candidate kind and canonical round trips; 161 tests
+ubu_store           = "c62eabc5983db554d3b57f694fe49d6597fe3ea8"  # P1B-61 C: core pin only; 108 tests
+ubu_planning_kernel = "8af10ece07043c307fe351ac867cfd8449e08c4f"  # P1B-61 C: core pin only; 83 tests
+ubu_github_adapter  = "50fae565e6d48fb5c41107ab3259096ad243ccf3"  # P1B-61 C: core pin only; 23 tests
+ubu_orchestrator    = "6c931d870e0924450b0d32e897071c8f5b78d9e5"  # P1B-61 C–F: precondition proposals/admission and Dynamic matches; 530 tests, 56 paths
+ubu_ui              = "9e0a8978b388abdfd64cf972fda965be1bd17ee0"  # P1B-61 F/G: Dynamic wording and explicit replacement review; 161 tests, 43 paths
 ubu_design          = "f7c4a1dbe2979fa498ae115bb2ee74e6772d4c2c"  # P1B-41 H: unchanged design baseline; inventory previously unset
 ubu_brand           = "faf2005a8bd9e64742dd76ee6d1f91f45223946b"  # P1B-41 H: unchanged brand baseline; inventory previously unset
