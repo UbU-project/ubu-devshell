@@ -369,7 +369,7 @@ async function startModelStub() {
         answer(200, { model: body.model, done: true, response: JSON.stringify({ reviews }) });
       } else if (stub.mode === "precondition") {
         const context = JSON.parse(body.prompt);
-        const proposals = context.tasks.map((task) => ({ id: task.id, precondition: { target: "numeric_values.synthetic.orbital_teapot_charge", predicate: "at_least", expected: stub.preconditionMinimum ?? 25 } }));
+        const proposals = context.tasks.filter((task) => !stub.preconditionTaskIds || stub.preconditionTaskIds.includes(task.id)).map((task) => ({ id: task.id, precondition: { target: "numeric_values.synthetic.orbital_teapot_charge", predicate: "at_least", expected: stub.preconditionMinimum ?? 25 } }));
         answer(200, { model: body.model, done: true, response: JSON.stringify({ proposals }) });
       } else if (stub.mode === "clarify") {
         const { round } = JSON.parse(body.prompt);
@@ -673,7 +673,7 @@ const scenarios = [
     async run(first) {
       const day = await appliedDay(first);
       ok(/^[0-9a-v]+_\d{8}T\d{6}Z$/.test(RECURRING_ID), `the seeded id has the {base32hex}_{timestamp} shape: ${RECURRING_ID}`);
-      const o = await restartObserving(first, [...day.applied, observedEvent(RECURRING_ID, "Synthetic recurring instance", 6)]);
+      const o = await restartObserving(first, [...day.applied, { ...observedEvent(RECURRING_ID, "Synthetic recurring instance", 6), description: "Synthetic recurring orbital notes." }]);
       ok(true, "the orchestrator started on the seed, so the event parsed");
       const notOwnable = `Calendar event \`${RECURRING_ID}\` cannot be captured: its id cannot be a UbU Task handle, so UbU cannot own it`;
       const reconciliation = await reconcile(o);
@@ -694,8 +694,14 @@ const scenarios = [
       const stored = (await readTask(o, occupancy.task_id)).payload;
       same(stored.provenance.source, { source_kind: "google_calendar", source_id: RECURRING_ID }, "the Google id is its provenance source, the dedupe key");
       ok(!occupancy.task_id.includes(RECURRING_ID.split("_")[0]), `its handle is minted, not derived from the Google id: ${occupancy.task_id}`);
+      const editedNotes = "Synthetic operator-authored orbital notes.";
+      const beforeEdit = await readTask(o, occupancy.task_id);
+      await call(o.base, "PATCH", fill(endpoints.TASK_PATH, { task_id: occupancy.task_id }), {
+        schema_version: endpoints.TASK_CAPTURE_SCHEMA_VERSION, expected_version: beforeEdit.version, description: editedNotes
+      });
       const again = await capture(o);
       same({ captured: again.captured, updated: again.updated, unchanged: again.unchanged }, { captured: 0, updated: 0, unchanged: 3 }, "a second capture admits nothing");
+      ok((await readTask(o, occupancy.task_id)).payload.description === editedNotes, "recapture preserves edited Task notes without echoing them");
       same((await listTasks(o)).length, 3, "and there is still one Task for it");
       const after = await reconcile(o);
       same(after.conflicts.map((conflict) => [conflict.conflict_type, conflict.external_id]), [["foreign", RECURRING_ID]], "after capture it is still foreign, so it is not in the applied record");
@@ -1935,10 +1941,14 @@ const scenarios = [
       const universe = await edit(0);
       const before = await readTask(o, task.task_id);
       const stub = await startModelStub(); stub.mode = "precondition";
+      // The control now reaches the model too. This scenario's model chooses
+      // a requirement only for the launch; scenario 26 proposes for title-only work.
+      stub.preconditionTaskIds = [task.task_id];
       await putSetting(o, "advisory.model", "synthetic-precondition-model");
       await putSetting(o, "advisory.endpoint", stub.endpoint);
       const proposed = await call(o.base, "POST", endpoints.ADVISORY_RUN_PATH, { schema_version: endpoints.ADVISORY_RUN_SCHEMA_VERSION, producer: "precondition", limit: 25 });
       same(proposed.candidates_enqueued, 1, "one precondition candidate appears");
+      same(JSON.parse(stub.requests[0].body.prompt).tasks.length, 2, "the title-only control is also eligible; the stub deliberately omits its proposal");
       same(await readTask(o, task.task_id), before, "proposal leaves the Task untouched");
       same(await call(o.base, "GET", endpoints.UNIVERSE_STATE_PATH), universe, "proposal leaves all facts and provenance untouched");
       const queued = await call(o.base, "GET", endpoints.ADVISORY_QUEUE_PATH);
@@ -2001,6 +2011,56 @@ const scenarios = [
       ok(held.diagnostics.some(d=>d.code==="advisory_proposal_suppressed" && d.message.includes("held until")),"the hold diagnostic gives a return date");
       same(stub.requests.length,asked,"a held subject is not sent to the model again");
       return "an explicit removal restores planned work; rejection retains a finite subject snooze across normal runs";
+    }
+  },
+  {
+    name: "calendar capture supplies optional notes and title-only advisor input",
+    seeded: true,
+    async run(first) {
+      // Deliberately use the calendar route, never the manual captureTask helper.
+      const noted = { id: "0inv3nt3d0rbital", summary: "Synthetic orbital kettle inspection", description: "Synthetic orbital inspection requires the recorded charge threshold.", start: { dateTime: at(6) }, end: { dateTime: at(6, 30) } };
+      const titleOnly = { id: "0inv3nt3dsaturn", summary: "Synthetic Saturn charge check", start: { dateTime: at(7) }, end: { dateTime: at(7, 30) } };
+      const o = await restartObserving(first, [noted, titleOnly]);
+      same((await capture(o)).captured, 2, "both uncoloured calendar events become Tasks");
+      const captured = await listTasks(o);
+      const described = captured.find((task) => task.title === noted.summary);
+      const bare = captured.find((task) => task.title === titleOnly.summary);
+      ok(described && bare, "the two captured titles identify the two Tasks");
+      const withNotes = await readTask(o, described.task_id);
+      const withoutNotes = await readTask(o, bare.task_id);
+      ok(withNotes.payload.description === noted.description, "calendar notes reached the Task unchanged; their text is not printed");
+      ok(!Object.hasOwn(withoutNotes.payload, "description"), "a title-only captured Task has no description key");
+      const target = "numeric_values.synthetic.orbital_teapot_charge";
+      await call(o.base, "PATCH", endpoints.UNIVERSE_STATE_PATH, { schema_version: endpoints.UNIVERSE_STATE_SCHEMA_VERSION, mutations: [{ operation: "set_numeric", target, payload: 40 }] });
+      const stub = await startModelStub(); stub.mode = "precondition";
+      await putSetting(o, "advisory.model", "synthetic-precondition-model");
+      await putSetting(o, "advisory.endpoint", stub.endpoint);
+      const result = await call(o.base, "POST", endpoints.ADVISORY_RUN_PATH, { schema_version: endpoints.ADVISORY_RUN_SCHEMA_VERSION, producer: "precondition", limit: 25 });
+      same(result.candidates_enqueued, 2, "the advisor enqueues for both calendar-captured Tasks");
+      const queue = await call(o.base, "GET", endpoints.ADVISORY_QUEUE_PATH);
+      ok(queue.candidates.some(({ candidate }) => candidate.target_refs.some(({ id }) => id === bare.task_id)), "a candidate targets the Task with only a title");
+      same(stub.requests.length, 1, "the model is asked once about these two Tasks");
+      const context = JSON.parse(stub.requests[0].body.prompt);
+      same(context.tasks.map(({ id, title }) => [id, title]).sort(), [[described.task_id, noted.summary], [bare.task_id, titleOnly.summary]].sort(), "the prompt carries both titles");
+      ok(context.tasks.find(({ id }) => id === described.task_id).description === noted.description, "the described Task supplies its notes to the model without printing them");
+      ok(!Object.hasOwn(context.tasks.find(({ id }) => id === bare.task_id), "description"), "the title-only model input omits description");
+      same(context.tasks.filter((task) => Object.hasOwn(task, "description")).length, 1, "exactly one prompt Task has a description");
+      const editedNotes = "Synthetic amended orbital inspection notes.";
+      await call(o.base, "PATCH", fill(endpoints.TASK_PATH, { task_id: described.task_id }), { schema_version: endpoints.TASK_CAPTURE_SCHEMA_VERSION, expected_version: withNotes.version, description: editedNotes });
+      const repeated = await capture(o);
+      same({ updated: repeated.updated, unchanged: repeated.unchanged }, { updated: 0, unchanged: 2 }, "recapture declines calendar notes and counts both Tasks unchanged");
+      ok((await readTask(o, described.task_id)).payload.description === editedNotes, "notes edited on Tasks survive recapture");
+      await generatePlan(o);
+      const proposed = await preview(o);
+      same(proposed.operations.length, 2, "both parked Dynamic events need a move");
+      ok(proposed.operations.every(({ kind, event }) => kind === "update" && !Object.hasOwn(event, "description")), "neither projected update carries a description");
+      const applied = await approve(o, proposed.preview_id);
+      same(applied.status, "applied", "explicit Mock approval applies both moves");
+      same(applied.operation_results.length, 2, "both description-free operations are applied");
+      ok(applied.applied_events.every((event) => !Object.hasOwn(event, "description")), "the approved Calendar projection contains no descriptions");
+      // Pure Rust wire tests additionally assert event_body and both event_request
+      // operations omit notes, and the recorder preserves Google's notes on PATCH.
+      return "calendar capture supplies optional notes, title-only work reaches the model and queue, edited notes survive recapture, and approved projections omit descriptions";
     }
   }
 

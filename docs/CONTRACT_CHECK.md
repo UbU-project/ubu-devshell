@@ -1,7 +1,7 @@
 # The scenario runner
 
 `scripts/check-ui-contract.sh` builds the real `ubu-orchestrator` and walks
-the daily loop against it over HTTP, in twenty-five scenarios. It needs no
+the daily loop against it over HTTP, in twenty-six scenarios. It needs no
 webview, no Google account and no model. A full walk takes about ten seconds
 once the orchestrator is built.
 
@@ -46,7 +46,7 @@ at that time:
 
 Those two assertions are still scenario 1, and still run first.
 
-## The twenty-five scenarios
+## The twenty-six scenarios
 
 Every scenario starts its own orchestrator on its own ephemeral loopback
 port with its own empty store. Nothing is carried from one to the next. All
@@ -78,6 +78,8 @@ calendar requests ask for `export_mode: "mock"`.
 | 22 | the UniverseState screen | What the screen “UniverseState” does, request for request, in the body `editUniverseState` sends, and from P1B-59 its real set and clear and the provenance it shows. On a new store `GET /universe-state` answers the empty state: a null `version`, all four collections and `fact_provenance` present and empty, and reading stores nothing. A Task is captured with a precondition on an invented fact and is in `blocked_tasks`. **Set a fact**: `set_fact` through `PATCH /universe-state` answers with the fact under its key at version 2, the seed being version 1; a later read is exactly what the edit answered with; the Task is blocked no longer; and the write is recorded as `asserted`, with its time, which is the word the screen shows. **Set a number**: `set_numeric` to 0.7 and then to 0.1 gives exactly 0.1, where the difference P1B-58's screen sent landed on 0.09999999999999998. A set that states `measured` is recorded as measured beside the asserted fact, and one that states nothing is asserted again. **Clear a number**: `clear_numeric` with no payload removes the key and its provenance, and clearing what is not there is not an error. **A Task that waits on a number**: captured with `at_least` 25, it is not ready while the number was never recorded, not ready at 24.5, and planned at 25 and at 40. **Sets** hold the text and the number as themselves, a member is removed as the value it is, a set that loses its last member is gone with its provenance, and no entry is left for a value that is gone. **Refusals**: eight lists that each hold a good mutation and then a bad one, among them a clear with a payload, a clear with a provenance kind and a `set_numeric` that is not a number, are each refused 400 `universe_mutation_invalid` naming mutation 1; an empty list is refused `universe_mutations_empty`; a mutation that carries `note`, and one whose kind is not one of the four, are refused 422 as not the route's shape; and after all eleven the state is what it was, version included. **Clear a fact**: `clear_fact` removes the fact and its provenance, the measured number keeps its own, and the Task that waits on the fact is blocked again. Nothing the screen does appends an event marker. Three kinds of body here are not the app's: a Task's precondition, which `ubu-ui` authors none of and the Task route accepts; a stated `provenance_kind`; and the malformed ones. |
 | 23 | matching placements and numeric words | A captured Dynamic placement needs no operation; the shared UI wording states the Dynamic count and the four numeric comparisons in words. |
 | 24 | the precondition advisor | A stub proposal changes only candidate state. Explicit admission sets or replaces the reviewed condition, leaves facts unchanged, and the next Plan follows the recorded fact. |
+| 25 | admitted precondition review | A removal restores blocked work to the Plan; a rejected review has a finite subject snooze and the next normal run does not ask the model again. |
+| 26 | calendar notes and title-only advice | Two calendar events, one with notes and one without, enter through calendar capture. Both titles reach the model, only one description is sent, and the title-only Task receives a candidate. Task edits survive recapture, and approved projections omit notes. |
 
 The seeded scenarios first apply a day with no seed, then restart the
 orchestrator on the same store with a fixture built from the events that
@@ -394,10 +396,10 @@ scenario 7 of 16: colour means done (seeded mock calendar)
 PASS  7 colour means done: a colour on an applied Dynamic event completes its Task at capture, and only that Task
 ```
 
-A complete walk ends with twenty-five `PASS` lines, two `SKIP` lines and:
+A complete walk ends with twenty-six `PASS` lines, two `SKIP` lines and:
 
 ```text
-RESULT: 24 of 24 scenarios passed, 0 failed, 2 skipped, 466 requests, all to 127.0.0.1
+RESULT: 26 of 26 scenarios passed, 0 failed, 2 skipped, 501 requests, all to 127.0.0.1
 ```
 
 The walk stops at the first failure. The `FAIL` line names the scenario and
@@ -423,7 +425,7 @@ Two scripts, one boundary.
 | | `check-ui-contract.sh` | `acceptance.sh` |
 |---|---|---|
 | Covers | The HTTP layer: what the orchestrator does with a request. | The rendered layer: what a human sees in the app. |
-| Asserts | Everything it checks, in twenty-five scenarios, each on its own store. | Nothing about behaviour. It stages a store and prints steps. |
+| Asserts | Everything it checks, in twenty-six scenarios, each on its own store. | Nothing about behaviour. It stages a store and prints steps. |
 | Store | One throwaway store per scenario, and two for the rehearsal, on ephemeral ports. | One throwaway store on the app's default port, held until Ctrl-C. |
 | Preconditions | Each scenario stages exactly what it asserts. | Each step declares the seeds it needs; each seed checks itself over HTTP. |
 | A human | Reads PASS and FAIL lines. | Opens the app and follows the steps. |
@@ -490,3 +492,27 @@ stub for rewording. The queue reports the blocking seed cap. No real model or
 operator store is involved. There are 25 automated mock scenarios; the two live
 scenarios remain opt-in and skipped by default. The harness only stages the
 wrong comparison; it does not assert reviewer behavior or add a manual step.
+
+## P1B-63: calendar notes and title-only advice
+
+Scenario 26 seeds two invented Google-shaped events through
+`UBU_CALENDAR_MOCK_EVENTS` and calls the existing Calendar capture route. It
+does not use `captureTask` or `POST /task`. One Task gets its event's notes and
+one has no description key. After one invented fact is authored, both titles
+reach the stub, just one description is sent, and the title-only Task gets a
+candidate. Capturing again preserves notes edited through Task PATCH and counts
+the Tasks unchanged. Both events then move through explicit Mock approval,
+with no description in their projected events. Rust tests separately inspect
+the actual insert and PATCH wire bodies and prove that omitted notes survive
+PATCH in the recorder; an HTTP response alone cannot prove wire serialization.
+
+Scenario 10 also edits a captured recurring-occupancy Task's description and
+proves recapture preserves it and reports unchanged. Scenario 24's title-only
+control is now eligible, so its stub explicitly chooses a proposal only for
+the launch Task; selection of both Tasks is asserted. The realistic week has
+one event with invented notes. The harness's `week_precondition` seed is
+unchanged. New assertions compare notes without printing them.
+
+The live rehearsal changes step 12's eligibility explanation, adds no step or
+copy-back, and promises no candidate: 13 steps, 8 copy-backs. The operator's
+own live run remains required; these 26 deterministic scenarios are not it.

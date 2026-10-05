@@ -389,10 +389,13 @@ click “Set number”. Use names meaningful to you. What you enter stays privat
 and is recorded as asserted. Do not copy any key, value or row back.
 
 Open **Review**. Under “Precondition advisor”, leave “Precondition Task limit”
-at 25 and click “Run precondition advisor”. It considers active Tasks with a
-description, including one with an existing precondition. A captured Task with
-no description is skipped; this step does not require an interview or promise
-any candidate.
+at 25 and click “Run precondition advisor”. It considers active Tasks that are
+not routine occurrences, whether or not they have notes, including one with an
+existing precondition. Only a Task with neither a non-blank title nor non-blank
+notes has nothing to reason over. A captured Task's first notes now come from
+its event's own notes, so the advisor can read what you wrote in your calendar;
+existing Task notes are kept. A title alone is enough to ask the model. This
+step does not require an interview or promise any candidate.
 A replacement shows “Currently required” and “Proposed requirement” together,
 with a line saying that admitting replaces the first with the second.
 Read “Run status” and “Candidates enqueued”, then the first precondition proposal
@@ -404,7 +407,10 @@ is needed to read the proposal, and the Plan already approved is unchanged.
 Every outcome is something to copy back, not a reason to repeat until a model
 agrees. `precondition_missing_targets` means needed targets were not recorded
 and no candidate for that Task was enqueued. `precondition_task_skipped` means
-an occurrence or a missing description prevented selection. `precondition_no_facts` means no supported targets were available
+a routine occurrence should be edited on its template, or the Task has neither
+a title nor notes to reason over. At most three Tasks are named, followed by
+one count of the rest; copy only the diagnostic code and count, never a Task id.
+`precondition_no_facts` means no supported targets were available
 and no model was asked. `advisory_unconfigured` means set the named configuration
 in Setup; no model was asked. Connection, timeout, HTTP and malformed-result
 diagnostics mean the run failed; read its remedy, copy only the code, and go on

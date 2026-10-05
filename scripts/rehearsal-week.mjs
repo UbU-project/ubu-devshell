@@ -93,8 +93,9 @@ export function rehearsalWeek(nowMs, zone) {
   const thisHour = Math.floor(nowMs / HOUR) * HOUR;
   const at = (hours, minutes = 0) => iso(thisHour + hours * HOUR + minutes * 60_000);
   const next = (hour) => nextLocalHour(zone, thisHour + HOUR, hour);
-  const event = (external_id, summary, startMs, minutes, color_id) => ({
-    external_id, summary, start_at: iso(startMs), end_at: iso(startMs + minutes * 60_000), color_id, transparent: false, reminders_minutes: []
+  const event = (external_id, summary, startMs, minutes, color_id, description) => ({
+    external_id, summary, start_at: iso(startMs), end_at: iso(startMs + minutes * 60_000), color_id, transparent: false, reminders_minutes: [],
+    ...(description === undefined ? {} : { description })
   });
 
   // One recurring commitment: seven daily instances at 14:00 local, a week of
@@ -118,7 +119,7 @@ export function rehearsalWeek(nowMs, zone) {
   // its time is not kept. Being Dynamic, the two do not collide.
   const parked = [
     { key: "globe", seconds: 2_700, ...event("0inv3nt3dg10bereturn", "Invented: return the library globe", next(17), 45, null) },
-    { key: "duck", seconds: 1_800, ...event("0inv3nt3dbrassduck", "Invented: polish the brass duck", next(17) + 15 * 60_000, 30, null) }
+    { key: "duck", seconds: 1_800, ...event("0inv3nt3dbrassduck", "Invented: polish the brass duck", next(17) + 15 * 60_000, 30, null, "Invented brass duck polishing needs the synthetic soft cloth.") }
   ];
   /// The event alone, as the mock Calendar holds it.
   const asEvent = ({ key, seconds, ...rest }) => rest;
