@@ -125,7 +125,7 @@ branch has no self-pin. `show-revs.sh` is the final pin and origin check.
 | valid / invalid schema fixtures | 89 / 103 | 91 / 110 |
 | store tests | 108 | 110 |
 | orchestrator tests | 530 | 553 |
-| UI tests | 161 | 172 |
+| UI tests | 161 | 173 |
 | OpenAPI paths | 56 | 56 |
 | `endpoints.ts` constants | 43 | 43 |
 | orchestrator clippy unique warnings | 8 | 7 |
