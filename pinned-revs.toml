@@ -15,12 +15,12 @@
 # each pinned commit is on a branch of origin. Push a branch before pinning it.
 
 [pinned]
-ubu_schemas         = "3b2c93e65710b85a1b29b8c97278a72b87b22944"  # P1B-61 A: precondition and replacement candidate schemas
+ubu_schemas         = "02e4c91ce149ef594f1d08408216097b48dd7afb"  # P1B-62 prerequisite: review replacement/removal schemas and fixtures
 ubu_core            = "c4b624d76f210f77f865c61801e02c89219763ce"  # P1B-61 B: candidate kind and canonical round trips; 161 tests
-ubu_store           = "c62eabc5983db554d3b57f694fe49d6597fe3ea8"  # P1B-61 C: core pin only; 108 tests
+ubu_store           = "9e471a46b357f99cff567c250ae59084a6768b52"  # P1B-62 prerequisite: context-aware candidate persistence; 110 tests
 ubu_planning_kernel = "8af10ece07043c307fe351ac867cfd8449e08c4f"  # P1B-61 C: core pin only; 83 tests
 ubu_github_adapter  = "50fae565e6d48fb5c41107ab3259096ad243ccf3"  # P1B-61 C: core pin only; 23 tests
-ubu_orchestrator    = "6c931d870e0924450b0d32e897071c8f5b78d9e5"  # P1B-61 C–F: precondition proposals/admission and Dynamic matches; 530 tests, 56 paths
-ubu_ui              = "9e0a8978b388abdfd64cf972fda965be1bd17ee0"  # P1B-61 F/G: Dynamic wording and explicit replacement review; 161 tests, 43 paths
+ubu_orchestrator    = "a8888c2444bf13c4008e855d05f2a416bc48b5ab"  # P1B-62 A–C: review, admission, suppression intervals; 553 tests, 56 paths
+ubu_ui              = "ee5a433e0edfee5320d7d5ea166406fd79d8816e"  # P1B-62 D/E: review queue and Plan placement counts; 172 tests, 43 paths
 ubu_design          = "f7c4a1dbe2979fa498ae115bb2ee74e6772d4c2c"  # P1B-41 H: unchanged design baseline; inventory previously unset
 ubu_brand           = "faf2005a8bd9e64742dd76ee6d1f91f45223946b"  # P1B-41 H: unchanged brand baseline; inventory previously unset
