@@ -632,3 +632,44 @@ its last model-dependent step is still step 12. It can now reach the model,
 but promises no candidate. All outcomes remain results to copy back with the
 existing redaction. Passing the runner and UI tests is not operator acceptance:
 the operator must run the full live procedure and return its copy-back.
+
+## P1B-64: the model is told what the validator will accept
+
+When a producer constrains a model with a schema, that schema is part of the
+contract and must be tested against the validator, not against the model's
+behaviour. A schema that admits a validator-refused tree is a defect model
+quality cannot fix. It presents as a model failure, which is how the expected
+presence and predicate/collection gaps survived P1B-61, P1B-62 and P1B-63.
+The tests must include concrete witnesses of that gap, rather than merely
+checking that a stub emits what a scenario wants.
+
+A batch validator that aborts on the first refusal converts one bad answer into
+no answer; the operator reads that as the feature not working. Independent
+Task proposals are refused independently, with bounded code-authored reasons.
+Previously recorded diagnostics survive. A decoded result can have no usable
+proposals and still be `ok`; an undecodable result retains its whole-response
+malformed diagnostic. Scenario 27 asserts that two valid proposals survive one
+equals leaf without an expectation, and observes the facts-only request format.
+
+Grounding required three operator-approved corrections. The proposed equality
+of schema and validator sets was impossible: core and the existing validator
+support object/array equality, while the ticket deliberately asks for scalar
+model expectations and a smaller depth. We chose a safe subset with an
+unchanged validator, rather than restricting established manual admission or
+expanding the model grammar. Three levels with ten children permit at most 111
+nodes; depth alone with 128 children would violate the 128-node guard. A full
+depth-16 expansion or exact node-budget grammar would be larger and harder for
+the model and operator. Finally, the prompt now says “the predicates allowed by
+the response schema”, rather than promising seven where facts alone permit
+two; its remaining constraints retain their wording. The contract tests
+explicitly distinguish valid trees inside the grammar, invalid trees, and
+validator-valid trees deliberately outside that conservative grammar.
+
+Nothing is retired. Step 12 remains model-dependent and promises no candidate.
+It explains that facts offer “is” and “is not recorded”, while numbers also
+offer comparisons. Its new per-proposal refusal code says the rest of the run
+stands; its malformed-result code means no proposal result could be decoded.
+The live rehearsal remains 13 steps and eight redacted copy-back items.
+Passing 27 deterministic scenarios is not operator acceptance: the operator
+must run the whole live procedure against their own calendar and return its
+copy-back, with step 12 as the step under test.
