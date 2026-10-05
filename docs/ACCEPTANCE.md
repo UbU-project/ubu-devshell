@@ -673,3 +673,48 @@ The live rehearsal remains 13 steps and eight redacted copy-back items.
 Passing 27 deterministic scenarios is not operator acceptance: the operator
 must run the whole live procedure against their own calendar and return its
 copy-back, with step 12 as the step under test.
+
+## P1B-65
+
+The operator has withdrawn hand redaction for his own live rehearsal copy-back:
+
+> “The specific requirement to strip value by hand is impractical. I am explicitly sharing my data now so there's really no need to redact anything; you have full access anyway.”
+
+This explicitly supersedes P1B-62's forward rule that future review copy-back
+must replace identifiers and expected values with placeholders, for this
+operator's own rehearsal. Step 12 asks for the precondition's words as rendered,
+with no substitution. Its `absent` predicate has no expected value to substitute.
+The waiver covers transcription to the operator's conversation, not repository
+content: every committed fixture remains invented, with no real Task titles,
+notes, event identifiers, or fact keys or values. Step 11's prohibition on
+copying a key, value or table row from UniverseState remains verbatim. A later
+editor must not restore the placeholders as a correction for this operator.
+
+Bulk transcription has shortened or abandoned four rehearsals. Steps 7 and 8
+now request each diagnostic code and how many lines carry it, rather than every
+sentence. This is a labour correction, not a privacy measure. The rehearsal
+still has thirteen steps and eight copy-back items; the rejection outcome is
+part of item seven.
+
+Planning collision diagnostics name Task titles so a person can recognise the
+two commitments on screen. Calendar capture diagnostics name only ids because
+they are read in bulk. Both families answer their own question correctly; neither
+changes. The copy-back rule concerns how much to transcribe, not which family
+produced it. Plan, capture and colour behavior, precondition rendering, advisor
+schema and review snoozes are unchanged. Nothing is retired.
+
+Two grounding corrections were approved before implementation. Initial
+precondition proposals use durable rejection, while finite snoozes belong to
+`precondition_review` critiques of already-admitted requirements. Step 12
+therefore reads the durable warning, uses Reject, Reason and Confirm reject,
+and reports whether the proposal left the queue. A sound proposal stays in
+Review; no candidate means “no candidate appeared, so nothing was rejected”.
+Live finite-snooze acceptance remains outstanding. Adding an admission and an
+extra model run would change the rehearsal's decision and still could not
+promise a critique, so the existing durable path is the chosen correction.
+
+UNIVERSE_STATE requires route contract changes in the implementation commit.
+Its essential namespace contract therefore ships in section A, with broader
+context in section D. Deferring the whole contract to D would violate that
+same-commit requirement; combining A and D would violate the ticket's separate
+section commits. No behavior is changed to resolve either documentation conflict.
