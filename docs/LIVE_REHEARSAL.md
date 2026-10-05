@@ -13,7 +13,7 @@ Each step says what to **open**, what to **click** and what to **read**. A
 step asks you to **copy back** only where this run can show something that
 has not already been shown. From P1B-55 a verification that has passed live
 is retired, and recorded in the ledger in [ACCEPTANCE.md](ACCEPTANCE.md).
-There are twelve steps and seven copy-back items. The colour setup and
+There are thirteen steps and eight copy-back items. The colour setup and
 colouring steps are retired in P1B-60; their preconditions are below.
 
 When a step cannot be completed, write down what the screen said and go on to
@@ -64,6 +64,20 @@ true before UbU will plan it. From P1B-58 the screen “UniverseState” shows
 what is recorded, and step 11 opens it. This run records nothing there, so on
 this store it will say that nothing is recorded yet. That is the expected
 reading and not a fault.
+
+### Placement counting: interim method, now history
+
+Step 8 now reads the Plan's own counts line; do not tally badges by hand.
+Before that line shipped, the interim method was to copy the placements' page
+text and count occurrences with `grep -o 'Skeleton' | wc -l`, case-sensitively.
+`grep -c` counts lines, not occurrences; a badge can share a line with its title.
+A case-insensitive search also counts lowercase `skeleton_failure` and
+“deterministic skeleton”. Skeleton plus Static anchor equals the placement total.
+Only for a store where all Dynamic work came from the calendar, with no other
+exclusions or multiple placements per Task, can Skeleton also be cross-checked
+against “N events had no colour” minus the number in “Not in this Plan”.
+This note is history now that P1B-62's counts line ships; retire it in the ticket
+that confirms the line live. No such acceptance is claimed here.
 
 ## Before you start
 
@@ -269,7 +283,7 @@ each finding has a name in bold, such as “unplaced work”, and its severity
 on a badge beside the name.
 
 Copy back: the first sentence of any box above “Timed placements”. The
-number of placements carrying the badge “Skeleton”. And the whole section
+line directly under “Timed placements” that begins “Placements:” and gives total, Skeleton and Static anchor counts. And the whole section
 “Not in this Plan”, or the words “no such section”.
 
 Copy back: the words on the badge beside “Plan risk”, and every finding's
@@ -419,7 +433,7 @@ calendar, at its step 6, so there is nothing to clean up after this one.
    begins “N events had no colour.”, and every line in the grey box with its
    code. Do not expand or copy the list behind “The N events with no colour”.
 2. From step 8: the first sentence of any box above “Timed placements”, the
-   number of “Skeleton” placements, and the whole section “Not in this Plan”
+   “Placements:” count line, and the whole section “Not in this Plan”
    or the words “no such section”.
 3. From step 8: the words on the badge beside “Plan risk”, and every
    finding's name and severity, in order.

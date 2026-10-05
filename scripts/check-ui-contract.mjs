@@ -363,6 +363,10 @@ async function startModelStub() {
       } else if (stub.mode === "slow") {
         const timer = setTimeout(() => answer(200, { model: body.model, done: true, response: '{"proposals":[]}' }), stub.delayMs);
         response.on("close", () => clearTimeout(timer));
+      } else if (stub.mode === "precondition_review") {
+        const context = JSON.parse(body.prompt);
+        const reviews = context.tasks.map((task) => ({ id: task.id, verdict: "remove", reason: stub.reviewReason ?? "This synthetic inspection needs no charge, so the guard is unrelated." }));
+        answer(200, { model: body.model, done: true, response: JSON.stringify({ reviews }) });
       } else if (stub.mode === "precondition") {
         const context = JSON.parse(body.prompt);
         const proposals = context.tasks.map((task) => ({ id: task.id, precondition: { target: "numeric_values.synthetic.orbital_teapot_charge", predicate: "at_least", expected: stub.preconditionMinimum ?? 25 } }));
@@ -1964,7 +1968,42 @@ const scenarios = [
       same(await call(o.base, "GET", endpoints.UNIVERSE_STATE_PATH), factsBeforeReplacement, "replacement authors no facts");
       return "stub proposals change only candidate state; explicit admission sets or visibly replaces the precondition; the next Plan excludes or includes the Task as the recorded fact changes";
     }
+  },
+  {
+    name: "admitted precondition reviews restore work and snooze rejected critiques",
+    async run(o) {
+      const target = "numeric_values.synthetic.orbital_teapot_charge";
+      await call(o.base, "PATCH", endpoints.UNIVERSE_STATE_PATH, { schema_version: endpoints.UNIVERSE_STATE_SCHEMA_VERSION, mutations: [{operation:"set_numeric",target,payload:0}] });
+      const wrong = {target,predicate:"greater_than",expected:25};
+      const task = await captureTask(o, {title:"Synthetic cold teapot inspection",description:"Inspect the synthetic cold unpowered teapot; no charge is required.",duration_estimate:fixed(10),preconditions:wrong});
+      await captureTask(o,{title:"Synthetic review control",duration_estimate:fixed(5)});
+      const generate = () => call(o.base,"POST",endpoints.PLANNING_GENERATE_PATH,{schema_version:endpoints.PLANNING_SCHEMA_VERSION,request:null});
+      const blocked = await generate();
+      ok(!blocked.plan.steps.some(s=>s.task_id===task.task_id),"the wrong comparison excludes the synthetic inspection");
+      const stub = await startModelStub();stub.mode="precondition_review";
+      await putSetting(o,"advisory.model","synthetic-review-model");await putSetting(o,"advisory.endpoint",stub.endpoint);
+      const review = () => call(o.base,"POST",endpoints.ADVISORY_RUN_PATH,{schema_version:endpoints.ADVISORY_RUN_SCHEMA_VERSION,producer:"precondition_review",limit:25});
+      const before=await readTask(o,task.task_id);const result=await review();same(result.candidates_enqueued,1,"the review creates one candidate");
+      same(await readTask(o,task.task_id),before,"the review leaves the Task untouched");
+      let queue=await call(o.base,"GET",endpoints.ADVISORY_QUEUE_PATH);let c=queue.candidates[0].candidate;
+      same(c.normalized_proposal.operation,"clear_precondition","removal is an explicit operation");
+      same(c.normalized_proposal.existing_precondition,wrong,"the reviewed tree is preserved");same(c.normalized_proposal.blocked_now,true,"the candidate says the requirement is blocking now");
+      ok(!("proposed_precondition" in c.normalized_proposal),"removal contains no proposed tree");
+      await call(o.base,"POST",fill(endpoints.ADVISORY_ADMIT_PATH,{candidate_id:c.advisory_candidate_id}),{observed_version:c.version});
+      ok((await generate()).plan.steps.some(s=>s.task_id===task.task_id),"admitting removal restores the previously excluded Task to the Plan");
+      await captureTask(o,{title:"Synthetic second cold inspection",description:"Inspect an unpowered synthetic dial; no charge is required.",duration_estimate:fixed(5),preconditions:wrong});
+      same((await review()).candidates_enqueued,1,"another admitted guard is open to review");
+      queue=await call(o.base,"GET",endpoints.ADVISORY_QUEUE_PATH);c=queue.candidates[0].candidate;
+      same(queue.review_intervals[c.advisory_candidate_id].suggested_days,7,"blocking work caps the review at the seven-day seed");
+      await call(o.base,"POST",fill(endpoints.ADVISORY_REJECT_PATH,{candidate_id:c.advisory_candidate_id}),{observed_version:c.version,reason:"The synthetic condition is intentional.",retention_policy:"retain",snooze_days:3});
+      const asked=stub.requests.length;stub.reviewReason="Another wording of the same synthetic critique.";
+      const held=await review();same(held.candidates_enqueued,0,"a rejected review stays held on the next normal run");
+      ok(held.diagnostics.some(d=>d.code==="advisory_proposal_suppressed" && d.message.includes("held until")),"the hold diagnostic gives a return date");
+      same(stub.requests.length,asked,"a held subject is not sent to the model again");
+      return "an explicit removal restores planned work; rejection retains a finite subject snooze across normal runs";
+    }
   }
+
 ];
 
 // ----------------------------------------------------- the live flags (§E)

@@ -1,7 +1,7 @@
 # The scenario runner
 
 `scripts/check-ui-contract.sh` builds the real `ubu-orchestrator` and walks
-the daily loop against it over HTTP, in twenty-four scenarios. It needs no
+the daily loop against it over HTTP, in twenty-five scenarios. It needs no
 webview, no Google account and no model. A full walk takes about ten seconds
 once the orchestrator is built.
 
@@ -46,7 +46,7 @@ at that time:
 
 Those two assertions are still scenario 1, and still run first.
 
-## The twenty-four scenarios
+## The twenty-five scenarios
 
 Every scenario starts its own orchestrator on its own ephemeral loopback
 port with its own empty store. Nothing is carried from one to the next. All
@@ -394,7 +394,7 @@ scenario 7 of 16: colour means done (seeded mock calendar)
 PASS  7 colour means done: a colour on an applied Dynamic event completes its Task at capture, and only that Task
 ```
 
-A complete walk ends with twenty-four `PASS` lines, two `SKIP` lines and:
+A complete walk ends with twenty-five `PASS` lines, two `SKIP` lines and:
 
 ```text
 RESULT: 24 of 24 scenarios passed, 0 failed, 2 skipped, 466 requests, all to 127.0.0.1
@@ -423,7 +423,7 @@ Two scripts, one boundary.
 | | `check-ui-contract.sh` | `acceptance.sh` |
 |---|---|---|
 | Covers | The HTTP layer: what the orchestrator does with a request. | The rendered layer: what a human sees in the app. |
-| Asserts | Everything it checks, in twenty-four scenarios, each on its own store. | Nothing about behaviour. It stages a store and prints steps. |
+| Asserts | Everything it checks, in twenty-five scenarios, each on its own store. | Nothing about behaviour. It stages a store and prints steps. |
 | Store | One throwaway store per scenario, and two for the rehearsal, on ephemeral ports. | One throwaway store on the app's default port, held until Ctrl-C. |
 | Preconditions | Each scenario stages exactly what it asserts. | Each step declares the seeds it needs; each seed checks itself over HTTP. |
 | A human | Reads PASS and FAIL lines. | Opens the app and follows the steps. |
@@ -478,3 +478,15 @@ are reported as skipped. The harness stages inputs and asserts no advisor behavi
 Scenario 24 also proposes over the admitted precondition, checks both trees in
 the replacement candidate, and proves only explicit admission replaces it while
 facts remain untouched.
+
+## P1B-62: an admitted precondition is open to review
+
+Scenario 25 stages a false, inappropriate comparison over an existing synthetic
+numeric target. The isolated model stub returns a removal review, the runner
+checks the candidate and unchanged Task, and explicit admission puts the Task
+back into the next Plan. A second critique is rejected for three days; its next
+normal run reports the saved hold date, enqueues nothing and never asks the
+stub for rewording. The queue reports the blocking seed cap. No real model or
+operator store is involved. There are 25 automated mock scenarios; the two live
+scenarios remain opt-in and skipped by default. The harness only stages the
+wrong comparison; it does not assert reviewer behavior or add a manual step.

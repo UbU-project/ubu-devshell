@@ -588,3 +588,23 @@ is not performed by the automated checks.
 The operator briefly requested a two-job Cargo default during this ticket,
 then reported another OOM and requested the known-good one-job configuration.
 The default is restored to one; invocations remain sequential. See BUILD_ENV.md.
+
+## P1B-62: a dismissal is a snooze, never a silence
+
+An operator can put a critique aside without hearing it again this week, and
+can reconsider it later. Keying on the subject prevents repeated rewordings;
+finite intervals, a ceiling and the blocking-work cap keep future reconsideration
+available. Normal review honours a hold; explicit Review again now bypasses it.
+Nothing is retired by this ticket. The harness stages a synthetic Task whose
+admitted at_most comparison contradicts its description's at-least requirement,
+over an existing numeric target. The runner asserts review behavior.
+
+The live rehearsal remains **13 steps and 8 copy-backs**. Step 8 and its existing
+copy-back read the new placement count line instead of tallying badges. The
+interim case-sensitive occurrence-counting command is retained as history until
+the count line is confirmed live. No other copy-back asks for a hand tally of
+rendered items. The existing advisor step remains after deterministic
+UniverseState and before Stop. Review requires a separate click there, so no
+review copy-back is added. Any future review copy-back must retain only verdict
+and tree shape, replace identifiers and expected values with placeholders, and
+omit model reason text, fact values, real Task titles and descriptions.

@@ -483,20 +483,20 @@ const SEEDS = {
     }
   },
   week_precondition: {
-    what: "a synthetic fact and a described Task ready for the precondition advisor",
+    what: "a synthetic fact and a described Task with a deliberately reversed comparison ready for advisory review",
     async make() {
       const target = "numeric_values.synthetic.orbital_teapot_charge";
       await call("PATCH", endpoints.UNIVERSE_STATE_PATH, { schema_version: endpoints.UNIVERSE_STATE_SCHEMA_VERSION, mutations: [{ operation: "set_numeric", target, payload: 0 }] });
-      const task = await captureTask({ title: "Synthetic orbital teapot launch", description: "Synthetic orbital teapot launch requires at least 25 charge units.", duration_estimate: { type: "fixed", seconds: 600 } });
+      const task = await captureTask({ title: "Synthetic orbital teapot launch", description: "Synthetic orbital teapot launch requires at least 25 charge units.", duration_estimate: { type: "fixed", seconds: 600 }, preconditions: { target, predicate: "at_most", expected: 25 } });
       return { target, id: task.task_id };
     },
     async check({ target, id }) {
       const universe = await call("GET", endpoints.UNIVERSE_STATE_PATH);
       const task = await readTask(id);
-      if (universe.numeric_values[target.slice("numeric_values.".length)] !== 0 || task.payload.preconditions || task.payload.description !== "Synthetic orbital teapot launch requires at least 25 charge units.") {
+      if (universe.numeric_values[target.slice("numeric_values.".length)] !== 0 || task.payload.preconditions?.predicate !== "at_most" || task.payload.preconditions?.target !== target || task.payload.preconditions?.expected !== 25 || task.payload.description !== "Synthetic orbital teapot launch requires at least 25 charge units.") {
         throw new StagingFailure("synthetic precondition advisor inputs were not staged");
       }
-      return `Synthetic orbital teapot launch (${id}) has a description and its fact exists; no advisor has run and no precondition has been admitted`;
+      return `Synthetic orbital teapot launch (${id}) has a description requiring at least 25, an admitted at_most 25 guard, and an existing fact target; no advisor has run`;
     }
   }
 };
