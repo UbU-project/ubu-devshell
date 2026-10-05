@@ -140,7 +140,7 @@ RESULT: 25 of 25 scenarios passed, 0 failed, 2 skipped, 483 requests, all to 127
 ```
 
 The stage-only harness passed all 11 seeds and printed its one existing manual
-step. `check-all.sh` was run with the fixture-demo quarantine disabled and
+step. `check-all.sh` was run with the fixture-demo quarantine left enabled and
 completed with exit 0. Unit and HTTP tests used StubTransport; only the
 explicit devshell runner and harness used isolated loopback processes. No live
 Google, Ollama, operator store, editor or signal handler was used.
