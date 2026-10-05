@@ -247,7 +247,8 @@ Copy back three things, and only these:
 
 - the six counters with their numbers;
 - the sentence that begins “N events had no colour.”;
-- every line in the grey box, each sentence with its code.
+- each diagnostic code in the grey box and how many lines carry it, or
+  “no diagnostics” if there is no grey box. Do not transcribe its sentences.
 
 **Do not copy back the list under that sentence.** The lines there, one for
 each uncoloured event, are not in the grey box and are not wanted, whether
@@ -282,8 +283,9 @@ beside the heading reads “low risk”, “medium risk” or “high risk”. U
 each finding has a name in bold, such as “unplaced work”, and its severity
 on a badge beside the name.
 
-Copy back: the first sentence of any box above “Timed placements”. The
-line directly under “Timed placements” that begins “Placements:” and gives total, Skeleton and Static anchor counts. And the whole section
+Copy back: each diagnostic code in the boxes above “Timed placements” and
+how many lines carry it, or “no diagnostics” if none carry a code. Do not
+transcribe their sentences. The line directly under “Timed placements” that begins “Placements:” and gives total, Skeleton and Static anchor counts. And the whole section
 “Not in this Plan”, or the words “no such section”.
 
 Copy back: the words on the badge beside “Plan risk”, and every finding's
@@ -402,8 +404,22 @@ with a line saying that admitting replaces the first with the second.
 Read “Run status” and “Candidates enqueued”, then the first precondition proposal
 in the queue, if there is one. A first-time proposal says “Before this Task
 can be planned:” and the condition in words; a replacement uses the two labels
-above. **Leave it in Review for this rehearsal.** No admission
-is needed to read the proposal, and the Plan already approved is unchanged.
+above. First read the proposal's words as rendered, then decide:
+
+- If you judge it sound: **Leave it in Review for this rehearsal.** Copy
+  “left in Review”. No admission is needed; the Plan already approved is unchanged.
+- If you judge it wrong: click “Reject” on that proposal. Read “Rejection is
+  durable. This same proposal will not return on another run; a different
+  proposal for the Task can still arrive.” Enter a brief reason in “Reason”,
+  then click “Confirm reject”. Read the queue again: the proposal should have
+  left it. Copy “rejected; proposal left the queue”, or “rejection failed”
+  and each diagnostic code with its line count if the proposal remains.
+- If no candidate appears: copy “no candidate appeared, so nothing was rejected”.
+
+This is durable suppression of a proposed requirement, with no finite snooze
+interval. Finite snoozes apply to reviews of already-admitted requirements;
+their live acceptance remains outstanding. Do not admit a proposal or run
+another advisor just to exercise that other path.
 
 Every outcome is something to copy back, not a reason to repeat until a model
 agrees. `precondition_missing_targets` means needed targets were not recorded
@@ -417,16 +433,15 @@ in Setup; no model was asked. `precondition_proposal_refused` means the model
 proposed something UbU cannot evaluate: that one Task got no candidate, and the
 rest of the run stands. `advisory_malformed_result` means the response was not a
 proposal result at all, so no candidates were enqueued. Connection, timeout and
-HTTP diagnostics mean the run failed; read its remedy, copy only the code, and
+HTTP diagnostics mean the run failed; read its remedy, copy the code and its line count, and
 go on to Stop. A valid result with zero candidates is also a result.
 
-Copy back: the candidate count and the words of the first precondition, **with
-every target name and expected value replaced by `[target]` and `[value]`**.
-Keep only the relationship words (such as “is at least”, “and”, “or”). A candidate
-can itself repeat private values or names, so its unredacted sentence is not a
-safe copy-back. Never copy a Task description or title, a fact's key or value,
-or diagnostic text that names a target. If there is no candidate, write “no
-candidate” and the diagnostic codes only, or “no diagnostics”.
+Copy back: the candidate count and the words of the first precondition **as
+the screen renders them**, with no substitution or hand redaction, plus the
+rejection outcome above. For a replacement, copy both “Currently required”
+and “Proposed requirement” as rendered. If there is no candidate, copy “no
+candidate appeared, so nothing was rejected” and each diagnostic code with
+its line count, or “no diagnostics”.
 
 ## Finish
 
@@ -440,9 +455,10 @@ calendar, at its step 6, so there is nothing to clean up after this one.
 ## What to copy back, in order
 
 1. From step 7: the six counters with their numbers, the sentence that
-   begins “N events had no colour.”, and every line in the grey box with its
-   code. Do not expand or copy the list behind “The N events with no colour”.
-2. From step 8: the first sentence of any box above “Timed placements”, the
+   begins “N events had no colour.”, and each diagnostic code in the grey
+   box with how many lines carry it, or “no diagnostics”. Do not expand or copy the list behind “The N events with no colour”.
+2. From step 8: each diagnostic code in the boxes above “Timed placements”
+   with how many lines carry it, or “no diagnostics”; the
    “Placements:” count line, and the whole section “Not in this Plan”
    or the words “no such section”.
 3. From step 8: the words on the badge beside “Plan risk”, and every
@@ -452,10 +468,12 @@ calendar, at its step 6, so there is nothing to clean up after this one.
 5. From step 10: the two approval lines, or “I did not approve”.
 6. From step 11: the line that begins “Entries:”. The names and the counts
    only, never a value.
-7. From step 12: the candidate count and the first precondition’s words with
-   target names replaced by `[target]` and expected values by `[value]`; or
-   “no candidate” and diagnostic codes only. No descriptions, titles or private
-   keys or values.
+7. From step 12: the candidate count and the first precondition’s words as
+   rendered, with no substitution or hand redaction (both requirements for a
+   replacement); and “left in Review”, “rejected; proposal left the queue”,
+   or “rejection failed” with diagnostic codes and line counts. If none
+   appeared: “no candidate appeared, so nothing was rejected”, with diagnostic
+   codes and line counts, or “no diagnostics”.
 8. And one answer, in your own words: is what it chose to schedule what you
    would have chosen, and is this a store you would plan tomorrow on? If
    not, what is missing?

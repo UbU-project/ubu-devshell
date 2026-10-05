@@ -2,7 +2,7 @@
 # check-ui-contract.sh: does ubu-ui's idea of the orchestrator match the
 # orchestrator, and does the daily loop work over HTTP?
 #
-# Builds the real ubu-orchestrator and walks twenty-seven scenarios against it. Each
+# Builds the real ubu-orchestrator and walks twenty-eight scenarios against it. Each
 # scenario gets its own temporary store and its own orchestrator on an ephemeral
 # loopback port, driven with the path and schema-version constants imported from
 # ubu-ui/src/api/endpoints.ts. See docs/CONTRACT_CHECK.md.
@@ -37,7 +37,7 @@ usage() {
   cat <<'USAGE'
 Usage: check-ui-contract.sh
 
-Builds ubu-orchestrator and walks twenty-seven scenarios against it, each with its
+Builds ubu-orchestrator and walks twenty-eight scenarios against it, each with its
 own temporary store and its own orchestrator on an ephemeral loopback port.
 Prints one PASS or FAIL line per scenario, stops at the first failure with the
 request, the status and the body, and exits non-zero on failure.

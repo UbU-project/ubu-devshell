@@ -2106,6 +2106,48 @@ const scenarios = [
       ok(JSON.stringify(await call(o.base, "GET", endpoints.UNIVERSE_STATE_PATH)) === JSON.stringify(universe), "the proposal run changes no UniverseState");
       return "facts-only schema constrains expected and predicates; a refused Task leaves two candidates, ok status, and canonical state unchanged";
     }
+  },
+  {
+    name: "manual UniverseState writes refuse reserved namespaces and legacy keys can be cleared",
+    async run(o) {
+      const read = () => call(o.base, "GET", endpoints.UNIVERSE_STATE_PATH);
+      const edit = (mutations, expect = 200) => call(o.base, "PATCH", endpoints.UNIVERSE_STATE_PATH,
+        { schema_version: endpoints.UNIVERSE_STATE_SCHEMA_VERSION, mutations }, expect);
+      for (const segment of ["facts", "numeric_values", "set_memberships", "event_markers", "affect"]) {
+        const target = `facts.${segment}.invented_kettle`;
+        const refused = await edit([{ operation: "set_fact", target, payload: true }], 400);
+        const message = segment === "affect"
+          ? `Key segment \`affect\` is reserved for intrinsic affect, which organization_mode and worker_mode refuse. The target would be \`${target}\`; the collection comes from the panel, not the key.`
+          : `Key segment \`${segment}\` names a collection; the collection comes from the panel, not the key. The target would be \`${target}\`.`;
+        same(refused.diagnostics, [{ code: "universe_target_namespace_invalid", message }], `${segment} is refused with its own grammar reason and the complete target`);
+      }
+      same((await read()).version, null, "five refusals seed no empty state");
+      // Task effects keep core semantics, so this stages invented legacy keys
+      // through existing HTTP contracts without a database editor or new route.
+      const legacy = (await captureTask(o, {
+        title: "Synthetic: stage an invented legacy kettle",
+        duration_estimate: fixed(5),
+        effects: { mutations: [
+          { operation: "set_fact", target: "facts.facts.invented_kettle", payload: true },
+          { operation: "set_fact", target: "facts.affect.invented_energy", payload: true },
+          { operation: "set_numeric", target: "numeric_values.numeric_values.invented_jars", payload: 3 },
+          { operation: "add_membership", target: "set_memberships.set_memberships.invented_tools", payload: "invented-spanner" }
+        ] }
+      })).task_id;
+      same((await recordAction(o, legacy, "complete")).diagnostics, [], "unchanged Task effects stage the legacy fixture");
+      const before = await read();
+      same(before.facts, { "facts.invented_kettle": true, "affect.invented_energy": true }, "legacy doubled and reserved keys remain readable");
+      const cleared = await edit([
+        { operation: "clear_fact", target: "facts.facts.invented_kettle" },
+        { operation: "clear_fact", target: "facts.affect.invented_energy" },
+        { operation: "clear_numeric", target: "numeric_values.numeric_values.invented_jars" },
+        { operation: "remove_membership", target: "set_memberships.set_memberships.invented_tools", payload: "invented-spanner" }
+      ]);
+      same([cleared.facts, cleared.numeric_values, cleared.set_memberships], [{}, {}, {}], "legacy clear and remove operations still work");
+      same(cleared.version, before.version + 1, "cleanup is one version");
+      same(await read(), cleared, "cleanup remains the current state");
+      return "five reserved first segments refused without a write; legacy keys remain readable and clear/remove succeeds";
+    }
   }
 
 ];
