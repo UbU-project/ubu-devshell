@@ -608,3 +608,27 @@ UniverseState and before Stop. Review requires a separate click there, so no
 review copy-back is added. Any future review copy-back must retain only verdict
 and tree shape, replace identifiers and expected values with placeholders, and
 omit model reason text, fact values, real Task titles and descriptions.
+
+## P1B-63: the advisor reads what capture writes
+
+A manual step's inputs must be staged by something that runs during that
+document's own procedure. `LIVE_REHEARSAL.md` explicitly stops `acceptance.sh`,
+so the acceptance harness stages nothing for that separate live procedure.
+P1B-61/62's step 12 depended on descriptions that its calendar capture could not
+write, while the only described seed lived in the stopped harness. Every
+captured Task was skipped. That was a design error, not a failed model run.
+
+A runner scenario that stages Tasks through `POST /task` does not exercise a
+store built by calendar capture. A producer whose input only the manual route
+can supply can pass those tests and do nothing on the operator's store. The
+P1B-63 scenario therefore starts with two mock calendar events, captures them,
+and runs the advisor for both a title-only Task and one with imported notes.
+Notes are optional; a non-blank title is sufficient. Routine occurrences stay
+excluded. Calendar notes fill only a blank description, never overwrite existing
+Task notes, and are never exported back to Google.
+
+Nothing is retired. The live rehearsal remains 13 steps and 8 copy-back items;
+its last model-dependent step is still step 12. It can now reach the model,
+but promises no candidate. All outcomes remain results to copy back with the
+existing redaction. Passing the runner and UI tests is not operator acceptance:
+the operator must run the full live procedure and return its copy-back.
