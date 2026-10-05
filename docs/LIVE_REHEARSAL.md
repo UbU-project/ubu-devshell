@@ -387,6 +387,7 @@ three facts relevant to your captured Tasks. Under “Facts”, enter a key and 
 value and click “Set fact”; or under “Numbers”, enter a key and a number and
 click “Set number”. Use names meaningful to you. What you enter stays private
 and is recorded as asserted. Do not copy any key, value or row back.
+Facts alone offer “is” and “is not recorded”; a number also offers the comparisons.
 
 Open **Review**. Under “Precondition advisor”, leave “Precondition Task limit”
 at 25 and click “Run precondition advisor”. It considers active Tasks that are
@@ -412,9 +413,12 @@ a title nor notes to reason over. At most three Tasks are named, followed by
 one count of the rest; copy only the diagnostic code and count, never a Task id.
 `precondition_no_facts` means no supported targets were available
 and no model was asked. `advisory_unconfigured` means set the named configuration
-in Setup; no model was asked. Connection, timeout, HTTP and malformed-result
-diagnostics mean the run failed; read its remedy, copy only the code, and go on
-to Stop. A valid result with zero candidates is also a result.
+in Setup; no model was asked. `precondition_proposal_refused` means the model
+proposed something UbU cannot evaluate: that one Task got no candidate, and the
+rest of the run stands. `advisory_malformed_result` means the response was not a
+proposal result at all, so no candidates were enqueued. Connection, timeout and
+HTTP diagnostics mean the run failed; read its remedy, copy only the code, and
+go on to Stop. A valid result with zero candidates is also a result.
 
 Copy back: the candidate count and the words of the first precondition, **with
 every target name and expected value replaced by `[target]` and `[value]`**.

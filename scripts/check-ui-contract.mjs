@@ -367,6 +367,13 @@ async function startModelStub() {
         const context = JSON.parse(body.prompt);
         const reviews = context.tasks.map((task) => ({ id: task.id, verdict: "remove", reason: stub.reviewReason ?? "This synthetic inspection needs no charge, so the guard is unrelated." }));
         answer(200, { model: body.model, done: true, response: JSON.stringify({ reviews }) });
+      } else if (stub.mode === "precondition_mixed") {
+        const context = JSON.parse(body.prompt);
+        const proposals = context.tasks.map((task) => ({ id: task.id, precondition: {
+          target: stub.preconditionFactTarget, predicate: "equals",
+          ...(task.id === stub.refusedTaskId ? {} : { expected: true })
+        } }));
+        answer(200, { model: body.model, done: true, response: JSON.stringify({ proposals }) });
       } else if (stub.mode === "precondition") {
         const context = JSON.parse(body.prompt);
         const proposals = context.tasks.filter((task) => !stub.preconditionTaskIds || stub.preconditionTaskIds.includes(task.id)).map((task) => ({ id: task.id, precondition: { target: "numeric_values.synthetic.orbital_teapot_charge", predicate: "at_least", expected: stub.preconditionMinimum ?? 25 } }));
@@ -2061,6 +2068,43 @@ const scenarios = [
       // Pure Rust wire tests additionally assert event_body and both event_request
       // operations omit notes, and the recorder preserves Google's notes on PATCH.
       return "calendar capture supplies optional notes, title-only work reaches the model and queue, edited notes survive recapture, and approved projections omit descriptions";
+    }
+  },
+  {
+    name: "facts-only grammar and mixed precondition refusals preserve usable proposals",
+    async run(o) {
+      const tasks = [];
+      for (const title of ["Synthetic lunar valve check", "Synthetic lunar seal check", "Synthetic lunar dial check"]) {
+        tasks.push(await captureTask(o, { title, duration_estimate: fixed(5) }));
+      }
+      const target = "facts.synthetic.lunar_ready";
+      const universe = await call(o.base, "PATCH", endpoints.UNIVERSE_STATE_PATH, { schema_version: endpoints.UNIVERSE_STATE_SCHEMA_VERSION, mutations: [{ operation: "set_fact", target, payload: true }] });
+      const before = await Promise.all(tasks.map((task) => readTask(o, task.task_id)));
+      const stub = await startModelStub(); stub.mode = "precondition_mixed";
+      stub.preconditionFactTarget = target; stub.refusedTaskId = tasks[2].task_id;
+      await putSetting(o, "advisory.model", "synthetic-mixed-precondition-model");
+      await putSetting(o, "advisory.endpoint", stub.endpoint);
+      const result = await call(o.base, "POST", endpoints.ADVISORY_RUN_PATH, { schema_version: endpoints.ADVISORY_RUN_SCHEMA_VERSION, producer: "precondition", limit: 25 });
+      same(result.status, "ok", "one refused proposal leaves the run ok");
+      same(result.candidates_enqueued, 2, "both independently usable proposals are enqueued");
+      same(result.diagnostics.length, 1, "one refused Task produces one diagnostic");
+      same(result.diagnostics[0], { code: "precondition_proposal_refused", message: `Task \`${tasks[2].task_id}\`: this predicate requires an expected value. No candidate was enqueued for this Task; the rest of the run stands.` }, "the refusal names the third Task and its code-authored reason");
+      const queue = await call(o.base, "GET", endpoints.ADVISORY_QUEUE_PATH);
+      same(queue.candidates.map(({ candidate }) => candidate.target_refs[0].id).sort(), tasks.slice(0, 2).map(({ task_id }) => task_id).sort(), "only the two usable Tasks have candidates");
+      const sent = stub.requests[0].body;
+      const context = JSON.parse(sent.prompt);
+      same(context.targets, [target], "the model receives facts-only vocabulary");
+      const branches = sent.format.$defs.leaf.oneOf;
+      const predicates = branches.flatMap(({ properties }) => properties.predicate.enum ?? [properties.predicate.const]).sort();
+      same(predicates, ["absent", "equals"], "facts-only grammar offers exactly equals and absent");
+      same(branches.length, 2, "empty comparison and membership partitions add no branch");
+      ok(!Object.hasOwn(branches[0].properties, "expected") && branches[0].additionalProperties === false, "absent cannot carry expected");
+      ok(branches[1].required.includes("expected"), "equals must carry expected");
+      console.log(`FORMAT_P1B64_FACTS_ONLY: ${JSON.stringify(sent.format)}`);
+      const after = await Promise.all(tasks.map((task) => readTask(o, task.task_id)));
+      ok(JSON.stringify(after) === JSON.stringify(before), "the proposal run changes no canonical Task");
+      ok(JSON.stringify(await call(o.base, "GET", endpoints.UNIVERSE_STATE_PATH)) === JSON.stringify(universe), "the proposal run changes no UniverseState");
+      return "facts-only schema constrains expected and predicates; a refused Task leaves two candidates, ok status, and canonical state unchanged";
     }
   }
 
