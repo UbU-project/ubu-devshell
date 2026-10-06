@@ -13,7 +13,7 @@ Each step says what to **open**, what to **click** and what to **read**. A
 step asks you to **copy back** only where this run can show something that
 has not already been shown. From P1B-55 a verification that has passed live
 is retired, and recorded in the ledger in [ACCEPTANCE.md](ACCEPTANCE.md).
-There are fifteen steps and ten copy-back items. The colour setup and
+There are fourteen steps and nine copy-back items. The colour setup and
 colouring steps are retired in P1B-60; their preconditions are below.
 
 When a step cannot be completed, copy its named result line or absence phrase
@@ -475,7 +475,11 @@ Under “Vocabulary advisor”, leave “Vocabulary Task limit” at 25 and clic
 “Run vocabulary advisor”. Read and copy its “Run status:” and “Candidates
 enqueued:” lines immediately, labelled Vocabulary, before any navigation away
 can discard the result. For Vocabulary diagnostics, copy “none” if none are shown; otherwise copy
-every rendered “Diagnostic counts:” line in that result. Candidate
+its rendered “Diagnostic counts:” line. Also copy the latest selection panel's
+“Diagnostic counts:” line now, labelled “Vocabulary selection”, or “none” if
+it has no diagnostics. Copy each count line once for this run; read the
+sentences on screen without copying them. The later Precondition click is a
+separate run, so its selection count is a separate answer. Candidate
 count is requested even when it is zero; an absent line is “no Vocabulary
 Candidates enqueued line”. Do not copy diagnostic sentences or Task ids.
 It considers active, non-occurrence Tasks with a title or notes, and proposes at
@@ -526,10 +530,12 @@ A replacement shows “Currently required” and “Proposed requirement” toge
 with a line saying that admitting replaces the first with the second.
 Read and copy “Run status:” and “Candidates enqueued:” immediately, labelled
 Precondition. For Precondition diagnostics, copy “none” if none are shown; otherwise copy
-every rendered “Diagnostic counts:” line in that result. The separate “Latest Task selection notes”
+its rendered “Diagnostic counts:” line, once for this run. The separate “Latest Task selection notes”
 panel holds the shared gate decision once; copy “none” if that panel
-shows no notes; otherwise copy its rendered “Diagnostic counts:” line. It replaces the older selection
-snapshot. No Task id or diagnostic sentence is requested. If `precondition_queue_full` is
+shows no notes; otherwise copy its rendered “Diagnostic counts:” line, once,
+labelled “Precondition selection”. It replaces the older on-screen selection
+snapshot, so keep the “Vocabulary selection” answer you copied after that run.
+No Task id or diagnostic sentence is requested. If `precondition_queue_full` is
 shown, ten or more proposed or resurfaced precondition candidates already await
 review: the run did not happen and no model was asked. Review, defer or reject
 what is waiting before asking for more; deferred candidates do not block a run.
@@ -594,7 +600,10 @@ Copy back: for each producer, label its “Run status:” and “Candidates enqu
 lines with “Vocabulary” or “Precondition”. For a missing line, copy “no Vocabulary
 Run status line”, “no Vocabulary Candidates enqueued line”, “no Precondition Run
 status line” or “no Precondition Candidates enqueued line”. Include both producers’ diagnostics answers (“none” or rendered count lines),
-and the latest shared selection diagnostics answer, the vocabulary judgment and any failed admission outcome above. Then copy the words of the
+and the selection count captured after each run, labelled “Vocabulary selection”
+and “Precondition selection”, the vocabulary judgment and any failed admission
+outcome above. Copy only the count line once per run, or “none”; two separate
+runs give two selection answers even when the counts are equal. Then copy the words of the
 first precondition **as
 the screen renders them**, with no substitution or hand redaction, plus the
 rejection outcome above. For a replacement, copy both “Currently required”
@@ -650,7 +659,7 @@ calendar, at its step 6, so there is nothing to clean up after this one.
    UniverseState.
 8. From step 13: both producers’ result lines, labelled Vocabulary and
    Precondition, or their four named absent-line phrases above. For Vocabulary, Precondition
-   and latest selection diagnostics, label each answer: “none” if none are
+   diagnostics and each run's selection diagnostics, label each answer: “none” if none are
    shown, otherwise its rendered Diagnostic counts line. If sentences are
    shown without that line, use the named count-line failure above. Include “a name
    was worth recording”, “no name was worth recording”, “no vocabulary candidate
@@ -661,7 +670,10 @@ calendar, at its step 6, so there is nothing to clean up after this one.
    proposal left the queue”, or “rejection failed”. If none appeared: “no
    candidate appeared, so nothing was rejected”. If the queue blocked the run:
    the two result lines and “queue full; no model asked”, with no proposal words.
-   Copy “none” or rendered Diagnostic counts lines, never diagnostic sentences or Task ids. Do not tally their lines.
+   Copy each rendered Diagnostic counts line once, never diagnostic sentences
+   or Task ids. Label the selection counts “Vocabulary selection” and
+   “Precondition selection”, copying each immediately after its click. Equal
+   counts from two runs remain two answers. Do not tally their lines.
 9. And one answer, in your own words: is what it chose to schedule what you
    would have chosen, and is this a store you would plan tomorrow on? If
    not, what is missing?
