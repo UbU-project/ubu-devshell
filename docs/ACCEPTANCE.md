@@ -383,6 +383,18 @@ Retired in P1B-60; these step numbers are from P1B-59.
 | step 5 and copy-back item 1, the colour-to-category setup and table | the capture mapping agrees with the operator's categories | P1B-56 through P1B-59 | P1B-60 records the identical table returned in P1B-56, P1B-57, P1B-58 and P1B-59 | `capture_partition.rs` and the runner's colour scenarios assert the mapping; the operator's own tooling now performs both setup and colouring | P1B-60 |
 | step 6 as an instruction, colouring the week | colour partitions commitments from work to schedule | P1B-55 and every run since | P1B-60 records the partition proven live in P1B-55 and every subsequent run | `capture_partition.rs` and the runner's colour scenarios; the operator's own tooling now performs both steps; four capture facts remain beside new step 7 | P1B-60 |
 
+Retired by operator decision on 2026-10-06; step numbers are from P1B-68.
+
+| retired | what it proved | proved in | on record | retired |
+|---|---|---|---|---|
+| step 13 and copy-back item 8, the first live finite-snooze reading | the review producer runs against an operator-authored precondition and returns a verdict; it did not prove a live critique or snooze interval, which requires model disagreement; intervals remain asserted by the runner against the stub | P1B-68 | P1B-69 quotes the operator's live result, “1 preconditions examined; 1 judged sound.”; explicit operator retirement, not inferred interval acceptance | P1B-69, operator decision 2026-10-06 |
+
+The operator declined to manufacture a false requirement on their own store
+just to induce disagreement. Synthetic reversed requirements remain staged by
+the harness and finite intervals remain asserted by the stub-backed runner.
+A ticket changing those intervals brings this check back under the ledger rule.
+Nothing else is retired by P1B-69.
+
 Three copy-backs and one instruction went from that document **without
 having been proven**. They are not retirements, and they are written down so
 that nobody takes them for one:

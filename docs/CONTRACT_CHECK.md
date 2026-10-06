@@ -1,7 +1,7 @@
 # The scenario runner
 
 `scripts/check-ui-contract.sh` builds the real `ubu-orchestrator` and walks
-the daily loop against it over HTTP, in thirty-three scenarios. It needs no
+the daily loop against it over HTTP, in thirty-five scenarios. It needs no
 webview, no Google account and no model. A full walk takes about ten seconds
 once the orchestrator is built.
 
@@ -46,7 +46,7 @@ at that time:
 
 Those two assertions are still scenario 1, and still run first.
 
-## The thirty-three scenarios
+## The thirty-five scenarios
 
 Every scenario starts its own orchestrator on its own ephemeral loopback
 port with its own empty store. Nothing is carried from one to the next. All
@@ -87,6 +87,8 @@ calendar requests ask for `export_mode: "mock"`.
 | 31 | operator-authored requirements | Existing Task PATCH authors one leaf, preserves other fields, observes versions and clears with null; the ordinary planner gate follows it. |
 | 32 | shared eligibility notes | Eight occurrences produce three named notes and one aggregate under advisory_task_skipped in each independent producer response; malformed proposals retain their producer-specific codes. |
 | 33 | stamped origins at reconciliation | An unknown stamped export retains foreign grouping with capture's truthful sentence; ordinary foreign wording, conflict sorting and non-adoption are unchanged. |
+| 34 | subjects and predicates | New writes require an effective subject and predicate, with whole-list refusal/no seed. Explicit minting/retirement leaves legacy enumeration, evaluation and clear/remove intact. |
+| 35 | vocabulary subject schema | Real request constrains governed-minus-affect plus provisional names; unknown subjects and missing predicates are refused independently, leaving ok status and the survivor. |
 
 The seeded scenarios first apply a day with no seed, then restart the
 orchestrator on the same store with a fixture built from the events that
@@ -413,10 +415,10 @@ scenario 7 of 16: colour means done (seeded mock calendar)
 PASS  7 colour means done: a colour on an applied Dynamic event completes its Task at capture, and only that Task
 ```
 
-A complete walk ends with thirty-three `PASS` lines, two `SKIP` lines and:
+A complete walk ends with thirty-five `PASS` lines, two `SKIP` lines and:
 
 ```text
-RESULT: 33 of 33 scenarios passed, 0 failed, 2 skipped, 622 requests, all to 127.0.0.1
+RESULT: 35 of 35 scenarios passed, 0 failed, 2 skipped, 659 requests, all to 127.0.0.1
 ```
 
 The walk stops at the first failure. The `FAIL` line names the scenario and
@@ -442,7 +444,7 @@ Two scripts, one boundary.
 | | `check-ui-contract.sh` | `acceptance.sh` |
 |---|---|---|
 | Covers | The HTTP layer: what the orchestrator does with a request. | The rendered layer: what a human sees in the app. |
-| Asserts | Everything it checks, in thirty-three scenarios, each on its own store. | Nothing about behaviour. It stages a store and prints steps. |
+| Asserts | Everything it checks, in thirty-five scenarios, each on its own store. | Nothing about behaviour. It stages a store and prints steps. |
 | Store | One throwaway store per scenario, and two for the rehearsal, on ephemeral ports. | One throwaway store on the app's default port, held until Ctrl-C. |
 | Preconditions | Each scenario stages exactly what it asserts. | Each step declares the seeds it needs; each seed checks itself over HTTP. |
 | A human | Reads PASS and FAIL lines. | Opens the app and follows the steps. |
@@ -560,3 +562,20 @@ Deferring one frees capacity; resurfacing it blocks again. Deferring all ten
 permits a model call. Both caps concern review labour, not relevance, and
 P1B-67 remains the vocabulary cold-start work. No existing diagnostic sentence
 is reworded. There are 29 mock scenarios and two opt-in live scenarios.
+
+
+## P1B-69 E: new authoring, legacy evaluation
+
+Scenarios 34 and 35 cover the additional mutation governance and the actual
+Vocabulary request sent to a loopback stub. Existing invented subject fixtures
+are now explicitly minted during setup; no producer or value write performs
+an implicit mint. The eleven harness seeds likewise mint their two invented
+roots before authoring. Seed/step counts remain eleven for one step.
+
+Single-part targets are staged through unchanged Task effects as pre-existing
+state, then read, enumerated, evaluated and cleared over the existing HTTP
+contracts. No store editor, migration, schema/route addition or live model is
+used. Existing reserved-namespace, provenance, planning and interval assertions
+remain. The live procedure retires only the operator-declared finite-snooze
+verification, and now has fourteen steps and nine copy-back items. Its new
+subject/predicate/minting reading remains for the operator at the actual app.

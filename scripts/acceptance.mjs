@@ -291,6 +291,7 @@ const SEEDS = {
   week_universe: {
     what: "the staged store's UniverseState, read and edited over HTTP: one invented fact is set and read back, and a malformed mutation is refused and changes nothing",
     async make() {
+      await call("PUT", fill(endpoints.SETTING_PUT_PATH, { name: "universe.subject.invented" }), { schema_version: endpoints.SETTING_SCHEMA_VERSION, value: true });
       const before = await readUniverse();
       const written = await editUniverse([{ operation: "set_fact", target: `facts.${UNIVERSE_FACT_KEY}`, payload: true }]);
       const after = await readUniverse();
@@ -486,6 +487,7 @@ const SEEDS = {
     what: "a synthetic fact and a described Task with a deliberately reversed comparison ready for advisory review",
     async make() {
       const target = "numeric_values.synthetic.orbital_teapot_charge";
+      await call("PUT", fill(endpoints.SETTING_PUT_PATH, { name: "universe.subject.synthetic" }), { schema_version: endpoints.SETTING_SCHEMA_VERSION, value: true });
       await call("PATCH", endpoints.UNIVERSE_STATE_PATH, { schema_version: endpoints.UNIVERSE_STATE_SCHEMA_VERSION, mutations: [{ operation: "set_numeric", target, payload: 0 }] });
       const task = await captureTask({ title: "Synthetic orbital teapot launch", description: "Synthetic orbital teapot launch requires at least 25 charge units.", duration_estimate: { type: "fixed", seconds: 600 }, preconditions: { target, predicate: "at_most", expected: 25 } });
       return { target, id: task.task_id };

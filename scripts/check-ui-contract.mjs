@@ -1788,6 +1788,7 @@ const scenarios = [
     // and deliberately malformed bodies outside those forms. Every fact is invented.
     name: "the UniverseState screen",
     async run(o) {
+    await putSetting(o, "universe.subject.invented", true);
       const read = () => call(o.base, "GET", endpoints.UNIVERSE_STATE_PATH);
       const edit = (mutations, expect = 200) =>
         call(o.base, "PATCH", endpoints.UNIVERSE_STATE_PATH, { schema_version: endpoints.UNIVERSE_STATE_SCHEMA_VERSION, mutations }, expect);
@@ -1840,7 +1841,7 @@ const scenarios = [
       ok(0.7 - (0.7 - 0.1) !== 0.1, `where the difference P1B-58's screen sent would have landed on ${0.7 - (0.7 - 0.1)}`);
       same({ version: lowered.version, word: words(lowered)[litres] }, { version: 4, word: "asserted" }, "each edit is one version, and the number is asserted");
 
-      // A reading states its kind. The app does not send one; a later instrument will.
+      // A reading states its kind, including the app's A reading choice.
       const measured = await edit([{ operation: "set_numeric", target: litres, payload: 0.4, provenance_kind: "measured" }]);
       same(words(measured), { [fact]: "asserted", [litres]: "measured" }, "a measured number and an asserted fact are different words");
       same(words(await edit([{ operation: "set_numeric", target: litres, payload: 0.5 }]))[litres], "asserted", "set again on someone's word, it is asserted again");
@@ -1953,6 +1954,7 @@ const scenarios = [
   {
     name: "advisor proposes a precondition over an existing fact",
     async run(o) {
+    await putSetting(o, "universe.subject.synthetic", true);
       const target = "numeric_values.synthetic.orbital_teapot_charge";
       const task = await captureTask(o, { title: "Synthetic orbital teapot launch", description: "Synthetic orbital teapot launch requires at least 25 charge units.", duration_estimate: fixed(10) });
       await captureTask(o, { title: "Synthetic control task", duration_estimate: fixed(5) });
@@ -2001,6 +2003,7 @@ const scenarios = [
   {
     name: "admitted precondition reviews restore work and snooze rejected critiques",
     async run(o) {
+    await putSetting(o, "universe.subject.synthetic", true);
       const target = "numeric_values.synthetic.orbital_teapot_charge";
       await call(o.base, "PATCH", endpoints.UNIVERSE_STATE_PATH, { schema_version: endpoints.UNIVERSE_STATE_SCHEMA_VERSION, mutations: [{operation:"set_numeric",target,payload:0}] });
       const wrong = {target,predicate:"greater_than",expected:25};
@@ -2040,6 +2043,7 @@ const scenarios = [
       const noted = { id: "0inv3nt3d0rbital", summary: "Synthetic orbital kettle inspection", description: "Synthetic orbital inspection requires the recorded charge threshold.", start: { dateTime: at(6) }, end: { dateTime: at(6, 30) } };
       const titleOnly = { id: "0inv3nt3dsaturn", summary: "Synthetic Saturn charge check", start: { dateTime: at(7) }, end: { dateTime: at(7, 30) } };
       const o = await restartObserving(first, [noted, titleOnly]);
+      await putSetting(o, "universe.subject.synthetic", true);
       same((await capture(o)).captured, 2, "both uncoloured calendar events become Tasks");
       const captured = await listTasks(o);
       const described = captured.find((task) => task.title === noted.summary);
@@ -2085,6 +2089,7 @@ const scenarios = [
   {
     name: "facts-only grammar and mixed precondition refusals preserve usable proposals",
     async run(o) {
+    await putSetting(o, "universe.subject.synthetic", true);
       const tasks = [];
       for (const title of ["Synthetic lunar valve check", "Synthetic lunar seal check", "Synthetic lunar dial check"]) {
         tasks.push(await captureTask(o, { title, duration_estimate: fixed(5) }));
@@ -2167,6 +2172,7 @@ const scenarios = [
 scenarios.push({
   name: "precondition proposal cap and review backlog boundary",
   async run(o) {
+    await putSetting(o, "universe.subject.synthetic", true);
     const ids = [];
     for (let index = 0; index < 25; index += 1) {
       ids.push((await captureTask(o, { title: `Synthetic bounded teapot ${index}`, duration_estimate: fixed(5) })).task_id);
@@ -2226,6 +2232,7 @@ scenarios.push({
 scenarios.push({
   name: "vocabulary names, operator values, then a separate precondition run",
   async run(o) {
+    await putSetting(o, "universe.subject.synthetic", true);
     const fact = "facts.synthetic.teapot_ready";
     const number = "numeric_values.synthetic.teapot_charge";
     const task = await captureTask(o, { title: "Synthetic orbital teapot launch", duration_estimate: fixed(10) });
@@ -2243,7 +2250,7 @@ scenarios.push({
     same(context.targets, [], "cold-start existing names are empty");
     same(Object.keys(context.tasks[0]).sort(), ["id","title"], "title-only Task context carries no unrelated data");
     same(body.format.properties.proposals.maxItems,3,"at most three names are requested");
-    same(body.format.properties.proposals.items.properties.target, {type:"string",pattern:"^(facts|numeric_values)\\.[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",maxLength:128}, "two-prefix grammar and length reach HTTP");
+    same(body.format.properties.proposals.items.properties.target, {type:"string",pattern:"^(facts|numeric_values)\\.(github|operator|project|relationship|synthetic)\\.([A-Za-z0-9_-]+\\.)*[a-z][a-z0-9]*(_[a-z0-9]+)*$",maxLength:128}, "two-prefix grammar and length reach HTTP");
     const queue = await call(o.base,"GET",endpoints.ADVISORY_QUEUE_PATH);
     const candidates = queue.candidates.map((row)=>row.candidate);
     same(candidates.length,2,"two name-only candidates survive");
@@ -2276,6 +2283,7 @@ scenarios.push({
 scenarios.push({
   name: "operator authors and clears one Task requirement through its existing PATCH",
   async run(o) {
+    await putSetting(o, "universe.subject.synthetic", true);
     const target = "numeric_values.synthetic.teapot_charge";
     const task = await captureTask(o, { title: "Synthetic operator-owned teapot launch", duration_estimate: fixed(5), category_tag: "work", tags: ["work"] });
     await call(o.base,"PATCH",endpoints.UNIVERSE_STATE_PATH,{schema_version:endpoints.UNIVERSE_STATE_SCHEMA_VERSION,mutations:[{operation:"set_numeric",target,payload:0,provenance_kind:"measured"}]});
@@ -2300,6 +2308,7 @@ scenarios.push({
 scenarios.push({
   name: "one producer-neutral selection report for eight routine occurrences",
   async run(o) {
+    await putSetting(o, "universe.subject.synthetic", true);
     for (let n=0;n<8;n+=1) await call(o.base,"POST",endpoints.OBJECTIVE_CREATE_PATH,{
       schema_version:endpoints.OBJECTIVE_SCHEMA_VERSION,mode:"evergreen",title:`Synthetic shared-gate routine ${n}`,
       recurrence:{timezone:"UTC",rule:{kind:"daily"}},routine_instance_template:{title:`Synthetic shared-gate occurrence ${n}`,duration_estimate:fixed(1),nominal_start:timeOfDay(n+1),placement:"static",occupies_capacity:true,tags:[],reminder_minutes:[]}
@@ -2344,6 +2353,77 @@ scenarios.push({
     same(captured.diagnostics.find((d)=>d.code==="capture_stale_export").message,stale.message,"capture and reconciliation tell the same origin story");
     const after=await reconcile(o);same(after.conflicts.map((c)=>[c.conflict_type,c.external_id]),[["foreign",id]],"the stamped echo never becomes an applied or owned event");
     return "stamp evidence changes only the truthful origin message; foreign grouping, ordering, capture and non-adoption remain intact";
+  }
+});
+
+scenarios.push({
+  name: "new-write subjects and predicates preserve legacy cleanup",
+  async run(o) {
+    const read = () => call(o.base,"GET",endpoints.UNIVERSE_STATE_PATH);
+    const edit = (mutations,status=200) => call(o.base,"PATCH",endpoints.UNIVERSE_STATE_PATH,{schema_version:endpoints.UNIVERSE_STATE_SCHEMA_VERSION,mutations},status);
+    for (const [target,code] of [["facts.teapot.ready","universe_target_subject_unknown"],["facts.single_leaf","universe_target_grammar_invalid"]]) {
+      const error=await edit([{operation:"set_fact",target:"facts.operator.ready",payload:true},{operation:"set_fact",target,payload:true}],400);
+      same(error.diagnostics[0].code,code,"new-write governance refuses one bad mutation and its entire list");
+      same((await read()).version,null,"refusal leaves no empty seed or earlier write");
+    }
+    await putSetting(o,"universe.subject.teapot",true);
+    const settings=await call(o.base,"GET",endpoints.SETTINGS_LIST_PATH);
+    same(settings.settings.filter(s=>s.name.startsWith("universe.subject.")).map(s=>[s.name,s.value]),[["universe.subject.teapot",true]],"the registry stores provisional subjects only");
+    await edit([
+      {operation:"set_fact",target:"facts.operator.ready",payload:true},
+      {operation:"set_fact",target:"facts.teapot.ready",payload:true},
+      {operation:"set_fact",target:"facts.github.issue.14.pipeline_state",payload:"synthetic"}
+    ]);
+    const legacy=(await captureTask(o,{title:"Synthetic legacy fixture writer",duration_estimate:fixed(1),effects:{mutations:[
+      {operation:"set_fact",target:"facts.legacy_leaf",payload:true},
+      {operation:"set_numeric",target:"numeric_values.legacy_number",payload:3},
+      {operation:"add_membership",target:"set_memberships.legacy_set",payload:"synthetic"}
+    ]}})).task_id;
+    same((await recordAction(o,legacy,"complete")).diagnostics,[],"unchanged Task effects create the invented pre-existing legacy state");
+    const waiting=await captureTask(o,{title:"Synthetic legacy requirement",duration_estimate:fixed(1),preconditions:{target:"facts.legacy_leaf",predicate:"equals",expected:true}});
+    ok((await generatePlan(o)).steps.some(s=>s.task_id===waiting.task_id),"a pre-existing single-segment target still evaluates");
+    const stub=await startModelStub();stub.mode="precondition";stub.preconditionTaskIds=[];
+    await putSetting(o,"advisory.model","synthetic-legacy-model");await putSetting(o,"advisory.endpoint",stub.endpoint);
+    await call(o.base,"POST",endpoints.ADVISORY_RUN_PATH,{schema_version:endpoints.ADVISORY_RUN_SCHEMA_VERSION,producer:"precondition",limit:25});
+    ok(JSON.parse(stub.requests[0].body.prompt).targets.includes("facts.legacy_leaf"),"recorded target enumeration retains the legacy name");
+    await call(o.base,"DELETE",fill(endpoints.SETTING_DELETE_PATH,{name:"universe.subject.teapot"}),undefined,204);
+    const before=await read();
+    same((await edit([{operation:"set_fact",target:"facts.teapot.ready",payload:false}],400)).diagnostics[0].code,"universe_target_subject_unknown","retirement refuses new writes");
+    same(await read(),before,"retirement never rewrites existing target data");
+    await edit([
+      {operation:"clear_fact",target:"facts.teapot.ready"},
+      {operation:"clear_fact",target:"facts.legacy_leaf"},
+      {operation:"clear_numeric",target:"numeric_values.legacy_number"},
+      {operation:"remove_membership",target:"set_memberships.legacy_set",payload:"synthetic"}
+    ]);
+    const cleared=await read();same([cleared.numeric_values,cleared.set_memberships],[{},{}],"legacy numeric/set cleanup still works");
+    same(cleared.facts,{"operator.ready":true,"github.issue.14.pipeline_state":"synthetic"},"legacy clearing preserves unrelated governed values");
+    return "new writes require a known subject and predicate; explicit minting/retirement leaves legacy enumeration, evaluation and clear/remove intact";
+  }
+});
+scenarios.push({
+  name: "vocabulary schema constrains subjects without discarding survivors",
+  async run(o) {
+    await putSetting(o,"universe.subject.teapot",true);
+    const task=await captureTask(o,{title:"Synthetic teapot readiness inspection",duration_estimate:fixed(1)});
+    const before=await readTask(o,task.task_id);
+    const stub=await startModelStub();stub.mode="vocabulary";
+    stub.vocabularyNames=["facts.teapot.ready","facts.unminted.ready","facts.operator"];
+    await putSetting(o,"advisory.model","synthetic-subject-model");await putSetting(o,"advisory.endpoint",stub.endpoint);
+    const result=await call(o.base,"POST",endpoints.ADVISORY_RUN_PATH,{schema_version:endpoints.ADVISORY_RUN_SCHEMA_VERSION,producer:"vocabulary",limit:25});
+    same([result.status,result.candidates_enqueued],["ok",1],"unknown subject and missing predicate lose only their own candidates");
+    same(result.diagnostics.map(d=>d.code),["vocabulary_proposal_refused","vocabulary_proposal_refused"],"per-proposal refusals retain the producer's code");
+    ok(result.diagnostics[0].message.includes("mint it explicitly"),"unknown subject names the operator's minting act");
+    ok(result.diagnostics[1].message.includes("lowercase snake_case predicate"),"single-segment key names the missing grammar");
+    const request=stub.requests[0].body,target=request.format.properties.proposals.items.properties.target;
+    same(target,{type:"string",pattern:"^(facts|numeric_values)\\.(github|operator|project|relationship|teapot)\\.([A-Za-z0-9_-]+\\.)*[a-z][a-z0-9]*(_[a-z0-9]+)*$",maxLength:128},"actual HTTP request constrains the effective subject vocabulary minus affect");
+    same(JSON.parse(request.prompt).subjects,["github","operator","project","relationship","teapot"],"only subject names reach model context");
+    const matches=(name)=>name.length<=target.maxLength&&new RegExp(target.pattern).test(name);
+    for(const name of ["facts.teapot.ready","numeric_values.operator.level","facts.github.issue.14.pipeline_state"]) ok(matches(name),"grammatical effective subjects are expressible");
+    for(const name of ["facts.affect.energy","facts.unminted.ready","facts.operator","facts.teapot.Upper_leaf","facts.teapot."+"a".repeat(128)]) ok(!matches(name),"forbidden or malformed subject/predicate names are not expressible");
+    same(await readTask(o,task.task_id),before,"the advisory run changes no Task");
+    same((await call(o.base,"GET",endpoints.UNIVERSE_STATE_PATH)).version,null,"a proposal mints no subject and writes no observation");
+    return "the real schema names exactly effective subjects minus affect with a final predicate; injected grammar violations keep ok status and the usable candidate";
   }
 });
 

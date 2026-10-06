@@ -245,7 +245,8 @@ Read: six counters appear: “captured”, “updated”, “unchanged”, “sk
   - `calendar_event_skipped`, `capture_event_invalid`: an event that was not
     captured, and why.
 
-Read: above the grey list, one line beginning “Diagnostic counts:”. It gives
+Read whether any diagnostics are shown in the quiet grey capture box. If none
+are shown there, copy “none” for capture diagnostics; otherwise read the line beginning “Diagnostic counts:”. It gives
 each code and its line count in the order its first line appears. The screen
 counts them; you do not. If the list is empty, there is no count line.
 
@@ -256,8 +257,8 @@ Copy back three things, and only these:
   “no moved counter” or “no resized counter”, using its name;
 - the sentence that begins “N events had no colour.” (or “1 event had no
   colour.”), or “no no-colour sentence” if it is absent;
-- the line beginning “Diagnostic counts:”, exactly as shown, or “no Diagnostic
-  counts line” if it is absent. Do not transcribe its sentences or count lines.
+- whether the grey capture box shows diagnostics: “none” if there are none, otherwise
+  the rendered “Diagnostic counts:” line. Do not transcribe sentences or tally lines.
 
 **Do not copy back the list under that sentence.** The lines there, one for
 each uncoloured event, are not in the grey box and are not wanted, whether
@@ -292,12 +293,13 @@ beside the heading reads “low risk”, “medium risk” or “high risk”. U
 each finding has a name in bold, such as “unplaced work”, and its severity
 on a badge beside the name.
 
-Read: above the quiet grey diagnostic list, one line beginning “Diagnostic
-counts:”. It states each code and its line count. Failure alerts keep their
+Read whether the quiet grey information list above “Timed placements” shows
+any diagnostics. If it shows none, copy “none”; otherwise read its “Diagnostic
+counts:” line, which states each code and its line count. Failure alerts keep their
 existing rendering; if there is no information list, there is no count line.
 
-Copy back: the line beginning “Diagnostic counts:” above “Timed placements”,
-exactly as shown, or “no Diagnostic counts line” if it is absent. Do not
+Copy back: for diagnostics above “Timed placements”, “none” if none are shown;
+otherwise the “Diagnostic counts:” line exactly as shown. Do not
 transcribe their sentences or count lines. The line directly under “Timed placements” that begins “Placements:” and gives total, Skeleton and Static anchor counts. And the whole section
 “Not in this Plan”, or the words “no such section”. If there is no
 “Placements:” line, copy “no Placements line”.
@@ -326,7 +328,7 @@ not tell you how much work was planned.
 
 - An operation headed “Update:” that reads “Placement: Dynamic” is one of
   your uncoloured events. Its “Window:” line is the time UbU chose for it, in
-  UTC, and not the time you parked it at. Its “Colour means:” line says that
+  UTC, and not the time you parked it at. Its “If you give this event a colour, it means:” line says that
   a colour would make it a commitment.
 - No operation is proposed for a coloured event of yours. It is a commitment
   and stays where it is.
@@ -407,7 +409,20 @@ leave that as it is.
 **12. Read and write a Task's requirement.** This step is deterministic and
 comes before every model-dependent step. First open **UniverseState**. Under
 “Facts” or “Numbers”, record one target that you can honestly assert or measure
-and that matters to an active Task. Use a name meaningful to you. The choice
+and that matters to an active Task. A fact now has two parts: the subject is
+what it is about, and the predicate is what you record about it. Choose a
+subject from the list and type the predicate in lowercase snake_case. Both
+words are yours. For an entity, put its path before the final predicate in
+that field. Read the assembled Target preview before saving.
+
+If none of the listed subjects fits your world, use the separate “Mint a
+subject” form on this screen. Read its noun rule, enter the new subject and
+click “Mint subject”. The Subjects list should mark it “awaiting ratification”;
+then choose it in the value form. Do not force your fact into a subject that
+means something else. Affect is shown as governed but reserved and cannot be
+chosen in these value forms. A refusal is something to copy back, not your
+error. Copy “subject mint failed” or “minted subject missing from selector” if
+that happened, and continue. Do not copy a subject name, key, value or table row. The choice
 beside the value is “My assertion” by default; choose “A reading” if this is a
 reading. Click “Set fact” or “Set number”. Do not copy its key, value or table row.
 
@@ -445,70 +460,22 @@ Codes to read, without transcribing their sentences:
 - `unknown_task`, `missing_title`, `unsupported_capture_field`: the Task request
   was refused; read the remedy and copy the failed-authoring outcome.
 - A connection failure or validation refusal: no condition was saved; continue.
-
-## Read a review and its finite hold
-
-**13. Review the requirement you authored.** Open **Review**. Under “Review
-admitted preconditions”, click “Review preconditions”. This model-dependent step
-uses the deterministic requirement from step 12, not a prior model admission.
-It can still run when step 12 failed; no selected Task or no review candidate is
-an outcome to copy back. Do not use “Review again now” merely to force a result.
-
-Read the result's line “N Tasks selected; N candidates enqueued.” Read its
-“Diagnostic counts:” line if present. If a Precondition review card arrives for
-your Task, read “Currently required”, the replacement's “Proposed requirement”
-and its admission sentence, or “Admitting removes this requirement entirely.”
-Those words are the verdict visible on the card; do not infer a separate verdict
-label. A sound review may be only an aggregate diagnostic and no card.
-
-On that card read “Hold this review for” and the selected number of days, then
-“Eligible to return on” with its date. If you want to put the critique aside,
-leave that selection or choose a shorter span and click “Defer”. Read the
-“Currently held until” line on the deferred card. This is the finite snooze's
-first live reading, not a promise that a model will emit a critique. No candidate
-means no interval to read and no deferral to make. Do not admit, reject or repeat
-a run just to manufacture a snooze outcome.
-
-Copy back the result's selected/enqueued line, or “no Precondition review result
-line”; its “Diagnostic counts:” line, or “no review Diagnostic counts line”.
-For a card, copy its current/proposed requirement words or removal sentence,
-the selected span and “Eligible to return on” line. Use “no Currently required words”, “no Proposed requirement words” or “no removal
-sentence” for the missing verdict fields; “no snooze span” or “no Eligible to
-return line” for each missing interval field.
-After Defer copy “Currently held until”, or “no Currently held until line”;
-otherwise copy “I did not defer”. With no card copy “no review candidate; no
-snooze interval”. With no selected Task copy “no admitted precondition selected”.
-These are all outcomes; none blocks step 14. Do not copy model reason text or
-Task ids, and do not tally diagnostic lines.
-
-Codes:
-
-- `precondition_review_sound`: sound verdicts were counted; no card is needed.
-- `advisory_proposal_suppressed`: a saved hold prevented that subject's model
-  review; its date is already recorded. No new card is promised.
-- `advisory_proposal_already_queued`: an equivalent review is already waiting;
-  no duplicate was requested.
-- `precondition_review_resurfaced`: an eligible held review returned to the queue.
-- `precondition_review_changed`: the Task changed during review; no candidate
-  for that Task was enqueued.
-- `precondition_missing_targets`: a proposed requirement named a target no longer
-  recorded; that candidate was not enqueued.
-- `advisory_unconfigured`: configure the named Setting; no model was asked.
-- `advisory_connection_failed`, `advisory_timeout`, `advisory_http_failed`,
-  `advisory_empty_response`, `advisory_malformed_result`: the run failed or
-  produced no usable answer; read its remedy and continue.
-- `PreconditionFailed`, `InvalidCandidateTransition` or a request refusal during
-  Defer: the hold was not saved; copy the missing-held-line outcome and continue.
+- `subject_reserved`, `subject_governed`, `subject_invalid`,
+  `subject_already_registered`, `subject_invalid_value`: mint was refused;
+  read the sentence, copy “subject mint failed” and continue.
+- `universe_target_subject_unknown` or `universe_target_grammar_invalid`: the
+  authored fact was refused; copy “fact authoring refused”, read the remedy
+  and continue. This is a result about the form, not an error by you.
 
 ## Ask for a precondition
 
-**14. Ask for names, supply values, then ask for a precondition.** This
+**13. Ask for names, supply values, then ask for a precondition.** This
 model-dependent step comes last, after the deterministic checks. Open **Review**.
 Under “Vocabulary advisor”, leave “Vocabulary Task limit” at 25 and click
 “Run vocabulary advisor”. Read and copy its “Run status:” and “Candidates
 enqueued:” lines immediately, labelled Vocabulary, before any navigation away
-can discard the result. Read and copy every “Diagnostic counts:” line in that
-result, or “no Vocabulary Diagnostic counts line” if none appears. Candidate
+can discard the result. For Vocabulary diagnostics, copy “none” if none are shown; otherwise copy
+every rendered “Diagnostic counts:” line in that result. Candidate
 count is requested even when it is zero; an absent line is “no Vocabulary
 Candidates enqueued line”. Do not copy diagnostic sentences or Task ids.
 It considers active, non-occurrence Tasks with a title or notes, and proposes at
@@ -529,8 +496,9 @@ failed” and continue. This is a judgment of the names, not a recheck of the
 runner's admission and context assertions.
 
 If no proposal was admitted, open **UniverseState** and choose two or three
-facts relevant to your captured Tasks. Under “Facts”, enter a key and a value
-and click “Set fact”; or under “Numbers”, enter a key and a number and click
+facts relevant to your captured Tasks. Under “Facts”, choose a subject, type
+a predicate and enter your value, then click “Set fact”; or under “Numbers”,
+choose a subject, type a predicate and enter a number, then click
 “Set number”. Use names meaningful to you. This hand-authoring is the fallback,
 so the second run is available even if the first proposes nothing. What you
 enter is asserted by default, or measured when you choose “A reading”. Do not
@@ -557,10 +525,10 @@ design, not a thin result.
 A replacement shows “Currently required” and “Proposed requirement” together,
 with a line saying that admitting replaces the first with the second.
 Read and copy “Run status:” and “Candidates enqueued:” immediately, labelled
-Precondition. Copy every “Diagnostic counts:” line in that result, or “no
-Precondition Diagnostic counts line”. The separate “Latest Task selection notes”
-panel holds the shared gate decision once; copy its “Diagnostic counts:” line,
-or “no selection Diagnostic counts line”. It replaces the older selection
+Precondition. For Precondition diagnostics, copy “none” if none are shown; otherwise copy
+every rendered “Diagnostic counts:” line in that result. The separate “Latest Task selection notes”
+panel holds the shared gate decision once; copy “none” if that panel
+shows no notes; otherwise copy its rendered “Diagnostic counts:” line. It replaces the older selection
 snapshot. No Task id or diagnostic sentence is requested. If `precondition_queue_full` is
 shown, ten or more proposed or resurfaced precondition candidates already await
 review: the run did not happen and no model was asked. Review, defer or reject
@@ -582,8 +550,10 @@ above. First read the proposal's words as rendered, then decide:
 - If no candidate appears: copy “no candidate appeared, so nothing was rejected”.
 
 This is durable suppression of a proposed requirement, with no finite snooze
-interval. Finite snoozes apply to reviews of already-admitted requirements;
-their live acceptance remains outstanding. Do not admit a proposal or run
+interval. Finite snoozes apply to reviews of already-admitted requirements. Their live
+acceptance was retired by operator decision on 2026-10-06: P1B-68 reached the
+review producer and received a sound verdict; the runner asserts intervals
+against a stub. A changed interval contract brings that verification back. Do not admit a proposal or run
 another advisor just to exercise that other path.
 
 Every outcome is something to copy back, not a reason to repeat until a model
@@ -623,8 +593,8 @@ go on to Stop. A valid result with zero candidates is also a result.
 Copy back: for each producer, label its “Run status:” and “Candidates enqueued:”
 lines with “Vocabulary” or “Precondition”. For a missing line, copy “no Vocabulary
 Run status line”, “no Vocabulary Candidates enqueued line”, “no Precondition Run
-status line” or “no Precondition Candidates enqueued line”. Include both producers’ count lines (or named absences), the shared selection count
-line (or its named absence), the vocabulary judgment and any failed admission outcome above. Then copy the words of the
+status line” or “no Precondition Candidates enqueued line”. Include both producers’ diagnostics answers (“none” or rendered count lines),
+and the latest shared selection diagnostics answer, the vocabulary judgment and any failed admission outcome above. Then copy the words of the
 first precondition **as
 the screen renders them**, with no substitution or hand redaction, plus the
 rejection outcome above. For a replacement, copy both “Currently required”
@@ -634,9 +604,15 @@ missing field’s name. If there is no candidate, copy “no
 candidate appeared, so nothing was rejected”. If rejection failed, copy
 “rejection failed”; read the diagnostic remedy without tallying its lines.
 
+If diagnostic sentences are visible but their count line is missing, copy
+“diagnostics shown; count line missing”, labelled with the capture, Plan,
+Vocabulary, Precondition or selection panel. “None” means no diagnostic
+sentences are shown, not merely that a summary is absent. Do not tally or
+transcribe their sentences.
+
 ## Finish
 
-**15. Stop.** In the first terminal, press Ctrl-C. The store at
+**14. Stop.** In the first terminal, press Ctrl-C. The store at
 `/tmp/ubu-live-rehearsal.db` is a rehearsal store and can be left or removed.
 
 If you approved, the calendar now holds what that store created and moved.
@@ -649,11 +625,11 @@ calendar, at its step 6, so there is nothing to clean up after this one.
    “no updated counter”, “no unchanged counter”, “no skipped counter”,
    “no moved counter” or “no resized counter” for each missing counter; the sentence beginning
    “N events had no colour.” or “1 event had no colour.”, or “no no-colour
-   sentence”; and the “Diagnostic counts:” line exactly as shown, or “no
-   Diagnostic counts line”. Do not expand or copy the list behind “The N
+   sentence”; and the grey capture box’s diagnostics: “none” if none are shown,
+   otherwise the rendered “Diagnostic counts:” line. Do not expand or copy the list behind “The N
    events with no colour”, transcribe diagnostic sentences or count lines.
-2. From step 8: the “Diagnostic counts:” line above “Timed placements”, or
-   “no Diagnostic counts line”; the “Placements:” count line, or “no Placements
+2. From step 8: diagnostics above “Timed placements”: “none” if none are
+   shown, otherwise the rendered “Diagnostic counts:” line; the “Placements:” count line, or “no Placements
    line”; and the whole section “Not in this Plan”, or “no such section”.
 3. From step 8: the whole panel headed “Plan risk”, exactly as rendered,
    or “no Plan risk panel”. Select it as one block; do not extract each finding.
@@ -668,16 +644,15 @@ calendar, at its step 6, so there is nothing to clean up after this one.
    and the counts
    only, never a value.
 7. From step 12: the saved-authoring judgment and condition's words, or the
-   named authoring failure, missing section/words/control, or no-target outcome.
-8. From step 13: the selected/enqueued result line and Diagnostic counts line,
-   or their named absences; a card's requirement/removal words, selected span and
-   eligible date, or each named absence; the held-until line or “I did not defer”.
-   With no card: “no review candidate; no snooze interval”. With no selection:
-   “no admitted precondition selected”. No model reason, Task id or hand tally.
-9. From step 14: both producers’ result lines, labelled Vocabulary and
-   Precondition, or their four named absent-line phrases above. Also copy both
-   producers’ Diagnostic counts lines and the latest selection count line, or
-   their three named absences above. Include “a name
+   named authoring failure, missing section/words/control, no-target outcome,
+   “subject mint failed”, “minted subject missing from selector” or
+   “fact authoring refused”. No subject name, key or value is requested from
+   UniverseState.
+8. From step 13: both producers’ result lines, labelled Vocabulary and
+   Precondition, or their four named absent-line phrases above. For Vocabulary, Precondition
+   and latest selection diagnostics, label each answer: “none” if none are
+   shown, otherwise its rendered Diagnostic counts line. If sentences are
+   shown without that line, use the named count-line failure above. Include “a name
    was worth recording”, “no name was worth recording”, “no vocabulary candidate
    appeared” or “vocabulary queue full; no model asked”, and “target admission
    failed” if applicable. Then the first
@@ -686,7 +661,7 @@ calendar, at its step 6, so there is nothing to clean up after this one.
    proposal left the queue”, or “rejection failed”. If none appeared: “no
    candidate appeared, so nothing was rejected”. If the queue blocked the run:
    the two result lines and “queue full; no model asked”, with no proposal words.
-   Copy only the rendered Diagnostic counts lines, never diagnostic sentences or Task ids. Do not tally their lines.
-10. And one answer, in your own words: is what it chose to schedule what you
+   Copy “none” or rendered Diagnostic counts lines, never diagnostic sentences or Task ids. Do not tally their lines.
+9. And one answer, in your own words: is what it chose to schedule what you
    would have chosen, and is this a store you would plan tomorrow on? If
    not, what is missing?
