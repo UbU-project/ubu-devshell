@@ -363,6 +363,11 @@ async function startModelStub() {
       } else if (stub.mode === "slow") {
         const timer = setTimeout(() => answer(200, { model: body.model, done: true, response: '{"proposals":[]}' }), stub.delayMs);
         response.on("close", () => clearTimeout(timer));
+      } else if (stub.mode === "vocabulary") {
+        const context = JSON.parse(body.prompt);
+        const names = stub.vocabularyNames ?? ["facts.synthetic.teapot_ready", "facts.affect.energy", "numeric_values.synthetic.teapot_charge"];
+        const proposals = names.map((target) => ({ id: context.tasks[0].id, target }));
+        answer(200, { model: body.model, done: true, response: JSON.stringify({ proposals }) });
       } else if (stub.mode === "precondition_review") {
         const context = JSON.parse(body.prompt);
         const reviews = context.tasks.map((task) => ({ id: task.id, verdict: "remove", reason: stub.reviewReason ?? "This synthetic inspection needs no charge, so the guard is unrelated." }));
@@ -2208,6 +2213,56 @@ scenarios.push({
     same([result.status, result.candidates_enqueued], ["ok", 0], "ten deferred candidates do not block another run");
     same(stub.requests.length, before + 1, "the all-deferred case reaches the model");
     return "three proposals per run; four refuse whole; nine awaiting permits, ten proposed/resurfaced refuses without a model call, ten deferred permits";
+  }
+});
+
+scenarios.push({
+  name: "vocabulary names, operator values, then a separate precondition run",
+  async run(o) {
+    const fact = "facts.synthetic.teapot_ready";
+    const number = "numeric_values.synthetic.teapot_charge";
+    const task = await captureTask(o, { title: "Synthetic orbital teapot launch", duration_estimate: fixed(10) });
+    const stub = await startModelStub(); stub.mode = "vocabulary";
+    await putSetting(o, "advisory.model", "synthetic-vocabulary-model");
+    await putSetting(o, "advisory.endpoint", stub.endpoint);
+    const run = (producer) => call(o.base, "POST", endpoints.ADVISORY_RUN_PATH, { schema_version: endpoints.ADVISORY_RUN_SCHEMA_VERSION, producer, limit: 25 });
+    const before = await call(o.base, "GET", endpoints.UNIVERSE_STATE_PATH);
+    same(before.version, null, "vocabulary starts with no canonical UniverseState");
+    const result = await run("vocabulary");
+    same([result.status,result.candidates_enqueued], ["ok",2], "one bad name costs one candidate in a three-proposal batch");
+    same(result.diagnostics, [{code:"vocabulary_proposal_refused",message:`Task \`${task.task_id}\`: the first key segment names a reserved collection or intrinsic-affect namespace. No candidate was enqueued for this Task; the rest of the run stands.`}], "refusal has the code-authored reason");
+    const body = stub.requests[0].body;
+    const context = JSON.parse(body.prompt);
+    same(context.targets, [], "cold-start existing names are empty");
+    same(Object.keys(context.tasks[0]).sort(), ["id","title"], "title-only Task context carries no unrelated data");
+    same(body.format.properties.proposals.maxItems,3,"at most three names are requested");
+    same(body.format.properties.proposals.items.properties.target, {type:"string",pattern:"^(facts|numeric_values)\\.[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",maxLength:128}, "two-prefix grammar and length reach HTTP");
+    const queue = await call(o.base,"GET",endpoints.ADVISORY_QUEUE_PATH);
+    const candidates = queue.candidates.map((row)=>row.candidate);
+    same(candidates.length,2,"two name-only candidates survive");
+    for (const candidate of candidates) {
+      same(Object.keys(candidate.normalized_proposal).sort(),["operation","target"],"candidate carries no value");
+      same(candidate.target_refs,[{id:task.task_id,object_type:"Task"}],"Task is evidence, not write destination");
+    }
+    const chosen = candidates.find((candidate)=>candidate.normalized_proposal.target===number);
+    const path = fill(endpoints.ADVISORY_ADMIT_PATH,{candidate_id:chosen.advisory_candidate_id});
+    const missing = await call(o.base,"POST",path,{observed_version:1},400);
+    same(missing.diagnostics,[{code:"vocabulary_value_required",message:"An operator-supplied value is required; no value is defaulted, inferred or derived"}],"no value cannot admit");
+    same((await call(o.base,"GET",endpoints.UNIVERSE_STATE_PATH)).version,null,"failed admission leaves no seed");
+    const value = 987654.125;
+    const admitted = await call(o.base,"POST",path,{observed_version:1,value});
+    same(admitted.task.id,task.task_id,"Task evidence remains available");
+    same(admitted.universe_state.numeric_values["synthetic.teapot_charge"],value,"only the supplied observation is written");
+    same(admitted.universe_state.fact_provenance[number].kind,"asserted","operator value is asserted");
+    stub.mode="precondition"; stub.preconditionTaskIds=[];
+    same((await run("precondition")).status,"ok","the second producer is a separate explicit click");
+    const second = JSON.parse(stub.requests[1].body.prompt);
+    same(second.targets,[number],"precondition context includes the admitted name");
+    ok(!JSON.stringify(stub.requests[1].body).includes(String(value)),"the operator observation never reaches the second model request");
+    stub.mode="vocabulary";stub.vocabularyNames=[fact,fact,fact,fact];
+    const oversized = await run("vocabulary");
+    same([oversized.status,oversized.candidates_enqueued],["malformed_result",0],"four vocabulary proposals refuse whole");
+    return "cold-start title-only vocabulary is name-only and capped at three; a reserved middle proposal is refused independently; no-value admission fails without a seed; supplied value is asserted; the next separate precondition context carries the name and no observation";
   }
 });
 

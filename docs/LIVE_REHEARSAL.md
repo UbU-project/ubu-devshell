@@ -250,7 +250,9 @@ counts them; you do not. If the list is empty, there is no count line.
 
 Copy back three things, and only these:
 
-- the six counters with their numbers;
+- the six counters with their numbers; for any missing counter copy “no captured
+  counter”, “no updated counter”, “no unchanged counter”, “no skipped counter”,
+  “no moved counter” or “no resized counter”, using its name;
 - the sentence that begins “N events had no colour.” (or “1 event had no
   colour.”), or “no no-colour sentence” if it is absent;
 - the line beginning “Diagnostic counts:”, exactly as shown, or “no Diagnostic
@@ -334,8 +336,10 @@ not tell you how much work was planned.
 - No operation is proposed for an instance of a recurring event.
 
 Copy back: the line that begins “Operations proposed:”, exactly as it
-appears, and the whole of the first operation headed “Update:” that reads
-“Placement: Dynamic”. If no operation is headed “Update:”, copy “no Update
+appears, or “no Operations proposed line” if absent, and the whole of the first
+operation headed “Update:” that reads
+“Placement: Dynamic”. If no Dynamic operation is headed “Update:”, copy “no
+Dynamic Update
 operation” instead of an operation. Do not count the operations yourself.
 
 **10. Decide whether to approve. Read this before you press it.**
@@ -361,7 +365,9 @@ If you click it:
 Read: “Approval status: applied”, and a line “Operations applied in this
 run: N of N”.
 
-Copy back: those two lines. Or the words “I did not approve”.
+Copy back: those two lines, or “no Approval status line” and “no Operations
+applied line” for the missing lines. If you did not click Approve, copy “I did
+not approve”.
 
 ## What a Task can wait for
 
@@ -385,7 +391,8 @@ From P1B-59 a number on this screen can be set and cleared outright, and each
 entry says in one word beside its value whether it was measured or asserted.
 
 Copy back: the line that begins “Entries:”, exactly as it appears. If any
-of its numbers is not 0, copy the line back all the same.
+of its numbers is not 0, copy the line back all the same. If the line is absent,
+copy “no Entries line”.
 
 **That line, and nothing else from this screen.** It holds the names of the
 collections and a count for each, and no value. A UniverseState is where
@@ -396,12 +403,40 @@ leave that as it is.
 
 ## Ask for a precondition
 
-**12. Author facts, then run the advisor.** This model-dependent step comes
-last, after the deterministic checks. Stay in **UniverseState**. Choose two or
-three facts relevant to your captured Tasks. Under “Facts”, enter a key and a
-value and click “Set fact”; or under “Numbers”, enter a key and a number and
-click “Set number”. Use names meaningful to you. What you enter stays private
-and is recorded as asserted. Do not copy any key, value or row back.
+**12. Ask for names, supply values, then ask for a precondition.** This
+model-dependent step comes last, after the deterministic checks. Open **Review**.
+Under “Vocabulary advisor”, leave “Vocabulary Task limit” at 25 and click
+“Run vocabulary advisor”. Read its “Run status:” and “Candidates enqueued:” lines.
+It considers active, non-occurrence Tasks with a title or notes, and proposes at
+most three names. A title alone is enough; an empty vocabulary is allowed.
+This run promises no candidate. Read the suggested names and the Task each
+was prompted by. Judge whether any name is worth recording about your own life.
+
+For a name you agree with, enter your own value in “Fact value” or “Number value”
+and click “Admit”. UbU suggested the name; every value is yours. Record only
+what you can assert. A name you do not agree with can stay in Review, be deferred
+or be rejected with the existing durable confirmation. Do not repeatedly ask
+until a model agrees. Copy “a name was worth recording”, “no name was worth
+recording”, or “no vocabulary candidate appeared”. Do not copy a name or value.
+If `vocabulary_queue_full` appears, no model was asked: copy “vocabulary queue
+full; no model asked”. Continue with the fallback and the precondition run.
+Read any admission diagnostic remedy; if admission fails, copy “target admission
+failed” and continue. This is a judgment of the names, not a recheck of the
+runner's admission and context assertions.
+
+If no proposal was admitted, open **UniverseState** and choose two or three
+facts relevant to your captured Tasks. Under “Facts”, enter a key and a value
+and click “Set fact”; or under “Numbers”, enter a key and a number and click
+“Set number”. Use names meaningful to you. This hand-authoring is the fallback,
+so the second run is available even if the first proposes nothing. What you
+enter is recorded as asserted. Do not copy any key, value or row back.
+Only `facts` and `numeric_values` names are proposed in this phase: Sets need a
+member form and Event markers an occurrence form. This is a scope choice, not
+a statement about those collections.
+
+The producers are separate clicks: admit names and supply values first, then
+run the precondition advisor against the larger vocabulary. The vocabulary
+run itself authors no precondition.
 Facts alone offer “is” and “is not recorded”; a number also offers the comparisons.
 
 Open **Review**. Under “Precondition advisor”, leave “Precondition Task limit”
@@ -442,7 +477,25 @@ their live acceptance remains outstanding. Do not admit a proposal or run
 another advisor just to exercise that other path.
 
 Every outcome is something to copy back, not a reason to repeat until a model
-agrees. `precondition_missing_targets` means needed targets were not recorded
+agrees. The vocabulary step's codes are:
+
+- `vocabulary_queue_full`: ten or more of its own proposed/resurfaced candidates
+  await review; no model was asked. Deferrals do not block it and the precondition
+  queue is independent.
+- `vocabulary_no_task`: no eligible Task had a title or notes; the run did not happen.
+- `vocabulary_task_skipped`: an occurrence or a Task without title/notes was skipped.
+- `vocabulary_proposal_refused`: one name was refused, with its code-authored reason;
+  the rest of the run stands. This includes an existing name, a reserved first
+  key segment, an unsupported collection, malformed grammar or excessive length.
+- `vocabulary_value_required`: admission was refused because no operator value was supplied.
+- `vocabulary_admission_refused`: the name or Task is no longer admissible; nothing was written.
+- `universe_mutation_invalid`: the supplied value failed the same mutation validation
+  as the UniverseState screen; read its remedy.
+
+The advisory configuration, connection, timeout, HTTP, empty-response and
+malformed-result outcomes below apply to either producer. A zero-candidate
+result is also a result. For the precondition run, `precondition_missing_targets`
+means needed targets were not recorded
 and no candidate for that Task was enqueued. `precondition_task_skipped` means
 a routine occurrence should be edited on its template, or the Task has neither
 a title nor notes to reason over. At most three Tasks are named, followed by
@@ -457,8 +510,12 @@ proposal result at all, so no candidates were enqueued. Connection, timeout and
 HTTP diagnostics mean the run failed; read its remedy, copy the two result lines, and
 go on to Stop. A valid result with zero candidates is also a result.
 
-Copy back: the “Run status:” and “Candidates enqueued:” lines, exactly as
-shown, and the words of the first precondition **as
+Copy back: for each producer, label its “Run status:” and “Candidates enqueued:”
+lines with “Vocabulary” or “Precondition”. For a missing line, copy “no Vocabulary
+Run status line”, “no Vocabulary Candidates enqueued line”, “no Precondition Run
+status line” or “no Precondition Candidates enqueued line”. Include the vocabulary
+judgment and any failed admission outcome above. Then copy the words of the
+first precondition **as
 the screen renders them**, with no substitution or hand redaction, plus the
 rejection outcome above. For a replacement, copy both “Currently required”
 and “Proposed requirement” as rendered. If there is no candidate, copy “no
@@ -476,7 +533,9 @@ calendar, at its step 6, so there is nothing to clean up after this one.
 
 ## What to copy back, in order
 
-1. From step 7: the six counters with their numbers; the sentence beginning
+1. From step 7: the six counters with their numbers, or “no captured counter”,
+   “no updated counter”, “no unchanged counter”, “no skipped counter”,
+   “no moved counter” or “no resized counter” for each missing counter; the sentence beginning
    “N events had no colour.” or “1 event had no colour.”, or “no no-colour
    sentence”; and the “Diagnostic counts:” line exactly as shown, or “no
    Diagnostic counts line”. Do not expand or copy the list behind “The N
@@ -486,13 +545,21 @@ calendar, at its step 6, so there is nothing to clean up after this one.
    line”; and the whole section “Not in this Plan”, or “no such section”.
 3. From step 8: the whole panel headed “Plan risk”, exactly as rendered,
    or “no Plan risk panel”. Select it as one block; do not extract each finding.
-4. From step 9: the line beginning “Operations proposed:”, and the whole of
+4. From step 9: the line beginning “Operations proposed:”, or “no Operations
+   proposed line”; and the whole of
    the first operation headed “Update:” that reads “Placement: Dynamic”,
-   or “no Update operation” if none is headed “Update:”.
-5. From step 10: the two approval lines, or “I did not approve”.
-6. From step 11: the line that begins “Entries:”. The names and the counts
+   or “no Dynamic Update operation” if no Dynamic Update is shown.
+5. From step 10: the two approval lines, “no Approval status line” or
+   “no Operations applied line” for missing lines, or “I did not approve” if
+   you did not click Approve.
+6. From step 11: the line that begins “Entries:”, or “no Entries line”. The names
+   and the counts
    only, never a value.
-7. From step 12: the “Run status:” and “Candidates enqueued:” lines; the first
+7. From step 12: both producers’ result lines, labelled Vocabulary and
+   Precondition, or their four named absent-line phrases above. Include “a name
+   was worth recording”, “no name was worth recording”, “no vocabulary candidate
+   appeared” or “vocabulary queue full; no model asked”, and “target admission
+   failed” if applicable. Then the first
    precondition’s words as rendered, with no substitution or hand redaction
    (both requirements for a replacement); and “left in Review”, “rejected;
    proposal left the queue”, or “rejection failed”. If none appeared: “no
