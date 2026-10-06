@@ -13,7 +13,7 @@ Each step says what to **open**, what to **click** and what to **read**. A
 step asks you to **copy back** only where this run can show something that
 has not already been shown. From P1B-55 a verification that has passed live
 is retired, and recorded in the ledger in [ACCEPTANCE.md](ACCEPTANCE.md).
-There are thirteen steps and eight copy-back items. The colour setup and
+There are fifteen steps and ten copy-back items. The colour setup and
 colouring steps are retired in P1B-60; their preconditions are below.
 
 When a step cannot be completed, copy its named result line or absence phrase
@@ -62,8 +62,9 @@ tallied by eye. The Preview panel now says the counts in one line, and step
 
 **What a Task can wait for has a screen.** A Task can ask that something be
 true before UbU will plan it. From P1B-58 the screen “UniverseState” shows
-what is recorded, and step 11 opens it. This run records nothing there, so on
-this store it will say that nothing is recorded yet. That is the expected
+what is recorded, and step 11 opens it. Nothing before step 11 records anything there, so at that step
+this store will say that nothing is recorded yet. Step 12 then records a target
+you choose and authors a Task requirement over it. That is the expected
 reading and not a fault.
 
 ### Placement counting: interim method, now history
@@ -401,12 +402,115 @@ step in this document asks for a value from this screen, a key from it or
 any row of its tables, and none ever may. Anyone who edits this step must
 leave that as it is.
 
+## Author a requirement before asking a model
+
+**12. Read and write a Task's requirement.** This step is deterministic and
+comes before every model-dependent step. First open **UniverseState**. Under
+“Facts” or “Numbers”, record one target that you can honestly assert or measure
+and that matters to an active Task. Use a name meaningful to you. The choice
+beside the value is “My assertion” by default; choose “A reading” if this is a
+reading. Click “Set fact” or “Set number”. Do not copy its key, value or table row.
+
+Open **Tasks**. Leave Status on active. Pick a non-routine Task whose requirement
+you know. If you have none, capture a one-off Task using “Capture a Task”; it is
+not dependent on a model's output. Expand “Notes for” that Task. Read its
+“Precondition” section in words, or “This Task has no precondition.” This reads
+an admitted requirement in exactly the same place as one you authored yourself.
+
+Click “Write precondition”. Choose your recorded target, then the requirement
+that expresses what the Task really needs. Enter its expected value if an input
+is shown. “Is not recorded” has none. Click “Save precondition”. Read the
+condition's words on this actual Task and judge whether they express what you
+meant. This is the live webview and transport reading; the runner already
+asserts versioning, authoring, clearing and the planner gate. Do not recheck
+those deterministic assertions here. A tree is readable and clearable but has
+no leaf-edit form; choose another non-routine Task, or capture a one-off Task,
+to author the leaf used in this step. Do not clear a useful tree just to test.
+
+Copy back “saved; the words express my requirement” or “saved; the words do
+not express my requirement”, and the condition's words as rendered. If saving
+failed, copy “precondition authoring failed”. If the section or saved words are
+absent, copy “no Task precondition section” or “no saved precondition words”.
+If no recorded target is available, copy “no recorded target; no condition
+saved”. If a required control is absent, copy “no Write precondition control”
+or “no Save precondition control”. Continue even if this step cannot complete.
+The existing precondition transcription waiver remains; no hand redaction.
+
+Codes to read, without transcribing their sentences:
+
+- `version_conflict` or `PreconditionFailed`: the Task changed; the edit was not
+  admitted. Read the current requirement and retry only if it is still yours.
+- `routine_occurrence_not_editable`: choose a non-routine Task; the occurrence
+  belongs to its template.
+- `unknown_task`, `missing_title`, `unsupported_capture_field`: the Task request
+  was refused; read the remedy and copy the failed-authoring outcome.
+- A connection failure or validation refusal: no condition was saved; continue.
+
+## Read a review and its finite hold
+
+**13. Review the requirement you authored.** Open **Review**. Under “Review
+admitted preconditions”, click “Review preconditions”. This model-dependent step
+uses the deterministic requirement from step 12, not a prior model admission.
+It can still run when step 12 failed; no selected Task or no review candidate is
+an outcome to copy back. Do not use “Review again now” merely to force a result.
+
+Read the result's line “N Tasks selected; N candidates enqueued.” Read its
+“Diagnostic counts:” line if present. If a Precondition review card arrives for
+your Task, read “Currently required”, the replacement's “Proposed requirement”
+and its admission sentence, or “Admitting removes this requirement entirely.”
+Those words are the verdict visible on the card; do not infer a separate verdict
+label. A sound review may be only an aggregate diagnostic and no card.
+
+On that card read “Hold this review for” and the selected number of days, then
+“Eligible to return on” with its date. If you want to put the critique aside,
+leave that selection or choose a shorter span and click “Defer”. Read the
+“Currently held until” line on the deferred card. This is the finite snooze's
+first live reading, not a promise that a model will emit a critique. No candidate
+means no interval to read and no deferral to make. Do not admit, reject or repeat
+a run just to manufacture a snooze outcome.
+
+Copy back the result's selected/enqueued line, or “no Precondition review result
+line”; its “Diagnostic counts:” line, or “no review Diagnostic counts line”.
+For a card, copy its current/proposed requirement words or removal sentence,
+the selected span and “Eligible to return on” line. Use “no Currently required words”, “no Proposed requirement words” or “no removal
+sentence” for the missing verdict fields; “no snooze span” or “no Eligible to
+return line” for each missing interval field.
+After Defer copy “Currently held until”, or “no Currently held until line”;
+otherwise copy “I did not defer”. With no card copy “no review candidate; no
+snooze interval”. With no selected Task copy “no admitted precondition selected”.
+These are all outcomes; none blocks step 14. Do not copy model reason text or
+Task ids, and do not tally diagnostic lines.
+
+Codes:
+
+- `precondition_review_sound`: sound verdicts were counted; no card is needed.
+- `advisory_proposal_suppressed`: a saved hold prevented that subject's model
+  review; its date is already recorded. No new card is promised.
+- `advisory_proposal_already_queued`: an equivalent review is already waiting;
+  no duplicate was requested.
+- `precondition_review_resurfaced`: an eligible held review returned to the queue.
+- `precondition_review_changed`: the Task changed during review; no candidate
+  for that Task was enqueued.
+- `precondition_missing_targets`: a proposed requirement named a target no longer
+  recorded; that candidate was not enqueued.
+- `advisory_unconfigured`: configure the named Setting; no model was asked.
+- `advisory_connection_failed`, `advisory_timeout`, `advisory_http_failed`,
+  `advisory_empty_response`, `advisory_malformed_result`: the run failed or
+  produced no usable answer; read its remedy and continue.
+- `PreconditionFailed`, `InvalidCandidateTransition` or a request refusal during
+  Defer: the hold was not saved; copy the missing-held-line outcome and continue.
+
 ## Ask for a precondition
 
-**12. Ask for names, supply values, then ask for a precondition.** This
+**14. Ask for names, supply values, then ask for a precondition.** This
 model-dependent step comes last, after the deterministic checks. Open **Review**.
 Under “Vocabulary advisor”, leave “Vocabulary Task limit” at 25 and click
-“Run vocabulary advisor”. Read its “Run status:” and “Candidates enqueued:” lines.
+“Run vocabulary advisor”. Read and copy its “Run status:” and “Candidates
+enqueued:” lines immediately, labelled Vocabulary, before any navigation away
+can discard the result. Read and copy every “Diagnostic counts:” line in that
+result, or “no Vocabulary Diagnostic counts line” if none appears. Candidate
+count is requested even when it is zero; an absent line is “no Vocabulary
+Candidates enqueued line”. Do not copy diagnostic sentences or Task ids.
 It considers active, non-occurrence Tasks with a title or notes, and proposes at
 most three names. A title alone is enough; an empty vocabulary is allowed.
 This run promises no candidate. Read the suggested names and the Task each
@@ -429,7 +533,8 @@ facts relevant to your captured Tasks. Under “Facts”, enter a key and a valu
 and click “Set fact”; or under “Numbers”, enter a key and a number and click
 “Set number”. Use names meaningful to you. This hand-authoring is the fallback,
 so the second run is available even if the first proposes nothing. What you
-enter is recorded as asserted. Do not copy any key, value or row back.
+enter is asserted by default, or measured when you choose “A reading”. Do not
+copy any key, value or row back.
 Only `facts` and `numeric_values` names are proposed in this phase: Sets need a
 member form and Event markers an occurrence form. This is a scope choice, not
 a statement about those collections.
@@ -451,7 +556,12 @@ to 25 Tasks but proposes for at most three; a small candidate count is the
 design, not a thin result.
 A replacement shows “Currently required” and “Proposed requirement” together,
 with a line saying that admitting replaces the first with the second.
-Read “Run status” and “Candidates enqueued”. If `precondition_queue_full` is
+Read and copy “Run status:” and “Candidates enqueued:” immediately, labelled
+Precondition. Copy every “Diagnostic counts:” line in that result, or “no
+Precondition Diagnostic counts line”. The separate “Latest Task selection notes”
+panel holds the shared gate decision once; copy its “Diagnostic counts:” line,
+or “no selection Diagnostic counts line”. It replaces the older selection
+snapshot. No Task id or diagnostic sentence is requested. If `precondition_queue_full` is
 shown, ten or more proposed or resurfaced precondition candidates already await
 review: the run did not happen and no model was asked. Review, defer or reject
 what is waiting before asking for more; deferred candidates do not block a run.
@@ -483,7 +593,7 @@ agrees. The vocabulary step's codes are:
   await review; no model was asked. Deferrals do not block it and the precondition
   queue is independent.
 - `vocabulary_no_task`: no eligible Task had a title or notes; the run did not happen.
-- `vocabulary_task_skipped`: an occurrence or a Task without title/notes was skipped.
+- `advisory_task_skipped`: an occurrence or a Task without title/notes was skipped.
 - `vocabulary_proposal_refused`: one name was refused, with its code-authored reason;
   the rest of the run stands. This includes an existing name, a reserved first
   key segment, an unsupported collection, malformed grammar or excessive length.
@@ -496,7 +606,7 @@ The advisory configuration, connection, timeout, HTTP, empty-response and
 malformed-result outcomes below apply to either producer. A zero-candidate
 result is also a result. For the precondition run, `precondition_missing_targets`
 means needed targets were not recorded
-and no candidate for that Task was enqueued. `precondition_task_skipped` means
+and no candidate for that Task was enqueued. `advisory_task_skipped` means
 a routine occurrence should be edited on its template, or the Task has neither
 a title nor notes to reason over. At most three Tasks are named, followed by
 one count of the rest. Read the explanation, but do not transcribe diagnostic
@@ -513,18 +623,20 @@ go on to Stop. A valid result with zero candidates is also a result.
 Copy back: for each producer, label its “Run status:” and “Candidates enqueued:”
 lines with “Vocabulary” or “Precondition”. For a missing line, copy “no Vocabulary
 Run status line”, “no Vocabulary Candidates enqueued line”, “no Precondition Run
-status line” or “no Precondition Candidates enqueued line”. Include the vocabulary
-judgment and any failed admission outcome above. Then copy the words of the
+status line” or “no Precondition Candidates enqueued line”. Include both producers’ count lines (or named absences), the shared selection count
+line (or its named absence), the vocabulary judgment and any failed admission outcome above. Then copy the words of the
 first precondition **as
 the screen renders them**, with no substitution or hand redaction, plus the
 rejection outcome above. For a replacement, copy both “Currently required”
-and “Proposed requirement” as rendered. If there is no candidate, copy “no
+and “Proposed requirement” as rendered. If condition words or replacement labels are missing, copy “no precondition words”,
+“no Currently required words” or “no Proposed requirement words”, using the
+missing field’s name. If there is no candidate, copy “no
 candidate appeared, so nothing was rejected”. If rejection failed, copy
 “rejection failed”; read the diagnostic remedy without tallying its lines.
 
 ## Finish
 
-**13. Stop.** In the first terminal, press Ctrl-C. The store at
+**15. Stop.** In the first terminal, press Ctrl-C. The store at
 `/tmp/ubu-live-rehearsal.db` is a rehearsal store and can be left or removed.
 
 If you approved, the calendar now holds what that store created and moved.
@@ -555,8 +667,17 @@ calendar, at its step 6, so there is nothing to clean up after this one.
 6. From step 11: the line that begins “Entries:”, or “no Entries line”. The names
    and the counts
    only, never a value.
-7. From step 12: both producers’ result lines, labelled Vocabulary and
-   Precondition, or their four named absent-line phrases above. Include “a name
+7. From step 12: the saved-authoring judgment and condition's words, or the
+   named authoring failure, missing section/words/control, or no-target outcome.
+8. From step 13: the selected/enqueued result line and Diagnostic counts line,
+   or their named absences; a card's requirement/removal words, selected span and
+   eligible date, or each named absence; the held-until line or “I did not defer”.
+   With no card: “no review candidate; no snooze interval”. With no selection:
+   “no admitted precondition selected”. No model reason, Task id or hand tally.
+9. From step 14: both producers’ result lines, labelled Vocabulary and
+   Precondition, or their four named absent-line phrases above. Also copy both
+   producers’ Diagnostic counts lines and the latest selection count line, or
+   their three named absences above. Include “a name
    was worth recording”, “no name was worth recording”, “no vocabulary candidate
    appeared” or “vocabulary queue full; no model asked”, and “target admission
    failed” if applicable. Then the first
@@ -565,7 +686,7 @@ calendar, at its step 6, so there is nothing to clean up after this one.
    proposal left the queue”, or “rejection failed”. If none appeared: “no
    candidate appeared, so nothing was rejected”. If the queue blocked the run:
    the two result lines and “queue full; no model asked”, with no proposal words.
-   Do not name diagnostic codes for copy-back or tally their lines.
-8. And one answer, in your own words: is what it chose to schedule what you
+   Copy only the rendered Diagnostic counts lines, never diagnostic sentences or Task ids. Do not tally their lines.
+10. And one answer, in your own words: is what it chose to schedule what you
    would have chosen, and is this a store you would plan tomorrow on? If
    not, what is missing?

@@ -363,6 +363,13 @@ async function startModelStub() {
       } else if (stub.mode === "slow") {
         const timer = setTimeout(() => answer(200, { model: body.model, done: true, response: '{"proposals":[]}' }), stub.delayMs);
         response.on("close", () => clearTimeout(timer));
+      } else if (stub.mode === "shared_selection") {
+        const context = JSON.parse(body.prompt);
+        const isVocabulary = Object.hasOwn(body.format.properties.proposals.items.properties, "target");
+        const proposals = !stub.badSelectionProposal ? [] : isVocabulary
+          ? [{ id: context.tasks[0].id, target: "facts.affect.synthetic" }]
+          : [{ id: context.tasks[0].id, precondition: { target: context.targets[0], predicate: "equals" } }];
+        answer(200, { model: body.model, done: true, response: JSON.stringify({ proposals }) });
       } else if (stub.mode === "vocabulary") {
         const context = JSON.parse(body.prompt);
         const names = stub.vocabularyNames ?? ["facts.synthetic.teapot_ready", "facts.affect.energy", "numeric_values.synthetic.teapot_charge"];
@@ -1387,7 +1394,7 @@ const scenarios = [
 
         // ---- 6. reconcile: the unowned events are foreign and nothing else drifts
         o = await observing(o, settled.applied_events);
-        // Reconciliation does not read the stamp: the leftover is foreign there, like the unowned instances.
+        // The leftover retains the foreign group, with the truthful stamped-origin message; unowned instances stay foreign.
         const foreignOnly = [...instances.map((event) => event.external_id), week.leftover.id].sort().map((id) => ["foreign", id]);
         const reconciled = await reconcile(o);
         say("reconcile conflicts", reconciled.conflicts);
@@ -1776,9 +1783,9 @@ const scenarios = [
   {
     // The UniverseState screen, at the HTTP layer, from P1B-58, and from P1B-59 its real set and
     // clear and the provenance it shows. Every request here is one the screen makes, in the body
-    // `editUniverseState` sends, except three the app does not send: a Task's precondition, which
-    // ubu-ui authors none of and the Task route accepts; a stated `provenance_kind`; and the
-    // malformed bodies. Every fact is invented.
+    // `editUniverseState` sends. P1B-68 also exposes leaf Task preconditions and measured
+    // readings; this scenario additionally checks compound lists, other provenance kinds
+    // and deliberately malformed bodies outside those forms. Every fact is invented.
     name: "the UniverseState screen",
     async run(o) {
       const read = () => call(o.base, "GET", endpoints.UNIVERSE_STATE_PATH);
@@ -2263,6 +2270,80 @@ scenarios.push({
     const oversized = await run("vocabulary");
     same([oversized.status,oversized.candidates_enqueued],["malformed_result",0],"four vocabulary proposals refuse whole");
     return "cold-start title-only vocabulary is name-only and capped at three; a reserved middle proposal is refused independently; no-value admission fails without a seed; supplied value is asserted; the next separate precondition context carries the name and no observation";
+  }
+});
+
+scenarios.push({
+  name: "operator authors and clears one Task requirement through its existing PATCH",
+  async run(o) {
+    const target = "numeric_values.synthetic.teapot_charge";
+    const task = await captureTask(o, { title: "Synthetic operator-owned teapot launch", duration_estimate: fixed(5), category_tag: "work", tags: ["work"] });
+    await call(o.base,"PATCH",endpoints.UNIVERSE_STATE_PATH,{schema_version:endpoints.UNIVERSE_STATE_SCHEMA_VERSION,mutations:[{operation:"set_numeric",target,payload:0,provenance_kind:"measured"}]});
+    const before = await readTask(o,task.task_id);
+    ok(!before.payload.preconditions,"the new Task has no requirement");
+    const path = fill(endpoints.TASK_PATH,{task_id:task.task_id});
+    const leaf = {target,predicate:"greater_than",expected:0};
+    await call(o.base,"PATCH",path,{schema_version:endpoints.TASK_CAPTURE_SCHEMA_VERSION,expected_version:before.version,preconditions:leaf});
+    const authored = await readTask(o,task.task_id);
+    same(authored.payload.preconditions,leaf,"the explicit operator-authored leaf is stored");
+    for (const field of ["title","duration_estimate","category_tag","tags","description","static_window","effects","blocked_by"]) same(authored.payload[field],before.payload[field],`only the condition changes, preserving ${field}`);
+    const planned = await call(o.base,"POST",endpoints.PLANNING_GENERATE_PATH,{schema_version:endpoints.PLANNING_SCHEMA_VERSION,request:null});
+    ok(planned.blocked_tasks.some((row)=>row.task_id===task.task_id),"the false condition excludes the Task");
+    const stale = await call(o.base,"PATCH",path,{schema_version:endpoints.TASK_CAPTURE_SCHEMA_VERSION,expected_version:before.version,preconditions:null},409);
+    same(stale.diagnostics[0].code,"version_conflict","clearing still observes the Task version");
+    await call(o.base,"PATCH",path,{schema_version:endpoints.TASK_CAPTURE_SCHEMA_VERSION,expected_version:authored.version,preconditions:null});
+    const cleared = await readTask(o,task.task_id);ok(!Object.hasOwn(cleared.payload,"preconditions"),"explicit null removes the requirement");
+    const unblocked = await generatePlan(o);ok(unblocked.steps.some((row)=>row.task_id===task.task_id),"the cleared Task is plannable again");
+    return "operator leaf authoring and null clearing use the existing versioned Task PATCH, preserve other fields and change the ordinary precondition gate";
+  }
+});
+scenarios.push({
+  name: "one producer-neutral selection report for eight routine occurrences",
+  async run(o) {
+    for (let n=0;n<8;n+=1) await call(o.base,"POST",endpoints.OBJECTIVE_CREATE_PATH,{
+      schema_version:endpoints.OBJECTIVE_SCHEMA_VERSION,mode:"evergreen",title:`Synthetic shared-gate routine ${n}`,
+      recurrence:{timezone:"UTC",rule:{kind:"daily"}},routine_instance_template:{title:`Synthetic shared-gate occurrence ${n}`,duration_estimate:fixed(1),nominal_start:timeOfDay(n+1),placement:"static",occupies_capacity:true,tags:[],reminder_minutes:[]}
+    },201);
+    const chosen = await captureTask(o,{title:"Synthetic eligible teapot",duration_estimate:fixed(1)});
+    await call(o.base,"POST",endpoints.PLANNING_GENERATE_PATH,{schema_version:endpoints.PLANNING_SCHEMA_VERSION,request:null,horizon:{start:at(0),end:at(24)}});
+    same((await listTasks(o)).filter((t)=>t.is_routine_occurrence).length,8,"eight ineligible occurrences are staged through HTTP");
+    await call(o.base,"PATCH",endpoints.UNIVERSE_STATE_PATH,{schema_version:endpoints.UNIVERSE_STATE_SCHEMA_VERSION,mutations:[{operation:"set_fact",target:"facts.synthetic.teapot_ready",payload:true}]});
+    const stub = await startModelStub();stub.mode="shared_selection";
+    await putSetting(o,"advisory.model","synthetic-shared-gate-model");await putSetting(o,"advisory.endpoint",stub.endpoint);
+    const run = (producer)=>call(o.base,"POST",endpoints.ADVISORY_RUN_PATH,{schema_version:endpoints.ADVISORY_RUN_SCHEMA_VERSION,producer,limit:25});
+    const notes=[];
+    for (const producer of ["vocabulary","precondition"]) {
+      const result=await run(producer);same(result.status,"ok","a shared gate skip is information");
+      same(result.selected.map((t)=>t.id),[chosen.task_id],"only the ordinary Task is selected");
+      const shared=result.diagnostics.filter((d)=>d.code==="advisory_task_skipped");same(shared.length,4,"one gate report has three names and one count");
+      same(shared[3].message,"5 more Tasks were skipped: they are routine occurrences or have neither a title nor a description","aggregate gives the remainder without Task ids");
+      ok(!shared[3].message.includes("task_"),"the aggregate contains no Task id");notes.push(shared);
+    }
+    same(notes[0],notes[1],"independent producer responses agree on the shared decision; UI deduplicates the latest report");
+    stub.badSelectionProposal=true;
+    for (const producer of ["vocabulary","precondition"]) {
+      const result=await run(producer);same(result.diagnostics.filter((d)=>d.code==="advisory_task_skipped").length,4,"the gate decision is emitted once");
+      ok(result.diagnostics.some((d)=>d.code===`${producer}_proposal_refused`),"proposal refusal retains its own producer code");
+    }
+    return "eight occurrences produce four shared selection notes in each independent run, and malformed proposals retain producer-specific refusals";
+  }
+});
+scenarios.push({
+  name: "reconcile a stamped export whose Task this store does not have",
+  seeded: true,
+  async run(first) {
+    const id="018f3c8e9b2a7c4d8f1e2a3b4c5d6e70";
+    const item=(externalId,title,hour,stamp)=>({id:externalId,summary:title,start:{dateTime:at(hour)},end:{dateTime:at(hour,30)},reminders:{useDefault:true},...(stamp?{extendedProperties:{private:{ubu_task:`task_${externalId}`}}}:{})});
+    const o=await restartObserving(first,[item(id,"Synthetic stamped teapot export",1,true),item(FOREIGN_ID,"Synthetic ordinary teapot visit",2,false)]);
+    const before=await reconcile(o);same(before.conflicts.map((c)=>c.conflict_type),["foreign","foreign"],"the known four-type UI grouping is preserved");
+    const stale=before.conflicts.find((c)=>c.external_id===id);
+    same(stale.message,`Calendar event \`${id}\` was created by UbU for a Task this store does not have, so it is left alone and becomes no Task`,"minted origin uses capture's exact sentence");
+    same(before.conflicts.find((c)=>c.external_id===FOREIGN_ID).message,"this event was not created by UbU and will not be touched","genuinely foreign wording is unchanged");
+    same((await listTasks(o)).length,0,"reconciliation adopts neither event");
+    const captured=await capture(o);same([captured.captured,captured.skipped],[1,1],"capture skips the stamped echo and captures the ordinary event");
+    same(captured.diagnostics.find((d)=>d.code==="capture_stale_export").message,stale.message,"capture and reconciliation tell the same origin story");
+    const after=await reconcile(o);same(after.conflicts.map((c)=>[c.conflict_type,c.external_id]),[["foreign",id]],"the stamped echo never becomes an applied or owned event");
+    return "stamp evidence changes only the truthful origin message; foreign grouping, ordering, capture and non-adoption remain intact";
   }
 });
 

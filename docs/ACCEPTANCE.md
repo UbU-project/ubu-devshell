@@ -811,3 +811,62 @@ force; no hand redaction is restored. No new real data is placed in repositories
 Passing the runner and UI tests is not operator acceptance: the operator must
 run LIVE_REHEARSAL.md end to end against his own calendar and return its copy-back.
 The new first half of step 12 is whether a suggested name is worth recording.
+
+
+## P1B-68
+
+The operator must be able to read and author the requirement that determines
+whether their Task appears in a Plan. The Tasks form reads admitted and manual
+requirements alike in words, authors one leaf over recorded targets, and clears
+explicitly through the same versioned Task route. Trees remain readable and
+clearable; tree authoring is outside the Phase 1b form. Candidate admission
+history is not reopened by a later Task edit. The existing review subject key
+includes the condition, so changing it already invalidates the old hold.
+
+Rule 4 decides the new live order. Step 12 records an operator-owned target and
+authors a requirement deterministically before any model-dependent step. Step 13
+reviews that requirement and reads a finite hold if a critique appears. Step 14
+then runs Vocabulary and Precondition as separate clicks; neither depends on
+the earlier review's output. A failed authoring or no candidate remains a named
+outcome, never a reason to abandon later steps. The full live rehearsal is now
+15 numbered steps and ten copy-back items. No deterministic admission, clearing,
+planner-gate or interval arithmetic is reverified manually: the live task is
+the actual webview's authoring and the first finite-hold reading. Nothing is
+retired and no live acceptance is claimed by the automated tests.
+
+The shared selection code is advisory_task_skipped. Each independent producer
+response carries its decision, three named Tasks then one count. Review renders
+the latest shared selection notes once; it does not introduce cross-request
+suppression or combine the two model requests. Producer refusals retain their
+own codes. Rehearsal-facing Review lists now state Diagnostic counts. The count
+is of rendered lines per code, not a Task count; sentences remain readable.
+
+Grounding corrected three descriptions with operator approval. First, the API
+has two independent producer clicks, so neutralizing the code alone cannot
+deduplicate their rendered panels; section D adds one shared selection report.
+Second, P1B-67 already requested vocabulary candidate counts and explicitly
+forbade code transcription/tallying. That existing request is preserved; the
+new work names the rendered count lines and copies results before navigation
+can discard them. The omitted vocabulary count is the fourth presence/reporting
+incident beside [value], NONE and the missing diagnostic count line, without
+claiming its instruction was absent. Every copy-back item is audited again.
+Third, the obsolete undo rule was also repeated in DESIGN §23.1 and the solved
+Q0132 summary. Their specific undo text is corrected with the same D0278
+supersession, preserving their other policy and status metadata.
+
+Scenarios 31–33 assert operator leaf authoring/null clearing, the shared gate,
+and truthful stamped-origin reconciliation over mock loopback HTTP. The latter
+keeps foreign grouping and applied ownership unchanged: a stamp proves origin,
+not adoption or write authority. Calendar's two legend paragraphs retain their
+layout and state future gestures conditionally. My assertion remains the
+UniverseState default; A reading records measured. No derived/proposed choice
+is offered and no fact observation goes to a model.
+
+D0291 records a two-tier effective subject vocabulary and ratification before
+the switch. It adds no root and implements no registry, minting control or
+validator; affect and D0242 remain reserved and unchanged. The desktop GPU scope
+stands for the raised planning expectation, without a switch date.
+
+The operator must run LIVE_REHEARSAL.md end to end against their own calendar
+and return the ten-item copy-back. Passing the runner and UI tests does not
+settle either the sovereignty question or the finite snooze's first live reading.
