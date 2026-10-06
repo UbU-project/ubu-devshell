@@ -1,0 +1,2835 @@
+[
+  {
+    "name": "synthetic-dependency-chain",
+    "reference_response": {
+      "effective_time": "1970-01-01T00:00:00Z",
+      "engine_provenance": {
+        "backend_kind": "cpu_reference",
+        "cpu_certification_status": "certified",
+        "device_summary": "cpu",
+        "engine_version": "0.1.0",
+        "invocation_kind": "in_process_cpu",
+        "tolerance_profile": "boundary-v1"
+      },
+      "generated_at": "1970-01-01T00:00:00Z",
+      "plan_candidates": [
+        {
+          "candidate_id": "plan-dependency-chain-000000000000002a-d02",
+          "candidate_role": "other",
+          "coverage": {
+            "coverage_below_threshold": false,
+            "coverage_confidence": {
+              "confidence_level": 0.95,
+              "lower": 0.9433759402071946,
+              "method": "wilson",
+              "n_rollouts": 64,
+              "upper": 1.0
+            },
+            "coverage_estimate": 1.0,
+            "coverage_scope": "reactive_horizon",
+            "coverage_threshold_used": 0.99,
+            "outcome_continuation_summary": {
+              "boundaries": [],
+              "budget_limited": false,
+              "covered_outcome_count": 0,
+              "quantization_rule": "lateness_seconds_ceil_60",
+              "uncovered_outcome_count": 0
+            },
+            "uncovered_mass_estimate": 0.0
+          },
+          "explanation_fragments": [
+            {
+              "taskId": "task-a",
+              "text": "Task 'task-a' is selected next because all listed dependencies precede it in the deterministic candidate order."
+            }
+          ],
+          "feasibility_summary": {
+            "affect_feasible": true,
+            "hard_constraints_assumed_satisfied_by_engine": true,
+            "violated_affect_dimensions": []
+          },
+          "probability_summary": {
+            "display_probability": 1.0,
+            "log_probability": 0.0,
+            "probability_interval_high": 1.0,
+            "probability_interval_low": 0.9433759402071946,
+            "probability_quality": "full",
+            "provenance_refs": []
+          },
+          "rank": 1,
+          "rollout_diagnostics": {
+            "feasibility_frequency": 1.0,
+            "feasible_rollouts": 64,
+            "n_rollouts": 64,
+            "probability_quality": "full",
+            "robustness_percentile": 0.1,
+            "stage_seed": 45
+          },
+          "schedule": {
+            "plan_id": "plan-dependency-chain-000000000000002a-d02",
+            "status": "candidate",
+            "steps": [
+              {
+                "end": 1,
+                "start": 0,
+                "task_id": "task-a"
+              },
+              {
+                "depends_on": [
+                  "task-a"
+                ],
+                "end": 2,
+                "start": 1,
+                "task_id": "task-b"
+              },
+              {
+                "depends_on": [
+                  "task-b"
+                ],
+                "end": 8,
+                "start": 7,
+                "task_id": "task-c"
+              }
+            ]
+          },
+          "score_summary": {
+            "affect_margin_score": 1.0,
+            "robustness_score": 0.2,
+            "schedule_diversity_score": 0.16666666666666669,
+            "total_score": 0.6,
+            "utility_score": 0.6333333333333334
+          },
+          "semi_legitimization_summary": {
+            "affect_budget_ok": true,
+            "result": "passes_cheap_checks",
+            "slack_preserved": true
+          }
+        },
+        {
+          "candidate_id": "plan-dependency-chain-000000000000002a-d14",
+          "candidate_role": "other",
+          "coverage": {
+            "coverage_below_threshold": false,
+            "coverage_confidence": {
+              "confidence_level": 0.95,
+              "lower": 0.9433759402071946,
+              "method": "wilson",
+              "n_rollouts": 64,
+              "upper": 1.0
+            },
+            "coverage_estimate": 1.0,
+            "coverage_scope": "reactive_horizon",
+            "coverage_threshold_used": 0.99,
+            "outcome_continuation_summary": {
+              "boundaries": [],
+              "budget_limited": false,
+              "covered_outcome_count": 0,
+              "quantization_rule": "lateness_seconds_ceil_60",
+              "uncovered_outcome_count": 0
+            },
+            "uncovered_mass_estimate": 0.0
+          },
+          "explanation_fragments": [
+            {
+              "taskId": "task-a",
+              "text": "Task 'task-a' is selected next because all listed dependencies precede it in the deterministic candidate order."
+            }
+          ],
+          "feasibility_summary": {
+            "affect_feasible": true,
+            "hard_constraints_assumed_satisfied_by_engine": true,
+            "violated_affect_dimensions": []
+          },
+          "probability_summary": {
+            "display_probability": 1.0,
+            "log_probability": 0.0,
+            "probability_interval_high": 1.0,
+            "probability_interval_low": 0.9433759402071946,
+            "probability_quality": "full",
+            "provenance_refs": []
+          },
+          "rank": 2,
+          "rollout_diagnostics": {
+            "feasibility_frequency": 1.0,
+            "feasible_rollouts": 64,
+            "n_rollouts": 64,
+            "probability_quality": "full",
+            "robustness_percentile": 0.1,
+            "stage_seed": 45
+          },
+          "schedule": {
+            "plan_id": "plan-dependency-chain-000000000000002a-d14",
+            "status": "candidate",
+            "steps": [
+              {
+                "end": 1,
+                "start": 0,
+                "task_id": "task-a"
+              },
+              {
+                "depends_on": [
+                  "task-a"
+                ],
+                "end": 2,
+                "start": 1,
+                "task_id": "task-b"
+              },
+              {
+                "depends_on": [
+                  "task-b"
+                ],
+                "end": 9,
+                "start": 8,
+                "task_id": "task-c"
+              }
+            ]
+          },
+          "score_summary": {
+            "affect_margin_score": 1.0,
+            "robustness_score": 0.1,
+            "schedule_diversity_score": 0.2,
+            "total_score": 0.5875000000000001,
+            "utility_score": 0.6000000000000001
+          },
+          "semi_legitimization_summary": {
+            "affect_budget_ok": true,
+            "result": "passes_cheap_checks",
+            "slack_preserved": true
+          }
+        },
+        {
+          "candidate_id": "plan-dependency-chain-000000000000002a-d11",
+          "candidate_role": "other",
+          "coverage": {
+            "coverage_below_threshold": false,
+            "coverage_confidence": {
+              "confidence_level": 0.95,
+              "lower": 0.9433759402071946,
+              "method": "wilson",
+              "n_rollouts": 64,
+              "upper": 1.0
+            },
+            "coverage_estimate": 1.0,
+            "coverage_scope": "reactive_horizon",
+            "coverage_threshold_used": 0.99,
+            "outcome_continuation_summary": {
+              "boundaries": [],
+              "budget_limited": false,
+              "covered_outcome_count": 0,
+              "quantization_rule": "lateness_seconds_ceil_60",
+              "uncovered_outcome_count": 0
+            },
+            "uncovered_mass_estimate": 0.0
+          },
+          "explanation_fragments": [
+            {
+              "taskId": "task-a",
+              "text": "Task 'task-a' is selected next because all listed dependencies precede it in the deterministic candidate order."
+            }
+          ],
+          "feasibility_summary": {
+            "affect_feasible": true,
+            "hard_constraints_assumed_satisfied_by_engine": true,
+            "violated_affect_dimensions": []
+          },
+          "probability_summary": {
+            "display_probability": 1.0,
+            "log_probability": 0.0,
+            "probability_interval_high": 1.0,
+            "probability_interval_low": 0.9433759402071946,
+            "probability_quality": "full",
+            "provenance_refs": []
+          },
+          "rank": 3,
+          "rollout_diagnostics": {
+            "feasibility_frequency": 1.0,
+            "feasible_rollouts": 64,
+            "n_rollouts": 64,
+            "probability_quality": "full",
+            "robustness_percentile": 0.1,
+            "stage_seed": 45
+          },
+          "schedule": {
+            "plan_id": "plan-dependency-chain-000000000000002a-d11",
+            "status": "candidate",
+            "steps": [
+              {
+                "end": 1,
+                "start": 0,
+                "task_id": "task-a"
+              },
+              {
+                "depends_on": [
+                  "task-a"
+                ],
+                "end": 9,
+                "start": 8,
+                "task_id": "task-b"
+              },
+              {
+                "depends_on": [
+                  "task-b"
+                ],
+                "end": 10,
+                "start": 9,
+                "task_id": "task-c"
+              }
+            ]
+          },
+          "score_summary": {
+            "affect_margin_score": 1.0,
+            "robustness_score": 0.0,
+            "schedule_diversity_score": 0.4666666666666667,
+            "total_score": 0.575,
+            "utility_score": 0.3333333333333333
+          },
+          "semi_legitimization_summary": {
+            "affect_budget_ok": true,
+            "result": "passes_cheap_checks",
+            "slack_preserved": true
+          }
+        },
+        {
+          "candidate_id": "plan-dependency-chain-000000000000002a-d08",
+          "candidate_role": "most_robust",
+          "explanation_fragments": [
+            {
+              "taskId": "task-a",
+              "text": "Task 'task-a' is selected next because all listed dependencies precede it in the deterministic candidate order."
+            }
+          ],
+          "feasibility_summary": {
+            "affect_feasible": true,
+            "hard_constraints_assumed_satisfied_by_engine": true,
+            "violated_affect_dimensions": []
+          },
+          "probability_summary": {
+            "probability_quality": "not_estimated",
+            "provenance_refs": []
+          },
+          "rank": 4,
+          "schedule": {
+            "plan_id": "plan-dependency-chain-000000000000002a-d08",
+            "status": "candidate",
+            "steps": [
+              {
+                "end": 1,
+                "start": 0,
+                "task_id": "task-a"
+              },
+              {
+                "depends_on": [
+                  "task-a"
+                ],
+                "end": 6,
+                "start": 5,
+                "task_id": "task-b"
+              },
+              {
+                "depends_on": [
+                  "task-b"
+                ],
+                "end": 7,
+                "start": 6,
+                "task_id": "task-c"
+              }
+            ]
+          },
+          "score_summary": {
+            "affect_margin_score": 1.0,
+            "robustness_score": 0.76,
+            "schedule_diversity_score": 0.26666666666666666,
+            "total_score": 0.64,
+            "utility_score": 0.5333333333333333
+          },
+          "semi_legitimization_summary": {
+            "affect_budget_ok": true,
+            "result": "passes_cheap_checks",
+            "slack_preserved": true
+          }
+        },
+        {
+          "candidate_id": "plan-dependency-chain-000000000000002a-d10",
+          "candidate_role": "other",
+          "explanation_fragments": [
+            {
+              "taskId": "task-a",
+              "text": "Task 'task-a' is selected next because all listed dependencies precede it in the deterministic candidate order."
+            }
+          ],
+          "feasibility_summary": {
+            "affect_feasible": true,
+            "hard_constraints_assumed_satisfied_by_engine": true,
+            "violated_affect_dimensions": []
+          },
+          "probability_summary": {
+            "probability_quality": "not_estimated",
+            "provenance_refs": []
+          },
+          "rank": 5,
+          "schedule": {
+            "plan_id": "plan-dependency-chain-000000000000002a-d10",
+            "status": "candidate",
+            "steps": [
+              {
+                "end": 1,
+                "start": 0,
+                "task_id": "task-a"
+              },
+              {
+                "depends_on": [
+                  "task-a"
+                ],
+                "end": 2,
+                "start": 1,
+                "task_id": "task-b"
+              },
+              {
+                "depends_on": [
+                  "task-b"
+                ],
+                "end": 5,
+                "start": 4,
+                "task_id": "task-c"
+              }
+            ]
+          },
+          "score_summary": {
+            "affect_margin_score": 1.0,
+            "robustness_score": 0.73,
+            "schedule_diversity_score": 0.06666666666666667,
+            "total_score": 0.6325000000000001,
+            "utility_score": 0.7333333333333334
+          },
+          "semi_legitimization_summary": {
+            "affect_budget_ok": true,
+            "result": "passes_cheap_checks",
+            "slack_preserved": true
+          }
+        },
+        {
+          "candidate_id": "plan-dependency-chain-000000000000002a-d12",
+          "candidate_role": "other",
+          "explanation_fragments": [
+            {
+              "taskId": "task-a",
+              "text": "Task 'task-a' is selected next because all listed dependencies precede it in the deterministic candidate order."
+            }
+          ],
+          "feasibility_summary": {
+            "affect_feasible": true,
+            "hard_constraints_assumed_satisfied_by_engine": true,
+            "violated_affect_dimensions": []
+          },
+          "probability_summary": {
+            "probability_quality": "not_estimated",
+            "provenance_refs": []
+          },
+          "rank": 6,
+          "schedule": {
+            "plan_id": "plan-dependency-chain-000000000000002a-d12",
+            "status": "candidate",
+            "steps": [
+              {
+                "end": 1,
+                "start": 0,
+                "task_id": "task-a"
+              },
+              {
+                "depends_on": [
+                  "task-a"
+                ],
+                "end": 4,
+                "start": 3,
+                "task_id": "task-b"
+              },
+              {
+                "depends_on": [
+                  "task-b"
+                ],
+                "end": 5,
+                "start": 4,
+                "task_id": "task-c"
+              }
+            ]
+          },
+          "score_summary": {
+            "affect_margin_score": 1.0,
+            "robustness_score": 0.73,
+            "schedule_diversity_score": 0.13333333333333333,
+            "total_score": 0.6325,
+            "utility_score": 0.6666666666666666
+          },
+          "semi_legitimization_summary": {
+            "affect_budget_ok": true,
+            "result": "passes_cheap_checks",
+            "slack_preserved": true
+          }
+        },
+        {
+          "candidate_id": "plan-dependency-chain-000000000000002a-d01",
+          "candidate_role": "other",
+          "explanation_fragments": [
+            {
+              "taskId": "task-a",
+              "text": "Task 'task-a' is selected next because all listed dependencies precede it in the deterministic candidate order."
+            }
+          ],
+          "feasibility_summary": {
+            "affect_feasible": true,
+            "hard_constraints_assumed_satisfied_by_engine": true,
+            "violated_affect_dimensions": []
+          },
+          "probability_summary": {
+            "probability_quality": "not_estimated",
+            "provenance_refs": []
+          },
+          "rank": 7,
+          "schedule": {
+            "plan_id": "plan-dependency-chain-000000000000002a-d01",
+            "status": "candidate",
+            "steps": [
+              {
+                "end": 1,
+                "start": 0,
+                "task_id": "task-a"
+              },
+              {
+                "depends_on": [
+                  "task-a"
+                ],
+                "end": 3,
+                "start": 2,
+                "task_id": "task-b"
+              },
+              {
+                "depends_on": [
+                  "task-b"
+                ],
+                "end": 4,
+                "start": 3,
+                "task_id": "task-c"
+              }
+            ]
+          },
+          "score_summary": {
+            "affect_margin_score": 1.0,
+            "robustness_score": 0.715,
+            "schedule_diversity_score": 0.06666666666666667,
+            "total_score": 0.62875,
+            "utility_score": 0.7333333333333334
+          },
+          "semi_legitimization_summary": {
+            "affect_budget_ok": true,
+            "result": "passes_cheap_checks",
+            "slack_preserved": true
+          }
+        },
+        {
+          "candidate_id": "plan-dependency-chain-000000000000002a-d05",
+          "candidate_role": "other",
+          "explanation_fragments": [
+            {
+              "taskId": "task-a",
+              "text": "Task 'task-a' is selected next because all listed dependencies precede it in the deterministic candidate order."
+            }
+          ],
+          "feasibility_summary": {
+            "affect_feasible": true,
+            "hard_constraints_assumed_satisfied_by_engine": true,
+            "violated_affect_dimensions": []
+          },
+          "probability_summary": {
+            "probability_quality": "not_estimated",
+            "provenance_refs": []
+          },
+          "rank": 8,
+          "schedule": {
+            "plan_id": "plan-dependency-chain-000000000000002a-d05",
+            "status": "candidate",
+            "steps": [
+              {
+                "end": 1,
+                "start": 0,
+                "task_id": "task-a"
+              },
+              {
+                "depends_on": [
+                  "task-a"
+                ],
+                "end": 2,
+                "start": 1,
+                "task_id": "task-b"
+              },
+              {
+                "depends_on": [
+                  "task-b"
+                ],
+                "end": 4,
+                "start": 3,
+                "task_id": "task-c"
+              }
+            ]
+          },
+          "score_summary": {
+            "affect_margin_score": 1.0,
+            "robustness_score": 0.715,
+            "schedule_diversity_score": 0.03333333333333333,
+            "total_score": 0.6287499999999999,
+            "utility_score": 0.7666666666666667
+          },
+          "semi_legitimization_summary": {
+            "affect_budget_ok": true,
+            "result": "passes_cheap_checks",
+            "slack_preserved": true
+          }
+        },
+        {
+          "candidate_id": "plan-dependency-chain-000000000000002a",
+          "candidate_role": "highest_utility",
+          "explanation_fragments": [
+            {
+              "taskId": "task-a",
+              "text": "Task 'task-a' is selected next because all listed dependencies precede it in the deterministic candidate order."
+            }
+          ],
+          "feasibility_summary": {
+            "affect_feasible": true,
+            "hard_constraints_assumed_satisfied_by_engine": true,
+            "violated_affect_dimensions": []
+          },
+          "probability_summary": {
+            "probability_quality": "not_estimated",
+            "provenance_refs": []
+          },
+          "rank": 9,
+          "schedule": {
+            "plan_id": "plan-dependency-chain-000000000000002a",
+            "status": "candidate",
+            "steps": [
+              {
+                "end": 1,
+                "start": 0,
+                "task_id": "task-a"
+              },
+              {
+                "depends_on": [
+                  "task-a"
+                ],
+                "end": 2,
+                "start": 1,
+                "task_id": "task-b"
+              },
+              {
+                "depends_on": [
+                  "task-b"
+                ],
+                "end": 3,
+                "start": 2,
+                "task_id": "task-c"
+              }
+            ]
+          },
+          "score_summary": {
+            "affect_margin_score": 1.0,
+            "robustness_score": 0.7,
+            "schedule_diversity_score": 0.0,
+            "total_score": 0.625,
+            "utility_score": 0.8000000000000002
+          },
+          "semi_legitimization_summary": {
+            "affect_budget_ok": true,
+            "result": "passes_cheap_checks",
+            "slack_preserved": true
+          }
+        },
+        {
+          "candidate_id": "plan-dependency-chain-000000000000002a-d06",
+          "candidate_role": "other",
+          "explanation_fragments": [
+            {
+              "taskId": "task-a",
+              "text": "Task 'task-a' is selected next because all listed dependencies precede it in the deterministic candidate order."
+            }
+          ],
+          "feasibility_summary": {
+            "affect_feasible": true,
+            "hard_constraints_assumed_satisfied_by_engine": true,
+            "violated_affect_dimensions": []
+          },
+          "probability_summary": {
+            "probability_quality": "not_estimated",
+            "provenance_refs": []
+          },
+          "rank": 10,
+          "schedule": {
+            "plan_id": "plan-dependency-chain-000000000000002a-d06",
+            "status": "candidate",
+            "steps": [
+              {
+                "end": 2,
+                "start": 1,
+                "task_id": "task-a"
+              },
+              {
+                "depends_on": [
+                  "task-a"
+                ],
+                "end": 3,
+                "start": 2,
+                "task_id": "task-b"
+              },
+              {
+                "depends_on": [
+                  "task-b"
+                ],
+                "end": 4,
+                "start": 3,
+                "task_id": "task-c"
+              }
+            ]
+          },
+          "score_summary": {
+            "affect_margin_score": 1.0,
+            "robustness_score": 0.7,
+            "schedule_diversity_score": 0.1,
+            "total_score": 0.625,
+            "utility_score": 0.7000000000000001
+          },
+          "semi_legitimization_summary": {
+            "affect_budget_ok": true,
+            "result": "passes_cheap_checks",
+            "slack_preserved": true
+          }
+        },
+        {
+          "candidate_id": "plan-dependency-chain-000000000000002a-d03",
+          "candidate_role": "other",
+          "explanation_fragments": [
+            {
+              "taskId": "task-a",
+              "text": "Task 'task-a' is selected next because all listed dependencies precede it in the deterministic candidate order."
+            }
+          ],
+          "feasibility_summary": {
+            "affect_feasible": true,
+            "hard_constraints_assumed_satisfied_by_engine": true,
+            "violated_affect_dimensions": []
+          },
+          "probability_summary": {
+            "probability_quality": "not_estimated",
+            "provenance_refs": []
+          },
+          "rank": 11,
+          "schedule": {
+            "plan_id": "plan-dependency-chain-000000000000002a-d03",
+            "status": "candidate",
+            "steps": [
+              {
+                "end": 3,
+                "start": 2,
+                "task_id": "task-a"
+              },
+              {
+                "depends_on": [
+                  "task-a"
+                ],
+                "end": 4,
+                "start": 3,
+                "task_id": "task-b"
+              },
+              {
+                "depends_on": [
+                  "task-b"
+                ],
+                "end": 5,
+                "start": 4,
+                "task_id": "task-c"
+              }
+            ]
+          },
+          "score_summary": {
+            "affect_margin_score": 1.0,
+            "robustness_score": 0.7,
+            "schedule_diversity_score": 0.2,
+            "total_score": 0.625,
+            "utility_score": 0.6
+          },
+          "semi_legitimization_summary": {
+            "affect_budget_ok": true,
+            "result": "passes_cheap_checks",
+            "slack_preserved": true
+          }
+        },
+        {
+          "candidate_id": "plan-dependency-chain-000000000000002a-d07",
+          "candidate_role": "other",
+          "explanation_fragments": [
+            {
+              "taskId": "task-a",
+              "text": "Task 'task-a' is selected next because all listed dependencies precede it in the deterministic candidate order."
+            }
+          ],
+          "feasibility_summary": {
+            "affect_feasible": true,
+            "hard_constraints_assumed_satisfied_by_engine": true,
+            "violated_affect_dimensions": []
+          },
+          "probability_summary": {
+            "probability_quality": "not_estimated",
+            "provenance_refs": []
+          },
+          "rank": 12,
+          "schedule": {
+            "plan_id": "plan-dependency-chain-000000000000002a-d07",
+            "status": "candidate",
+            "steps": [
+              {
+                "end": 4,
+                "start": 3,
+                "task_id": "task-a"
+              },
+              {
+                "depends_on": [
+                  "task-a"
+                ],
+                "end": 5,
+                "start": 4,
+                "task_id": "task-b"
+              },
+              {
+                "depends_on": [
+                  "task-b"
+                ],
+                "end": 6,
+                "start": 5,
+                "task_id": "task-c"
+              }
+            ]
+          },
+          "score_summary": {
+            "affect_margin_score": 1.0,
+            "robustness_score": 0.7,
+            "schedule_diversity_score": 0.3,
+            "total_score": 0.625,
+            "utility_score": 0.5
+          },
+          "semi_legitimization_summary": {
+            "affect_budget_ok": true,
+            "result": "passes_cheap_checks",
+            "slack_preserved": true
+          }
+        },
+        {
+          "candidate_id": "plan-dependency-chain-000000000000002a-d13",
+          "candidate_role": "other",
+          "explanation_fragments": [
+            {
+              "taskId": "task-a",
+              "text": "Task 'task-a' is selected next because all listed dependencies precede it in the deterministic candidate order."
+            }
+          ],
+          "feasibility_summary": {
+            "affect_feasible": true,
+            "hard_constraints_assumed_satisfied_by_engine": true,
+            "violated_affect_dimensions": []
+          },
+          "probability_summary": {
+            "probability_quality": "not_estimated",
+            "provenance_refs": []
+          },
+          "rank": 13,
+          "schedule": {
+            "plan_id": "plan-dependency-chain-000000000000002a-d13",
+            "status": "candidate",
+            "steps": [
+              {
+                "end": 5,
+                "start": 4,
+                "task_id": "task-a"
+              },
+              {
+                "depends_on": [
+                  "task-a"
+                ],
+                "end": 6,
+                "start": 5,
+                "task_id": "task-b"
+              },
+              {
+                "depends_on": [
+                  "task-b"
+                ],
+                "end": 7,
+                "start": 6,
+                "task_id": "task-c"
+              }
+            ]
+          },
+          "score_summary": {
+            "affect_margin_score": 1.0,
+            "robustness_score": 0.7,
+            "schedule_diversity_score": 0.4,
+            "total_score": 0.625,
+            "utility_score": 0.4000000000000001
+          },
+          "semi_legitimization_summary": {
+            "affect_budget_ok": true,
+            "result": "passes_cheap_checks",
+            "slack_preserved": true
+          }
+        },
+        {
+          "candidate_id": "plan-dependency-chain-000000000000002a-d09",
+          "candidate_role": "other",
+          "explanation_fragments": [
+            {
+              "taskId": "task-a",
+              "text": "Task 'task-a' is selected next because all listed dependencies precede it in the deterministic candidate order."
+            }
+          ],
+          "feasibility_summary": {
+            "affect_feasible": true,
+            "hard_constraints_assumed_satisfied_by_engine": true,
+            "violated_affect_dimensions": []
+          },
+          "probability_summary": {
+            "probability_quality": "not_estimated",
+            "provenance_refs": []
+          },
+          "rank": 14,
+          "schedule": {
+            "plan_id": "plan-dependency-chain-000000000000002a-d09",
+            "status": "candidate",
+            "steps": [
+              {
+                "end": 6,
+                "start": 5,
+                "task_id": "task-a"
+              },
+              {
+                "depends_on": [
+                  "task-a"
+                ],
+                "end": 7,
+                "start": 6,
+                "task_id": "task-b"
+              },
+              {
+                "depends_on": [
+                  "task-b"
+                ],
+                "end": 8,
+                "start": 7,
+                "task_id": "task-c"
+              }
+            ]
+          },
+          "score_summary": {
+            "affect_margin_score": 1.0,
+            "robustness_score": 0.7,
+            "schedule_diversity_score": 0.5,
+            "total_score": 0.625,
+            "utility_score": 0.3
+          },
+          "semi_legitimization_summary": {
+            "affect_budget_ok": true,
+            "result": "passes_cheap_checks",
+            "slack_preserved": true
+          }
+        },
+        {
+          "candidate_id": "plan-dependency-chain-000000000000002a-d04",
+          "candidate_role": "other",
+          "explanation_fragments": [
+            {
+              "taskId": "task-a",
+              "text": "Task 'task-a' is selected next because all listed dependencies precede it in the deterministic candidate order."
+            }
+          ],
+          "feasibility_summary": {
+            "affect_feasible": true,
+            "hard_constraints_assumed_satisfied_by_engine": true,
+            "violated_affect_dimensions": []
+          },
+          "probability_summary": {
+            "probability_quality": "not_estimated",
+            "provenance_refs": []
+          },
+          "rank": 15,
+          "schedule": {
+            "plan_id": "plan-dependency-chain-000000000000002a-d04",
+            "status": "candidate",
+            "steps": [
+              {
+                "end": 7,
+                "start": 6,
+                "task_id": "task-a"
+              },
+              {
+                "depends_on": [
+                  "task-a"
+                ],
+                "end": 8,
+                "start": 7,
+                "task_id": "task-b"
+              },
+              {
+                "depends_on": [
+                  "task-b"
+                ],
+                "end": 9,
+                "start": 8,
+                "task_id": "task-c"
+              }
+            ]
+          },
+          "score_summary": {
+            "affect_margin_score": 1.0,
+            "robustness_score": 0.7,
+            "schedule_diversity_score": 0.6,
+            "total_score": 0.625,
+            "utility_score": 0.19999999999999998
+          },
+          "semi_legitimization_summary": {
+            "affect_budget_ok": true,
+            "result": "passes_cheap_checks",
+            "slack_preserved": true
+          }
+        },
+        {
+          "candidate_id": "plan-dependency-chain-000000000000002a-d15",
+          "candidate_role": "most_schedule_diverse",
+          "explanation_fragments": [
+            {
+              "taskId": "task-a",
+              "text": "Task 'task-a' is selected next because all listed dependencies precede it in the deterministic candidate order."
+            }
+          ],
+          "feasibility_summary": {
+            "affect_feasible": true,
+            "hard_constraints_assumed_satisfied_by_engine": true,
+            "violated_affect_dimensions": []
+          },
+          "probability_summary": {
+            "probability_quality": "not_estimated",
+            "provenance_refs": []
+          },
+          "rank": 16,
+          "schedule": {
+            "plan_id": "plan-dependency-chain-000000000000002a-d15",
+            "status": "candidate",
+            "steps": [
+              {
+                "end": 8,
+                "start": 7,
+                "task_id": "task-a"
+              },
+              {
+                "depends_on": [
+                  "task-a"
+                ],
+                "end": 9,
+                "start": 8,
+                "task_id": "task-b"
+              },
+              {
+                "depends_on": [
+                  "task-b"
+                ],
+                "end": 10,
+                "start": 9,
+                "task_id": "task-c"
+              }
+            ]
+          },
+          "score_summary": {
+            "affect_margin_score": 1.0,
+            "robustness_score": 0.7,
+            "schedule_diversity_score": 0.7,
+            "total_score": 0.625,
+            "utility_score": 0.09999999999999998
+          },
+          "semi_legitimization_summary": {
+            "affect_budget_ok": true,
+            "result": "passes_cheap_checks",
+            "slack_preserved": true
+          }
+        }
+      ],
+      "planner_version": "0.1.0",
+      "request_id": "dependency-chain",
+      "rng_seed_echo": 42,
+      "schema_version": "planning-kernel-contract/0.1",
+      "status": "ok",
+      "unplaced_tasks": []
+    },
+    "request": {
+      "horizon_policy": {
+        "branch_coverage_target": 0.99,
+        "reactive_horizon_seconds": 3600
+      },
+      "mode": "fresh_generation",
+      "n_rollouts": 64,
+      "request_id": "dependency-chain",
+      "rng_seed": 42,
+      "schema_version": "planning-kernel-contract/0.1",
+      "scoring_policy": {
+        "affect_margin_weight": 1.0,
+        "robustness_weight": 1.0,
+        "schedule_diversity_weight": 1.0,
+        "utility_weight": 1.0
+      },
+      "strict_validation": false,
+      "tasks": [
+        {
+          "duration": {
+            "seconds": 1,
+            "type": "fixed"
+          },
+          "id": "task-a",
+          "priority": 1.0,
+          "value": 1.0
+        },
+        {
+          "depends_on": [
+            "task-a"
+          ],
+          "duration": {
+            "seconds": 1,
+            "type": "fixed"
+          },
+          "id": "task-b",
+          "priority": 1.0,
+          "value": 1.0
+        },
+        {
+          "depends_on": [
+            "task-b"
+          ],
+          "duration": {
+            "seconds": 1,
+            "type": "fixed"
+          },
+          "id": "task-c",
+          "priority": 1.0,
+          "value": 1.0
+        }
+      ],
+      "time_window": {
+        "end": 10,
+        "start": 0
+      },
+      "top_k": 3,
+      "topological_order": [
+        "task-a",
+        "task-b",
+        "task-c"
+      ]
+    },
+    "snapshot": {
+      "exact": {
+        "affect_legitimacy_filter": {
+          "feasible_mask": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        "chunk_partitioning": [
+          [
+            0,
+            10
+          ]
+        ],
+        "monte_carlo_rollout": {
+          "candidate_order": [
+            "plan-dependency-chain-000000000000002a-d02",
+            "plan-dependency-chain-000000000000002a-d14",
+            "plan-dependency-chain-000000000000002a-d11",
+            "plan-dependency-chain-000000000000002a-d08",
+            "plan-dependency-chain-000000000000002a-d10",
+            "plan-dependency-chain-000000000000002a-d12",
+            "plan-dependency-chain-000000000000002a-d01",
+            "plan-dependency-chain-000000000000002a-d05",
+            "plan-dependency-chain-000000000000002a",
+            "plan-dependency-chain-000000000000002a-d06",
+            "plan-dependency-chain-000000000000002a-d03",
+            "plan-dependency-chain-000000000000002a-d07",
+            "plan-dependency-chain-000000000000002a-d13",
+            "plan-dependency-chain-000000000000002a-d09",
+            "plan-dependency-chain-000000000000002a-d04",
+            "plan-dependency-chain-000000000000002a-d15"
+          ],
+          "cpu_certified_selected_plan_validity": true,
+          "status": "ok"
+        },
+        "schema_decoding": {
+          "request": true,
+          "response": true,
+          "schema_version": "planning-kernel-contract/0.1"
+        },
+        "skeleton_sampling": {
+          "dependency_feasibility": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "hard_constraint_feasibility": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "rejection_classes": [],
+          "validity_mask": [
+            [
+              true,
+              true,
+              true
+            ],
+            [
+              true,
+              true,
+              true
+            ],
+            [
+              true,
+              true,
+              true
+            ],
+            [
+              true,
+              true,
+              true
+            ],
+            [
+              true,
+              true,
+              true
+            ],
+            [
+              true,
+              true,
+              true
+            ],
+            [
+              true,
+              true,
+              true
+            ],
+            [
+              true,
+              true,
+              true
+            ],
+            [
+              true,
+              true,
+              true
+            ],
+            [
+              true,
+              true,
+              true
+            ],
+            [
+              true,
+              true,
+              true
+            ],
+            [
+              true,
+              true,
+              true
+            ],
+            [
+              true,
+              true,
+              true
+            ],
+            [
+              true,
+              true,
+              true
+            ],
+            [
+              true,
+              true,
+              true
+            ],
+            [
+              true,
+              true,
+              true
+            ]
+          ]
+        },
+        "value_scoring": {
+          "top_k_indices": [
+            0,
+            1,
+            2
+          ]
+        }
+      },
+      "n_rollouts": 64,
+      "profile": "boundary-v1",
+      "rng_seed": 42,
+      "tolerance": {
+        "monte_carlo_rollout": {
+          "probability_intervals": [
+            [
+              0.9433759402071946,
+              1.0
+            ],
+            [
+              0.9433759402071946,
+              1.0
+            ],
+            [
+              0.9433759402071946,
+              1.0
+            ],
+            [
+              null,
+              null
+            ],
+            [
+              null,
+              null
+            ],
+            [
+              null,
+              null
+            ],
+            [
+              null,
+              null
+            ],
+            [
+              null,
+              null
+            ],
+            [
+              null,
+              null
+            ],
+            [
+              null,
+              null
+            ],
+            [
+              null,
+              null
+            ],
+            [
+              null,
+              null
+            ],
+            [
+              null,
+              null
+            ],
+            [
+              null,
+              null
+            ],
+            [
+              null,
+              null
+            ],
+            [
+              null,
+              null
+            ]
+          ],
+          "rollout_frequencies": [
+            1.0,
+            1.0,
+            1.0,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        "value_scoring": {
+          "composite_scores": [
+            0.65125,
+            0.6475000000000001,
+            0.6437499999999999,
+            0.64,
+            0.6325000000000001,
+            0.6325,
+            0.62875,
+            0.6287499999999999,
+            0.625,
+            0.625,
+            0.625,
+            0.625,
+            0.625,
+            0.625,
+            0.625,
+            0.625
+          ],
+          "floating_point_scores": [
+            {
+              "affect_margin_score": 1.0,
+              "robustness_score": 0.8049999999999999,
+              "schedule_diversity_score": 0.4666666666666667,
+              "total_score": 0.65125,
+              "utility_score": 0.3333333333333333
+            },
+            {
+              "affect_margin_score": 1.0,
+              "robustness_score": 0.7899999999999999,
+              "schedule_diversity_score": 0.2,
+              "total_score": 0.6475000000000001,
+              "utility_score": 0.6000000000000001
+            },
+            {
+              "affect_margin_score": 1.0,
+              "robustness_score": 0.7749999999999999,
+              "schedule_diversity_score": 0.16666666666666669,
+              "total_score": 0.6437499999999999,
+              "utility_score": 0.6333333333333334
+            },
+            {
+              "affect_margin_score": 1.0,
+              "robustness_score": 0.76,
+              "schedule_diversity_score": 0.26666666666666666,
+              "total_score": 0.64,
+              "utility_score": 0.5333333333333333
+            },
+            {
+              "affect_margin_score": 1.0,
+              "robustness_score": 0.73,
+              "schedule_diversity_score": 0.06666666666666667,
+              "total_score": 0.6325000000000001,
+              "utility_score": 0.7333333333333334
+            },
+            {
+              "affect_margin_score": 1.0,
+              "robustness_score": 0.73,
+              "schedule_diversity_score": 0.13333333333333333,
+              "total_score": 0.6325,
+              "utility_score": 0.6666666666666666
+            },
+            {
+              "affect_margin_score": 1.0,
+              "robustness_score": 0.715,
+              "schedule_diversity_score": 0.06666666666666667,
+              "total_score": 0.62875,
+              "utility_score": 0.7333333333333334
+            },
+            {
+              "affect_margin_score": 1.0,
+              "robustness_score": 0.715,
+              "schedule_diversity_score": 0.03333333333333333,
+              "total_score": 0.6287499999999999,
+              "utility_score": 0.7666666666666667
+            },
+            {
+              "affect_margin_score": 1.0,
+              "robustness_score": 0.7,
+              "schedule_diversity_score": 0.0,
+              "total_score": 0.625,
+              "utility_score": 0.8000000000000002
+            },
+            {
+              "affect_margin_score": 1.0,
+              "robustness_score": 0.7,
+              "schedule_diversity_score": 0.1,
+              "total_score": 0.625,
+              "utility_score": 0.7000000000000001
+            },
+            {
+              "affect_margin_score": 1.0,
+              "robustness_score": 0.7,
+              "schedule_diversity_score": 0.2,
+              "total_score": 0.625,
+              "utility_score": 0.6
+            },
+            {
+              "affect_margin_score": 1.0,
+              "robustness_score": 0.7,
+              "schedule_diversity_score": 0.3,
+              "total_score": 0.625,
+              "utility_score": 0.5
+            },
+            {
+              "affect_margin_score": 1.0,
+              "robustness_score": 0.7,
+              "schedule_diversity_score": 0.4,
+              "total_score": 0.625,
+              "utility_score": 0.4000000000000001
+            },
+            {
+              "affect_margin_score": 1.0,
+              "robustness_score": 0.7,
+              "schedule_diversity_score": 0.5,
+              "total_score": 0.625,
+              "utility_score": 0.3
+            },
+            {
+              "affect_margin_score": 1.0,
+              "robustness_score": 0.7,
+              "schedule_diversity_score": 0.6,
+              "total_score": 0.625,
+              "utility_score": 0.19999999999999998
+            },
+            {
+              "affect_margin_score": 1.0,
+              "robustness_score": 0.7,
+              "schedule_diversity_score": 0.7,
+              "total_score": 0.625,
+              "utility_score": 0.09999999999999998
+            }
+          ],
+          "schedule_diversity_scores": [
+            0.4666666666666667,
+            0.2,
+            0.16666666666666669,
+            0.26666666666666666,
+            0.06666666666666667,
+            0.13333333333333333,
+            0.06666666666666667,
+            0.03333333333333333,
+            0.0,
+            0.1,
+            0.2,
+            0.3,
+            0.4,
+            0.5,
+            0.6,
+            0.7
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "synthetic-static-anchor",
+    "reference_response": {
+      "effective_time": "1970-01-01T00:00:00Z",
+      "engine_provenance": {
+        "backend_kind": "cpu_reference",
+        "cpu_certification_status": "certified",
+        "device_summary": "cpu",
+        "engine_version": "0.1.0",
+        "invocation_kind": "in_process_cpu",
+        "tolerance_profile": "boundary-v1"
+      },
+      "generated_at": "1970-01-01T00:00:00Z",
+      "plan_candidates": [
+        {
+          "candidate_id": "plan-static-anchor-0000000000000000",
+          "candidate_role": "highest_utility",
+          "coverage": {
+            "coverage_below_threshold": false,
+            "coverage_confidence": {
+              "confidence_level": 0.95,
+              "lower": 0.9433759402071946,
+              "method": "wilson",
+              "n_rollouts": 64,
+              "upper": 1.0
+            },
+            "coverage_estimate": 1.0,
+            "coverage_scope": "reactive_horizon",
+            "coverage_threshold_used": 0.99,
+            "outcome_continuation_summary": {
+              "boundaries": [
+                {
+                  "boundary_index": 0,
+                  "boundary_start": 5,
+                  "boundary_task_ref": "task-a",
+                  "covered_outcome_count": 1,
+                  "heaviest_uncovered_digest": null,
+                  "uncovered_mass": 0.0,
+                  "uncovered_outcome_count": 0
+                }
+              ],
+              "budget_limited": false,
+              "covered_outcome_count": 1,
+              "quantization_rule": "lateness_seconds_ceil_60",
+              "uncovered_outcome_count": 0
+            },
+            "uncovered_mass_estimate": 0.0
+          },
+          "explanation_fragments": [
+            {
+              "taskId": "task-a",
+              "text": "Task 'task-a' is selected next because all listed dependencies precede it in the deterministic candidate order."
+            }
+          ],
+          "feasibility_summary": {
+            "affect_feasible": true,
+            "hard_constraints_assumed_satisfied_by_engine": true,
+            "violated_affect_dimensions": []
+          },
+          "probability_summary": {
+            "display_probability": 1.0,
+            "log_probability": 0.0,
+            "probability_interval_high": 1.0,
+            "probability_interval_low": 0.9433759402071946,
+            "probability_quality": "full",
+            "provenance_refs": []
+          },
+          "rank": 1,
+          "rollout_diagnostics": {
+            "feasibility_frequency": 1.0,
+            "feasible_rollouts": 64,
+            "n_rollouts": 64,
+            "probability_quality": "full",
+            "robustness_percentile": 0.1,
+            "stage_seed": 3
+          },
+          "schedule": {
+            "plan_id": "plan-static-anchor-0000000000000000",
+            "status": "candidate",
+            "steps": [
+              {
+                "end": 7,
+                "start": 5,
+                "static_anchor": true,
+                "task_id": "task-a"
+              }
+            ]
+          },
+          "score_summary": {
+            "affect_margin_score": 1.0,
+            "robustness_score": 0.3,
+            "schedule_diversity_score": 0.0,
+            "total_score": 0.48750000000000004,
+            "utility_score": 0.30000000000000004
+          },
+          "semi_legitimization_summary": {
+            "affect_budget_ok": true,
+            "result": "passes_cheap_checks",
+            "slack_preserved": true
+          }
+        }
+      ],
+      "planner_version": "0.1.0",
+      "request_id": "static-anchor",
+      "rng_seed_echo": 0,
+      "schema_version": "planning-kernel-contract/0.1",
+      "status": "ok",
+      "unplaced_tasks": []
+    },
+    "request": {
+      "horizon_policy": {
+        "branch_coverage_target": 0.99,
+        "reactive_horizon_seconds": 3600
+      },
+      "mode": "fresh_generation",
+      "n_rollouts": 64,
+      "request_id": "static-anchor",
+      "rng_seed": 0,
+      "schema_version": "planning-kernel-contract/0.1",
+      "scoring_policy": {
+        "affect_margin_weight": 1.0,
+        "robustness_weight": 1.0,
+        "schedule_diversity_weight": 1.0,
+        "utility_weight": 1.0
+      },
+      "strict_validation": false,
+      "tasks": [
+        {
+          "duration": {
+            "seconds": 2,
+            "type": "fixed"
+          },
+          "id": "task-a",
+          "priority": 1.0,
+          "static_anchor": {
+            "start": 5
+          },
+          "value": 1.0,
+          "window": {
+            "end": 10,
+            "start": 5
+          }
+        }
+      ],
+      "time_window": {
+        "end": 10,
+        "start": 0
+      },
+      "top_k": 3,
+      "topological_order": [
+        "task-a"
+      ]
+    },
+    "snapshot": {
+      "exact": {
+        "affect_legitimacy_filter": {
+          "feasible_mask": [
+            true
+          ]
+        },
+        "chunk_partitioning": [
+          [
+            0,
+            5
+          ],
+          [
+            7,
+            10
+          ]
+        ],
+        "monte_carlo_rollout": {
+          "candidate_order": [
+            "plan-static-anchor-0000000000000000"
+          ],
+          "cpu_certified_selected_plan_validity": true,
+          "status": "ok"
+        },
+        "schema_decoding": {
+          "request": true,
+          "response": true,
+          "schema_version": "planning-kernel-contract/0.1"
+        },
+        "skeleton_sampling": {
+          "dependency_feasibility": [
+            true
+          ],
+          "hard_constraint_feasibility": [
+            true
+          ],
+          "rejection_classes": [],
+          "validity_mask": [
+            [
+              true
+            ]
+          ]
+        },
+        "value_scoring": {
+          "top_k_indices": [
+            0
+          ]
+        }
+      },
+      "n_rollouts": 64,
+      "profile": "boundary-v1",
+      "rng_seed": 0,
+      "tolerance": {
+        "monte_carlo_rollout": {
+          "probability_intervals": [
+            [
+              0.9433759402071946,
+              1.0
+            ]
+          ],
+          "rollout_frequencies": [
+            1.0
+          ]
+        },
+        "value_scoring": {
+          "composite_scores": [
+            0.5225
+          ],
+          "floating_point_scores": [
+            {
+              "affect_margin_score": 1.0,
+              "robustness_score": 0.7899999999999999,
+              "schedule_diversity_score": 0.0,
+              "total_score": 0.5225,
+              "utility_score": 0.30000000000000004
+            }
+          ],
+          "schedule_diversity_scores": [
+            0.0
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "synthetic-affect-break-required",
+    "reference_response": {
+      "effective_time": "1970-01-01T00:00:00Z",
+      "engine_provenance": {
+        "backend_kind": "cpu_reference",
+        "cpu_certification_status": "certified",
+        "device_summary": "cpu",
+        "engine_version": "0.1.0",
+        "invocation_kind": "in_process_cpu",
+        "tolerance_profile": "boundary-v1"
+      },
+      "generated_at": "1970-01-01T00:00:00Z",
+      "plan_candidates": [
+        {
+          "candidate_id": "plan-affect-break-required-0000000000000000",
+          "candidate_role": "highest_utility",
+          "coverage": {
+            "coverage_below_threshold": false,
+            "coverage_confidence": {
+              "confidence_level": 0.95,
+              "lower": 0.9433759402071946,
+              "method": "wilson",
+              "n_rollouts": 64,
+              "upper": 1.0
+            },
+            "coverage_estimate": 1.0,
+            "coverage_scope": "reactive_horizon",
+            "coverage_threshold_used": 0.99,
+            "outcome_continuation_summary": {
+              "boundaries": [],
+              "budget_limited": false,
+              "covered_outcome_count": 0,
+              "quantization_rule": "lateness_seconds_ceil_60",
+              "uncovered_outcome_count": 0
+            },
+            "uncovered_mass_estimate": 0.0
+          },
+          "explanation_fragments": [
+            {
+              "taskId": "task-a",
+              "text": "Task 'task-a' is selected next because all listed dependencies precede it in the deterministic candidate order."
+            }
+          ],
+          "feasibility_summary": {
+            "affect_feasible": false,
+            "hard_constraints_assumed_satisfied_by_engine": true,
+            "minimum_affect_score": 0.2689414213699951,
+            "violated_affect_dimensions": [
+              "energy"
+            ]
+          },
+          "probability_summary": {
+            "display_probability": 1.0,
+            "log_probability": 0.0,
+            "probability_interval_high": 1.0,
+            "probability_interval_low": 0.9433759402071946,
+            "probability_quality": "full",
+            "provenance_refs": []
+          },
+          "rank": 1,
+          "rollout_diagnostics": {
+            "feasibility_frequency": 1.0,
+            "feasible_rollouts": 64,
+            "n_rollouts": 64,
+            "probability_quality": "full",
+            "robustness_percentile": 0.1,
+            "stage_seed": 3
+          },
+          "schedule": {
+            "plan_id": "plan-affect-break-required-0000000000000000",
+            "status": "candidate",
+            "steps": [
+              {
+                "end": 1,
+                "start": 0,
+                "task_id": "task-a"
+              }
+            ]
+          },
+          "score_summary": {
+            "affect_margin_score": 0.38447071068499755,
+            "robustness_score": 0.9,
+            "schedule_diversity_score": 0.0,
+            "total_score": 0.5586176776712494,
+            "utility_score": 0.9
+          },
+          "semi_legitimization_summary": {
+            "affect_budget_ok": true,
+            "result": "passes_cheap_checks",
+            "slack_preserved": true
+          }
+        },
+        {
+          "candidate_id": "plan-affect-break-required-0000000000000000-d07",
+          "candidate_role": "other",
+          "coverage": {
+            "coverage_below_threshold": false,
+            "coverage_confidence": {
+              "confidence_level": 0.95,
+              "lower": 0.9433759402071946,
+              "method": "wilson",
+              "n_rollouts": 64,
+              "upper": 1.0
+            },
+            "coverage_estimate": 1.0,
+            "coverage_scope": "reactive_horizon",
+            "coverage_threshold_used": 0.99,
+            "outcome_continuation_summary": {
+              "boundaries": [],
+              "budget_limited": false,
+              "covered_outcome_count": 0,
+              "quantization_rule": "lateness_seconds_ceil_60",
+              "uncovered_outcome_count": 0
+            },
+            "uncovered_mass_estimate": 0.0
+          },
+          "explanation_fragments": [
+            {
+              "taskId": "task-a",
+              "text": "Task 'task-a' is selected next because all listed dependencies precede it in the deterministic candidate order."
+            }
+          ],
+          "feasibility_summary": {
+            "affect_feasible": false,
+            "hard_constraints_assumed_satisfied_by_engine": true,
+            "minimum_affect_score": 0.2689414213699951,
+            "violated_affect_dimensions": [
+              "energy"
+            ]
+          },
+          "probability_summary": {
+            "display_probability": 1.0,
+            "log_probability": 0.0,
+            "probability_interval_high": 1.0,
+            "probability_interval_low": 0.9433759402071946,
+            "probability_quality": "full",
+            "provenance_refs": []
+          },
+          "rank": 2,
+          "rollout_diagnostics": {
+            "feasibility_frequency": 1.0,
+            "feasible_rollouts": 64,
+            "n_rollouts": 64,
+            "probability_quality": "full",
+            "robustness_percentile": 0.1,
+            "stage_seed": 3
+          },
+          "schedule": {
+            "plan_id": "plan-affect-break-required-0000000000000000-d07",
+            "status": "candidate",
+            "steps": [
+              {
+                "end": 2,
+                "start": 1,
+                "task_id": "task-a"
+              }
+            ]
+          },
+          "score_summary": {
+            "affect_margin_score": 0.38447071068499755,
+            "robustness_score": 0.8,
+            "schedule_diversity_score": 0.1,
+            "total_score": 0.5461176776712494,
+            "utility_score": 0.8
+          },
+          "semi_legitimization_summary": {
+            "affect_budget_ok": true,
+            "result": "passes_cheap_checks",
+            "slack_preserved": true
+          }
+        },
+        {
+          "candidate_id": "plan-affect-break-required-0000000000000000-d04",
+          "candidate_role": "other",
+          "coverage": {
+            "coverage_below_threshold": false,
+            "coverage_confidence": {
+              "confidence_level": 0.95,
+              "lower": 0.9433759402071946,
+              "method": "wilson",
+              "n_rollouts": 64,
+              "upper": 1.0
+            },
+            "coverage_estimate": 1.0,
+            "coverage_scope": "reactive_horizon",
+            "coverage_threshold_used": 0.99,
+            "outcome_continuation_summary": {
+              "boundaries": [],
+              "budget_limited": false,
+              "covered_outcome_count": 0,
+              "quantization_rule": "lateness_seconds_ceil_60",
+              "uncovered_outcome_count": 0
+            },
+            "uncovered_mass_estimate": 0.0
+          },
+          "explanation_fragments": [
+            {
+              "taskId": "task-a",
+              "text": "Task 'task-a' is selected next because all listed dependencies precede it in the deterministic candidate order."
+            }
+          ],
+          "feasibility_summary": {
+            "affect_feasible": false,
+            "hard_constraints_assumed_satisfied_by_engine": true,
+            "minimum_affect_score": 0.2689414213699951,
+            "violated_affect_dimensions": [
+              "energy"
+            ]
+          },
+          "probability_summary": {
+            "display_probability": 1.0,
+            "log_probability": 0.0,
+            "probability_interval_high": 1.0,
+            "probability_interval_low": 0.9433759402071946,
+            "probability_quality": "full",
+            "provenance_refs": []
+          },
+          "rank": 3,
+          "rollout_diagnostics": {
+            "feasibility_frequency": 1.0,
+            "feasible_rollouts": 64,
+            "n_rollouts": 64,
+            "probability_quality": "full",
+            "robustness_percentile": 0.1,
+            "stage_seed": 3
+          },
+          "schedule": {
+            "plan_id": "plan-affect-break-required-0000000000000000-d04",
+            "status": "candidate",
+            "steps": [
+              {
+                "end": 3,
+                "start": 2,
+                "task_id": "task-a"
+              }
+            ]
+          },
+          "score_summary": {
+            "affect_margin_score": 0.38447071068499755,
+            "robustness_score": 0.7,
+            "schedule_diversity_score": 0.2,
+            "total_score": 0.5336176776712493,
+            "utility_score": 0.7
+          },
+          "semi_legitimization_summary": {
+            "affect_budget_ok": true,
+            "result": "passes_cheap_checks",
+            "slack_preserved": true
+          }
+        },
+        {
+          "candidate_id": "plan-affect-break-required-0000000000000000-d02",
+          "candidate_role": "other",
+          "explanation_fragments": [
+            {
+              "taskId": "task-a",
+              "text": "Task 'task-a' is selected next because all listed dependencies precede it in the deterministic candidate order."
+            }
+          ],
+          "feasibility_summary": {
+            "affect_feasible": false,
+            "hard_constraints_assumed_satisfied_by_engine": true,
+            "minimum_affect_score": 0.2689414213699951,
+            "violated_affect_dimensions": [
+              "energy"
+            ]
+          },
+          "probability_summary": {
+            "probability_quality": "not_estimated",
+            "provenance_refs": []
+          },
+          "rank": 4,
+          "schedule": {
+            "plan_id": "plan-affect-break-required-0000000000000000-d02",
+            "status": "candidate",
+            "steps": [
+              {
+                "end": 4,
+                "start": 3,
+                "task_id": "task-a"
+              }
+            ]
+          },
+          "score_summary": {
+            "affect_margin_score": 0.38447071068499755,
+            "robustness_score": 0.8799999999999999,
+            "schedule_diversity_score": 0.3,
+            "total_score": 0.5411176776712494,
+            "utility_score": 0.6
+          },
+          "semi_legitimization_summary": {
+            "affect_budget_ok": true,
+            "result": "passes_cheap_checks",
+            "slack_preserved": true
+          }
+        },
+        {
+          "candidate_id": "plan-affect-break-required-0000000000000000-d06",
+          "candidate_role": "other",
+          "explanation_fragments": [
+            {
+              "taskId": "task-a",
+              "text": "Task 'task-a' is selected next because all listed dependencies precede it in the deterministic candidate order."
+            }
+          ],
+          "feasibility_summary": {
+            "affect_feasible": false,
+            "hard_constraints_assumed_satisfied_by_engine": true,
+            "minimum_affect_score": 0.2689414213699951,
+            "violated_affect_dimensions": [
+              "energy"
+            ]
+          },
+          "probability_summary": {
+            "probability_quality": "not_estimated",
+            "provenance_refs": []
+          },
+          "rank": 5,
+          "schedule": {
+            "plan_id": "plan-affect-break-required-0000000000000000-d06",
+            "status": "candidate",
+            "steps": [
+              {
+                "end": 5,
+                "start": 4,
+                "task_id": "task-a"
+              }
+            ]
+          },
+          "score_summary": {
+            "affect_margin_score": 0.38447071068499755,
+            "robustness_score": 0.85,
+            "schedule_diversity_score": 0.4,
+            "total_score": 0.5336176776712495,
+            "utility_score": 0.5
+          },
+          "semi_legitimization_summary": {
+            "affect_budget_ok": true,
+            "result": "passes_cheap_checks",
+            "slack_preserved": true
+          }
+        },
+        {
+          "candidate_id": "plan-affect-break-required-0000000000000000-d03",
+          "candidate_role": "other",
+          "explanation_fragments": [
+            {
+              "taskId": "task-a",
+              "text": "Task 'task-a' is selected next because all listed dependencies precede it in the deterministic candidate order."
+            }
+          ],
+          "feasibility_summary": {
+            "affect_feasible": false,
+            "hard_constraints_assumed_satisfied_by_engine": true,
+            "minimum_affect_score": 0.2689414213699951,
+            "violated_affect_dimensions": [
+              "energy"
+            ]
+          },
+          "probability_summary": {
+            "probability_quality": "not_estimated",
+            "provenance_refs": []
+          },
+          "rank": 6,
+          "schedule": {
+            "plan_id": "plan-affect-break-required-0000000000000000-d03",
+            "status": "candidate",
+            "steps": [
+              {
+                "end": 6,
+                "start": 5,
+                "task_id": "task-a"
+              }
+            ]
+          },
+          "score_summary": {
+            "affect_margin_score": 0.38447071068499755,
+            "robustness_score": 0.82,
+            "schedule_diversity_score": 0.5,
+            "total_score": 0.5261176776712494,
+            "utility_score": 0.4
+          },
+          "semi_legitimization_summary": {
+            "affect_budget_ok": true,
+            "result": "passes_cheap_checks",
+            "slack_preserved": true
+          }
+        },
+        {
+          "candidate_id": "plan-affect-break-required-0000000000000000-d05",
+          "candidate_role": "other",
+          "explanation_fragments": [
+            {
+              "taskId": "task-a",
+              "text": "Task 'task-a' is selected next because all listed dependencies precede it in the deterministic candidate order."
+            }
+          ],
+          "feasibility_summary": {
+            "affect_feasible": false,
+            "hard_constraints_assumed_satisfied_by_engine": true,
+            "minimum_affect_score": 0.2689414213699951,
+            "violated_affect_dimensions": [
+              "energy"
+            ]
+          },
+          "probability_summary": {
+            "probability_quality": "not_estimated",
+            "provenance_refs": []
+          },
+          "rank": 7,
+          "schedule": {
+            "plan_id": "plan-affect-break-required-0000000000000000-d05",
+            "status": "candidate",
+            "steps": [
+              {
+                "end": 7,
+                "start": 6,
+                "task_id": "task-a"
+              }
+            ]
+          },
+          "score_summary": {
+            "affect_margin_score": 0.38447071068499755,
+            "robustness_score": 0.7899999999999999,
+            "schedule_diversity_score": 0.6,
+            "total_score": 0.5186176776712493,
+            "utility_score": 0.30000000000000004
+          },
+          "semi_legitimization_summary": {
+            "affect_budget_ok": true,
+            "result": "passes_cheap_checks",
+            "slack_preserved": true
+          }
+        },
+        {
+          "candidate_id": "plan-affect-break-required-0000000000000000-d01",
+          "candidate_role": "other",
+          "explanation_fragments": [
+            {
+              "taskId": "task-a",
+              "text": "Task 'task-a' is selected next because all listed dependencies precede it in the deterministic candidate order."
+            }
+          ],
+          "feasibility_summary": {
+            "affect_feasible": false,
+            "hard_constraints_assumed_satisfied_by_engine": true,
+            "minimum_affect_score": 0.2689414213699951,
+            "violated_affect_dimensions": [
+              "energy"
+            ]
+          },
+          "probability_summary": {
+            "probability_quality": "not_estimated",
+            "provenance_refs": []
+          },
+          "rank": 8,
+          "schedule": {
+            "plan_id": "plan-affect-break-required-0000000000000000-d01",
+            "status": "candidate",
+            "steps": [
+              {
+                "end": 8,
+                "start": 7,
+                "task_id": "task-a"
+              }
+            ]
+          },
+          "score_summary": {
+            "affect_margin_score": 0.38447071068499755,
+            "robustness_score": 0.76,
+            "schedule_diversity_score": 0.7,
+            "total_score": 0.5111176776712494,
+            "utility_score": 0.19999999999999996
+          },
+          "semi_legitimization_summary": {
+            "affect_budget_ok": true,
+            "result": "passes_cheap_checks",
+            "slack_preserved": true
+          }
+        },
+        {
+          "candidate_id": "plan-affect-break-required-0000000000000000-d08",
+          "candidate_role": "other",
+          "explanation_fragments": [
+            {
+              "taskId": "task-a",
+              "text": "Task 'task-a' is selected next because all listed dependencies precede it in the deterministic candidate order."
+            }
+          ],
+          "feasibility_summary": {
+            "affect_feasible": false,
+            "hard_constraints_assumed_satisfied_by_engine": true,
+            "minimum_affect_score": 0.2689414213699951,
+            "violated_affect_dimensions": [
+              "energy"
+            ]
+          },
+          "probability_summary": {
+            "probability_quality": "not_estimated",
+            "provenance_refs": []
+          },
+          "rank": 9,
+          "schedule": {
+            "plan_id": "plan-affect-break-required-0000000000000000-d08",
+            "status": "candidate",
+            "steps": [
+              {
+                "end": 9,
+                "start": 8,
+                "task_id": "task-a"
+              }
+            ]
+          },
+          "score_summary": {
+            "affect_margin_score": 0.38447071068499755,
+            "robustness_score": 0.73,
+            "schedule_diversity_score": 0.8,
+            "total_score": 0.5036176776712493,
+            "utility_score": 0.09999999999999998
+          },
+          "semi_legitimization_summary": {
+            "affect_budget_ok": true,
+            "result": "passes_cheap_checks",
+            "slack_preserved": true
+          }
+        },
+        {
+          "candidate_id": "plan-affect-break-required-0000000000000000-d09",
+          "candidate_role": "most_schedule_diverse",
+          "explanation_fragments": [
+            {
+              "taskId": "task-a",
+              "text": "Task 'task-a' is selected next because all listed dependencies precede it in the deterministic candidate order."
+            }
+          ],
+          "feasibility_summary": {
+            "affect_feasible": false,
+            "hard_constraints_assumed_satisfied_by_engine": true,
+            "minimum_affect_score": 0.2689414213699951,
+            "violated_affect_dimensions": [
+              "energy"
+            ]
+          },
+          "probability_summary": {
+            "probability_quality": "not_estimated",
+            "provenance_refs": []
+          },
+          "rank": 10,
+          "schedule": {
+            "plan_id": "plan-affect-break-required-0000000000000000-d09",
+            "status": "candidate",
+            "steps": [
+              {
+                "end": 10,
+                "start": 9,
+                "task_id": "task-a"
+              }
+            ]
+          },
+          "score_summary": {
+            "affect_margin_score": 0.38447071068499755,
+            "robustness_score": 0.7,
+            "schedule_diversity_score": 0.9,
+            "total_score": 0.49611767767124937,
+            "utility_score": 0.0
+          },
+          "semi_legitimization_summary": {
+            "affect_budget_ok": true,
+            "result": "passes_cheap_checks",
+            "slack_preserved": true
+          }
+        }
+      ],
+      "planner_version": "0.1.0",
+      "request_id": "affect-break-required",
+      "rng_seed_echo": 0,
+      "schema_version": "planning-kernel-contract/0.1",
+      "status": "ok",
+      "unplaced_tasks": []
+    },
+    "request": {
+      "affect_observation": {
+        "dimensions": {
+          "energy": {
+            "observed_at": 0,
+            "source_kind": "self_report",
+            "value": 4.0
+          }
+        }
+      },
+      "affect_profile": {
+        "dimensions": {
+          "energy": {
+            "direction": "higher_is_better",
+            "freshness_seconds": 60,
+            "location": 5.0,
+            "scale": 1.0,
+            "threshold": 0.5
+          }
+        },
+        "mode": "warn_only"
+      },
+      "horizon_policy": {
+        "branch_coverage_target": 0.99,
+        "reactive_horizon_seconds": 3600
+      },
+      "mode": "fresh_generation",
+      "n_rollouts": 64,
+      "request_id": "affect-break-required",
+      "rng_seed": 0,
+      "schema_version": "planning-kernel-contract/0.1",
+      "scoring_policy": {
+        "affect_margin_weight": 1.0,
+        "robustness_weight": 1.0,
+        "schedule_diversity_weight": 1.0,
+        "utility_weight": 1.0
+      },
+      "strict_validation": false,
+      "tasks": [
+        {
+          "duration": {
+            "seconds": 1,
+            "type": "fixed"
+          },
+          "id": "task-a",
+          "priority": 1.0,
+          "value": 1.0
+        }
+      ],
+      "time_window": {
+        "end": 10,
+        "start": 0
+      },
+      "top_k": 3,
+      "topological_order": [
+        "task-a"
+      ]
+    },
+    "snapshot": {
+      "exact": {
+        "affect_legitimacy_filter": {
+          "feasible_mask": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        },
+        "chunk_partitioning": [
+          [
+            0,
+            10
+          ]
+        ],
+        "monte_carlo_rollout": {
+          "candidate_order": [
+            "plan-affect-break-required-0000000000000000",
+            "plan-affect-break-required-0000000000000000-d07",
+            "plan-affect-break-required-0000000000000000-d04",
+            "plan-affect-break-required-0000000000000000-d02",
+            "plan-affect-break-required-0000000000000000-d06",
+            "plan-affect-break-required-0000000000000000-d03",
+            "plan-affect-break-required-0000000000000000-d05",
+            "plan-affect-break-required-0000000000000000-d01",
+            "plan-affect-break-required-0000000000000000-d08",
+            "plan-affect-break-required-0000000000000000-d09"
+          ],
+          "cpu_certified_selected_plan_validity": true,
+          "status": "ok"
+        },
+        "schema_decoding": {
+          "request": true,
+          "response": true,
+          "schema_version": "planning-kernel-contract/0.1"
+        },
+        "skeleton_sampling": {
+          "dependency_feasibility": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "hard_constraint_feasibility": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "rejection_classes": [],
+          "validity_mask": [
+            [
+              true
+            ],
+            [
+              true
+            ],
+            [
+              true
+            ],
+            [
+              true
+            ],
+            [
+              true
+            ],
+            [
+              true
+            ],
+            [
+              true
+            ],
+            [
+              true
+            ],
+            [
+              true
+            ],
+            [
+              true
+            ]
+          ]
+        },
+        "value_scoring": {
+          "top_k_indices": [
+            0,
+            1,
+            2
+          ]
+        }
+      },
+      "n_rollouts": 64,
+      "profile": "boundary-v1",
+      "rng_seed": 0,
+      "tolerance": {
+        "monte_carlo_rollout": {
+          "probability_intervals": [
+            [
+              0.9433759402071946,
+              1.0
+            ],
+            [
+              0.9433759402071946,
+              1.0
+            ],
+            [
+              0.9433759402071946,
+              1.0
+            ],
+            [
+              null,
+              null
+            ],
+            [
+              null,
+              null
+            ],
+            [
+              null,
+              null
+            ],
+            [
+              null,
+              null
+            ],
+            [
+              null,
+              null
+            ],
+            [
+              null,
+              null
+            ],
+            [
+              null,
+              null
+            ]
+          ],
+          "rollout_frequencies": [
+            1.0,
+            1.0,
+            1.0,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        },
+        "value_scoring": {
+          "composite_scores": [
+            0.5636176776712494,
+            0.5561176776712494,
+            0.5486176776712494,
+            0.5411176776712494,
+            0.5336176776712495,
+            0.5261176776712494,
+            0.5186176776712493,
+            0.5111176776712494,
+            0.5036176776712493,
+            0.49611767767124937
+          ],
+          "floating_point_scores": [
+            {
+              "affect_margin_score": 0.38447071068499755,
+              "robustness_score": 0.97,
+              "schedule_diversity_score": 0.0,
+              "total_score": 0.5636176776712494,
+              "utility_score": 0.9
+            },
+            {
+              "affect_margin_score": 0.38447071068499755,
+              "robustness_score": 0.94,
+              "schedule_diversity_score": 0.1,
+              "total_score": 0.5561176776712494,
+              "utility_score": 0.8
+            },
+            {
+              "affect_margin_score": 0.38447071068499755,
+              "robustness_score": 0.9099999999999999,
+              "schedule_diversity_score": 0.2,
+              "total_score": 0.5486176776712494,
+              "utility_score": 0.7
+            },
+            {
+              "affect_margin_score": 0.38447071068499755,
+              "robustness_score": 0.8799999999999999,
+              "schedule_diversity_score": 0.3,
+              "total_score": 0.5411176776712494,
+              "utility_score": 0.6
+            },
+            {
+              "affect_margin_score": 0.38447071068499755,
+              "robustness_score": 0.85,
+              "schedule_diversity_score": 0.4,
+              "total_score": 0.5336176776712495,
+              "utility_score": 0.5
+            },
+            {
+              "affect_margin_score": 0.38447071068499755,
+              "robustness_score": 0.82,
+              "schedule_diversity_score": 0.5,
+              "total_score": 0.5261176776712494,
+              "utility_score": 0.4
+            },
+            {
+              "affect_margin_score": 0.38447071068499755,
+              "robustness_score": 0.7899999999999999,
+              "schedule_diversity_score": 0.6,
+              "total_score": 0.5186176776712493,
+              "utility_score": 0.30000000000000004
+            },
+            {
+              "affect_margin_score": 0.38447071068499755,
+              "robustness_score": 0.76,
+              "schedule_diversity_score": 0.7,
+              "total_score": 0.5111176776712494,
+              "utility_score": 0.19999999999999996
+            },
+            {
+              "affect_margin_score": 0.38447071068499755,
+              "robustness_score": 0.73,
+              "schedule_diversity_score": 0.8,
+              "total_score": 0.5036176776712493,
+              "utility_score": 0.09999999999999998
+            },
+            {
+              "affect_margin_score": 0.38447071068499755,
+              "robustness_score": 0.7,
+              "schedule_diversity_score": 0.9,
+              "total_score": 0.49611767767124937,
+              "utility_score": 0.0
+            }
+          ],
+          "schedule_diversity_scores": [
+            0.0,
+            0.1,
+            0.2,
+            0.3,
+            0.4,
+            0.5,
+            0.6,
+            0.7,
+            0.8,
+            0.9
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "synthetic-cyclic-dependency",
+    "reference_response": {
+      "diagnostics": [
+        {
+          "code": "cyclic_dependency",
+          "message": "dependency graph must be acyclic"
+        }
+      ],
+      "effective_time": "1970-01-01T00:00:00Z",
+      "engine_provenance": {
+        "backend_kind": "cpu_reference",
+        "cpu_certification_status": "certified",
+        "device_summary": "cpu",
+        "engine_version": "0.1.0",
+        "invocation_kind": "in_process_cpu",
+        "tolerance_profile": "boundary-v1"
+      },
+      "generated_at": "1970-01-01T00:00:00Z",
+      "plan_candidates": [],
+      "planner_version": "0.1.0",
+      "request_id": "cyclic-dependency",
+      "rng_seed_echo": 0,
+      "schema_version": "planning-kernel-contract/0.1",
+      "status": "rejected",
+      "unplaced_tasks": []
+    },
+    "request": {
+      "horizon_policy": {
+        "branch_coverage_target": 0.99,
+        "reactive_horizon_seconds": 3600
+      },
+      "mode": "fresh_generation",
+      "n_rollouts": 64,
+      "request_id": "cyclic-dependency",
+      "rng_seed": 0,
+      "schema_version": "planning-kernel-contract/0.1",
+      "scoring_policy": {
+        "affect_margin_weight": 1.0,
+        "robustness_weight": 1.0,
+        "schedule_diversity_weight": 1.0,
+        "utility_weight": 1.0
+      },
+      "strict_validation": false,
+      "tasks": [
+        {
+          "depends_on": [
+            "task-b"
+          ],
+          "duration": {
+            "seconds": 1,
+            "type": "fixed"
+          },
+          "id": "task-a",
+          "priority": 1.0,
+          "value": 1.0
+        },
+        {
+          "depends_on": [
+            "task-a"
+          ],
+          "duration": {
+            "seconds": 1,
+            "type": "fixed"
+          },
+          "id": "task-b",
+          "priority": 1.0,
+          "value": 1.0
+        }
+      ],
+      "time_window": {
+        "end": 10,
+        "start": 0
+      },
+      "top_k": 3,
+      "topological_order": [
+        "task-a",
+        "task-b"
+      ]
+    },
+    "snapshot": {
+      "exact": {
+        "affect_legitimacy_filter": {
+          "feasible_mask": []
+        },
+        "chunk_partitioning": [
+          [
+            0,
+            10
+          ]
+        ],
+        "monte_carlo_rollout": {
+          "candidate_order": [],
+          "cpu_certified_selected_plan_validity": null,
+          "status": "rejected"
+        },
+        "schema_decoding": {
+          "request": true,
+          "response": true,
+          "schema_version": "planning-kernel-contract/0.1"
+        },
+        "skeleton_sampling": {
+          "dependency_feasibility": [],
+          "hard_constraint_feasibility": [],
+          "rejection_classes": [
+            "cyclic_dependency"
+          ],
+          "validity_mask": []
+        },
+        "value_scoring": {
+          "top_k_indices": []
+        }
+      },
+      "n_rollouts": 64,
+      "profile": "boundary-v1",
+      "rng_seed": 0,
+      "tolerance": {
+        "monte_carlo_rollout": {
+          "probability_intervals": [],
+          "rollout_frequencies": []
+        },
+        "value_scoring": {
+          "composite_scores": [],
+          "floating_point_scores": [],
+          "schedule_diversity_scores": []
+        }
+      }
+    }
+  }
+]

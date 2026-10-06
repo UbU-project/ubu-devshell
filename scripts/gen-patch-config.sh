@@ -2,6 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/env.sh"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPOS_FILE="${REPOS_FILE:-$ROOT_DIR/repos.toml}"
 REPOS_DIR="${REPOS_DIR:-$(cd "$ROOT_DIR/.." && pwd)}"
@@ -40,91 +41,10 @@ is_generated_config() {
 make_patch_body() {
   local consumer_dir="$1"
   local consumer_name="$2"
-  python3 - "$consumer_dir" "$consumer_name" "$REPOS_FILE" "$REPOS_DIR" "$MARKER" <<'PY'
-import json
-import os
-from pathlib import Path
-import re
-import subprocess
-import sys
-import tempfile
-import tomllib
-
-consumer, consumer_name, repos_file, repos_dir, marker = sys.argv[1:]
-consumer = Path(consumer).resolve()
-repos_dir = Path(repos_dir).resolve()
-
-def read_manifest(path):
-    with open(path, "rb") as source:
-        return tomllib.load(source)
-
-def packages(root):
-    # An isolated cwd avoids loading a consumer's stale generated patch config.
-    # --no-deps reads workspace/package locations without fetching dependencies.
-    with tempfile.TemporaryDirectory(prefix="ubu-package-metadata-") as cwd:
-        result = subprocess.run(
-            ["cargo", "metadata", "--offline", "--no-deps", "--format-version", "1",
-             "--manifest-path", str(root / "Cargo.toml")],
-            cwd=cwd, env={**os.environ, "CARGO_NET_OFFLINE": "true"},
-            text=True, capture_output=True,
-        )
-    if result.returncode:
-        raise RuntimeError(f"cargo metadata failed for {root}:\n{result.stderr}")
-    return json.loads(result.stdout)["packages"]
-
-def dependency_tables(manifest):
-    for name in ("dependencies", "dev-dependencies", "build-dependencies"):
-        yield manifest.get(name, {})
-        for target in manifest.get("target", {}).values():
-            yield target.get(name, {})
-    yield manifest.get("workspace", {}).get("dependencies", {})
-
-try:
-    siblings = {}
-    for name, url in read_manifest(repos_file)["repos"].items():
-        root = repos_dir / name.replace("_", "-")
-        if name != consumer_name and (root / "Cargo.toml").is_file():
-            if url in siblings and siblings[url] != root:
-                raise RuntimeError(f"multiple local checkouts configured for {url}")
-            siblings[url] = root
-
-    manifest_paths = {consumer / "Cargo.toml"}
-    manifest = read_manifest(consumer / "Cargo.toml")
-    if "workspace" in manifest:
-        manifest_paths.update(Path(package["manifest_path"]) for package in packages(consumer))
-    needed = {}
-    for manifest_path in sorted(manifest_paths):
-        for table in dependency_tables(read_manifest(manifest_path)):
-            for key, spec in table.items():
-                if not isinstance(spec, dict) or spec.get("git") not in siblings:
-                    continue
-                needed.setdefault(spec["git"], set()).add(spec.get("package", key))
-
-    blocks = []
-    for url, names in sorted(needed.items()):
-        available = {}
-        for package in packages(siblings[url]):
-            directory = Path(package["manifest_path"]).parent
-            if not directory.is_relative_to(siblings[url].resolve()):
-                raise RuntimeError(f"package {package['name']} lies outside {siblings[url]}")
-            available[package["name"]] = directory
-        lines = [f"[patch.{json.dumps(url)}]"]
-        for name in sorted(names):
-            if name not in available:
-                raise RuntimeError(f"package {name} not found in {siblings[url]} for {consumer}")
-            relative = os.path.relpath(available[name], consumer)
-            key = name if re.fullmatch(r"[A-Za-z0-9_-]+", name) else json.dumps(name)
-            lines.append(f"{key} = {{ path = {json.dumps(relative)} }}")
-        blocks.append("\n".join(lines))
-    if blocks:
-        print(marker)
-        print("# Local-only Cargo patches. Do not commit this file.")
-        print("# Re-run from ubu-devshell when sibling paths change.\n")
-        print("\n\n".join(blocks))
-except (OSError, ValueError, RuntimeError) as error:
-    sys.exit(f"error: {error}")
-PY
+  "$PATCH_TOOL" "$consumer_dir" "$consumer_name" "$REPOS_FILE" "$REPOS_DIR" "$MARKER"
 }
+
+PATCH_TOOL="$("$SCRIPT_DIR/build-patch-config-tool.sh")"
 
 echo "Generating local Cargo patch configs under $REPOS_DIR"
 written=()

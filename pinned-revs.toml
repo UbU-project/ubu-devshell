@@ -15,12 +15,12 @@
 # each pinned commit is on a branch of origin. Push a branch before pinning it.
 
 [pinned]
-ubu_schemas         = "926636041ded437d101aa51bb123559f52bc155e"  # P1B-67 published branch
-ubu_core            = "46135fea0312bab3606e467c3012d7327096d400"  # P1B-67 published branch
-ubu_store           = "b80787d86c235a754b285cb80c800fea2e178e54"  # P1B-67 published branch
-ubu_planning_kernel = "8413a270cd2525b515501563e78fde474f112f48"  # P1B-67 published branch
-ubu_github_adapter  = "2a253029b8dea8a824aff970532face21a6c354e"  # P1B-67 published branch
-ubu_orchestrator    = "f610d321219ab9f64150acc2191cecf8188f64a3"  # P1B-69 published branch
+ubu_schemas         = "070d0a6f9a6ad7833dd523042925008316ce923b"  # P1B-70 published branch
+ubu_core            = "fa26bf678977f5e077229eb97a39cc1b8b960c9b"  # P1B-70 published branch
+ubu_store           = "83a099f55220b1286ffb2dee3c9d19006e2090b5"  # P1B-70 published branch
+ubu_planning_kernel = "a2957a3f4edb1fec2b86b7f9fe632ded735820e5"  # P1B-70 published branch
+ubu_github_adapter  = "e14a43b47aeb0a928f4dfdc83cd78ea9a2e044f6"  # P1B-70 published branch
+ubu_orchestrator    = "b42cadd9b3a6a010021a080e5a4f4af16ac2095a"  # P1B-70 published branch
 ubu_ui              = "698a15fde8244dca96a03b07ad144a4c2b65af15"  # P1B-69 published branch
 ubu_design          = "7313e82f7fb835965bc18521b10f897b238b65dc"  # P1B-68 published branch
 ubu_brand           = "faf2005a8bd9e64742dd76ee6d1f91f45223946b"  # P1B-41 H: unchanged brand baseline; inventory previously unset

@@ -16,3 +16,5 @@ tmp/
 
 # Do not ignore devshell source files or artifacts by default.
 # Generated .cargo/config.toml files are written into sibling repos, not here.
+
+.cache/

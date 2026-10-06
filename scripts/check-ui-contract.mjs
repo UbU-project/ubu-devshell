@@ -2427,6 +2427,63 @@ scenarios.push({
   }
 });
 
+scenarios.push({
+  name: "invocation provenance and unchanged pre-ticket Plan fields",
+  async run(o) {
+    const a = await captureTask(o, { title: "Synthetic golden copper teapot", duration_estimate: fixed(5) });
+    const b = await captureTask(o, { title: "Synthetic golden silver shelf", duration_estimate: fixed(7) });
+    const body = { schema_version: endpoints.PLANNING_SCHEMA_VERSION, request: {
+      schema_version: endpoints.PLANNING_SCHEMA_VERSION, request_id: "fixture-golden", rng_seed: 17,
+      compute_budget: { n_rollouts: 0, top_k: 3 }, time_window: { start: 1791331200, end: 1791338400 },
+      tasks: [{ id: a.task_id, duration: 300 }, { id: b.task_id, duration: 420, depends_on: [a.task_id] }]
+    } };
+    const result = await call(o.base, "POST", endpoints.PLANNING_GENERATE_PATH, body);
+    ok(result.plan, "the invented fixture store yielded a committed Plan");
+    const replacements = [[a.task_id, "task_fixture_a"], [b.task_id, "task_fixture_b"], [result.plan.id, "plan_fixture"]];
+    const volatileTimes = new Set(["created_at", "risk_report/generated_at", "human_complete_plan_quality/generated_at"]);
+    function normalized(value, path = []) {
+      if (volatileTimes.has(path.join("/"))) {
+        ok(typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/.test(value) && Number.isFinite(Date.parse(value)), `existing ${path.join("/")} remains a valid UTC timestamp`);
+        return "2026-10-07T00:00:00Z";
+      }
+      if (Array.isArray(value)) return value.map((v, index) => normalized(v, [...path, String(index)]));
+      if (value && typeof value === "object") return Object.fromEntries(Object.keys(value).sort().map((k) => [k, normalized(value[k], [...path, k])]));
+      if (typeof value === "string") for (const [from, to] of replacements) value = value.replaceAll(from, to);
+      return value;
+    }
+    const projection = { ...result.plan };
+    delete projection.engine_provenance;
+    delete projection.replay_metadata;
+    const actualBytes = JSON.stringify(normalized(projection), null, 2) + "\n";
+    const goldenBytes = readFileSync(new URL("../fixtures/planning-worker/pre-ticket-plan.json", import.meta.url), "utf8");
+    ok(actualBytes === goldenBytes, "every pre-existing Plan field is byte-identical after only old volatile IDs and three explicit generation timestamps are normalized");
+    function cpuProvenance(response) {
+      same(response.engine_provenance.backend_kind, "cpu_reference", "actual computation is CPU reference");
+      same(response.engine_provenance.invocation_kind, "in_process_cpu", "actual invocation is in-process CPU");
+      same(response.engine_provenance.cpu_certification_status, "certified", "CPU certification is recorded");
+      same(response.engine_provenance.tolerance_profile, "boundary-v1", "the numeric profile travels on provenance");
+      ok(!Object.hasOwn(response.engine_provenance, "framework"), "CPU provenance claims no framework");
+      same(response.plan.engine_provenance, response.engine_provenance, "the admitted Plan carries the response provenance");
+      for (const field of ["planner_version", "rng_seed_echo", "effective_time", "generated_at"]) same(response.plan.replay_metadata[field], response[field], `the admitted Plan retains ${field}`);
+    }
+    cpuProvenance(result);
+    same(result.rng_seed_echo, 17, "the original fixture seed is echoed");
+    const current = await call(o.base, "GET", endpoints.CALENDAR_CURRENT_PATH);
+    same(current.plan_id, result.plan.id, "the current Calendar reads the persisted Plan");
+    same(current.selected_candidate, result.selected_candidate, "persisted placements and scores survive the read");
+    await putSetting(o, "planning.gpu_enabled", true);
+    const enabled = await call(o.base, "POST", endpoints.PLANNING_GENERATE_PATH, body);
+    cpuProvenance(enabled);
+    const diagnostic = enabled.diagnostics.find((d) => d.code === "planning_gpu_unavailable");
+    ok(diagnostic?.message.includes("GPU compute stage not implemented"), "policy-on reports the missing device stage");
+    same(enabled.selected_candidate, result.selected_candidate, "policy-on preserves the CPU selected candidate");
+    await call(o.base, "DELETE", endpoints.SETTING_DELETE_PATH.replace("{name}", "planning.gpu_enabled"), undefined, 204);
+    const restored = await call(o.base, "POST", endpoints.PLANNING_GENERATE_PATH, body);
+    ok(!restored.diagnostics.some((d) => d.code === "planning_gpu_unavailable"), "withdrawal restores default-off without an environment probe diagnostic");
+    return "complete old Plan-field golden preserved; CPU provenance and replay persist; policy-on reports unavailable GPU compute and still uses CPU";
+  }
+});
+
 // ----------------------------------------------------- the live flags (§E)
 
 // Off by default. Unset, each is reported as skipped, never as passed, and

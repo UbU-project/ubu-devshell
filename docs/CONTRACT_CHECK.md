@@ -1,7 +1,7 @@
 # The scenario runner
 
 `scripts/check-ui-contract.sh` builds the real `ubu-orchestrator` and walks
-the daily loop against it over HTTP, in thirty-five scenarios. It needs no
+the daily loop against it over HTTP, in thirty-six scenarios. It needs no
 webview, no Google account and no model. A full walk takes about ten seconds
 once the orchestrator is built.
 
@@ -46,7 +46,7 @@ at that time:
 
 Those two assertions are still scenario 1, and still run first.
 
-## The thirty-five scenarios
+## The thirty-six scenarios
 
 Every scenario starts its own orchestrator on its own ephemeral loopback
 port with its own empty store. Nothing is carried from one to the next. All
@@ -415,7 +415,7 @@ scenario 7 of 16: colour means done (seeded mock calendar)
 PASS  7 colour means done: a colour on an applied Dynamic event completes its Task at capture, and only that Task
 ```
 
-A complete walk ends with thirty-five `PASS` lines, two `SKIP` lines and:
+A complete walk ends with thirty-six `PASS` lines, two `SKIP` lines and:
 
 ```text
 RESULT: 35 of 35 scenarios passed, 0 failed, 2 skipped, 659 requests, all to 127.0.0.1
@@ -444,7 +444,7 @@ Two scripts, one boundary.
 | | `check-ui-contract.sh` | `acceptance.sh` |
 |---|---|---|
 | Covers | The HTTP layer: what the orchestrator does with a request. | The rendered layer: what a human sees in the app. |
-| Asserts | Everything it checks, in thirty-five scenarios, each on its own store. | Nothing about behaviour. It stages a store and prints steps. |
+| Asserts | Everything it checks, in thirty-six scenarios, each on its own store. | Nothing about behaviour. It stages a store and prints steps. |
 | Store | One throwaway store per scenario, and two for the rehearsal, on ephemeral ports. | One throwaway store on the app's default port, held until Ctrl-C. |
 | Preconditions | Each scenario stages exactly what it asserts. | Each step declares the seeds it needs; each seed checks itself over HTTP. |
 | A human | Reads PASS and FAIL lines. | Opens the app and follows the steps. |
@@ -579,3 +579,21 @@ used. Existing reserved-namespace, provenance, planning and interval assertions
 remain. The live procedure retires only the operator-declared finite-snooze
 verification, and now has fourteen steps and nine copy-back items. Its new
 subject/predicate/minting reading remains for the operator at the actual app.
+
+## P1B-70: invocation metadata and the pre-ticket Plan
+
+Scenario 36 recreates the invented fixture store and stable request captured
+from the unchanged P1B-69 binary. The complete pre-existing Plan-field projection
+must be byte-identical, normalizing only existing volatile Task/Plan IDs and the three generation-time
+paths: Plan created_at, risk_report.generated_at and
+human_complete_plan_quality.generated_at. Valid UTC timestamp shape is checked
+before normalization; all other risk/quality fields remain compared. Only new root engine_provenance/replay_metadata are excluded and
+independently asserted. Current Calendar reads the admitted Plan; policy-on
+reports unavailable GPU compute, retains the same CPU selected candidate, and
+Setting withdrawal restores default-off. No live rehearsal step changes.
+
+CPU-only stage goldens, exact/tolerance comparisons and owned Python worker
+lifecycle tests run through scripts/check-planning-worker.sh, included by
+check-all.sh and test-all.sh. See [the explicit invocation profile](PLANNING_WORKER.md)
+and [the five-condition exemption](ACCEPTANCE.md#p1b-70). No GPU computation,
+framework installation or interpreter requirement is added to checks.

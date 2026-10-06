@@ -4,7 +4,8 @@ One file holds how these repositories are built on a given machine:
 `scripts/env.sh`. It is **sourced**, never run. Every script here that runs
 cargo sources it first: `check-ui-contract.sh`, `acceptance.sh`,
 `run-live.sh`, `run-orchestrator.sh`, `check-all.sh`, `test-all.sh` and
-`fmt-all.sh`. Source it yourself before running cargo by hand:
+`fmt-all.sh`, `check-planning-worker.sh`, `gen-patch-config.sh`,
+`test-patch-config.sh` and `build-patch-config-tool.sh`. Source it yourself before running cargo by hand:
 
 ```sh
 source ../ubu-devshell/scripts/env.sh    # from inside the repository you are building

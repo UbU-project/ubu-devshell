@@ -1,0 +1,12 @@
+[package]
+name = "ubu_planning_parity"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+serde_json = { version = "1", features = ["float_roundtrip"] }
+ubu_planning_core = { git = "https://github.com/UbU-project/ubu-planning-kernel", rev = "@KERNEL_REV@" }
+ubu_planning_cpu = { git = "https://github.com/UbU-project/ubu-planning-kernel", rev = "@KERNEL_REV@" }
+ubu_planning_worker = { git = "https://github.com/UbU-project/ubu-planning-kernel", rev = "@KERNEL_REV@" }
+ubu_planning_worker_protocol = { git = "https://github.com/UbU-project/ubu-planning-kernel", rev = "@KERNEL_REV@" }

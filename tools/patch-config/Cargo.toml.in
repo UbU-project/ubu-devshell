@@ -1,0 +1,10 @@
+[package]
+name = "ubu_patch_config"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+serde_json = { version = "1", features = ["float_roundtrip"] }
+tempfile = "3"
+toml = "=0.8.2"

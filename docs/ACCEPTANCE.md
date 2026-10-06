@@ -915,3 +915,30 @@ other. Thirty-five runner scenarios and the unchanged eleven seeds for one
 staged step assert HTTP behavior. Automated checks are not operator acceptance;
 the operator must run LIVE_REHEARSAL.md end to end against their own calendar
 and return its nine-item copy-back.
+
+## P1B-70
+
+Land and prove a boundary before moving any computation across it. The CPU
+oracle and its exact/tolerance parity classes must exist before the device
+implementation they judge. This ticket computes nothing on a GPU and adds no
+manual step; the unchanged live rehearsal remains the operator's acceptance.
+
+Only the kernel worker tests and devshell's bounded worker suite gain the
+process exemption, under all five conditions:
+
+1. Spawn only a local interpreter running the kernel repository's own committed
+   module, with no network, download or installation.
+2. The test owns the session lifetime and reaps the child under a timeout,
+   including failure, cancellation, timeout and panic. No orphan may survive.
+3. Skip interpreter-dependent checks cleanly if suitable Python is absent;
+   check-all.sh must still pass without Python, CUDA or torch. CPU-only oracle,
+   parity and pure codec checks remain mandatory.
+4. No worker test installs a signal handler.
+5. No other test path gains permission to spawn: orchestrator and UI tests do
+   not, and every advisory transport remains StubTransport. The runner's
+   pre-existing owned loopback orchestrator/model-stub exemption is unchanged.
+
+The worker is persistent inside its owned session, transient across sessions,
+with no socket or daemon. See [the boundary and parity profile](PLANNING_WORKER.md).
+Transport engine_error/cancelled outcomes never certify a Plan; no streamed
+chunk is exposed. Future streaming must obey CPU certification before surfacing.
