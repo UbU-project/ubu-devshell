@@ -882,3 +882,36 @@ stands for the raised planning expectation, without a switch date.
 The operator must run LIVE_REHEARSAL.md end to end against their own calendar
 and return the ten-item copy-back. Passing the runner and UI tests does not
 settle either the sovereignty question or the finite snooze's first live reading.
+
+
+## P1B-69
+
+An item whose correct answer in a clean run is an absence is phrased so that
+the absence is an answer, not a missing figure. The assumed-presence pattern
+has now appeared five times: [value], NONE, the absent diagnostic count line,
+the omitted vocabulary candidate count, and empty diagnostic lists in a clean
+run. This fifth case is the inverse of the other four: absence is the good
+outcome. Copy “none” when the named list has no diagnostics; copy its rendered
+count line when it does. Visible diagnostic sentences without their summary
+remain a distinct failure, “diagnostics shown; count line missing”. Neither
+case asks for a tally or transcription of diagnostic sentences. The audit
+covers all nine items, including optional no-operation/no-candidate outcomes
+and missing mandatory result fields.
+
+The live procedure now has fourteen steps and nine copy-back items, both one
+fewer after the operator's retirement of the finite-snooze reading. The ledger
+records exactly what P1B-68 proved and what it did not; the synthetic harness
+and stub-backed runner continue to cover intervals. A later interval change
+brings the check back. Nothing else is retired. The protected step 11
+UniverseState paragraph, the preview convergence explanation and the operator's
+precondition transcription waiver remain intact. No subject name, fact key,
+value or UniverseState row is requested.
+
+Step 12 teaches authoring a fact as a subject and predicate and explicitly
+minting a root if none fits. A refusal is a result about the form, not an
+operator mistake. It retains deterministic authoring before model-dependent
+Vocabulary/Precondition, now step 13; neither producer's result can block the
+other. Thirty-five runner scenarios and the unchanged eleven seeds for one
+staged step assert HTTP behavior. Automated checks are not operator acceptance;
+the operator must run LIVE_REHEARSAL.md end to end against their own calendar
+and return its nine-item copy-back.
