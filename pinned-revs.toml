@@ -15,12 +15,12 @@
 # each pinned commit is on a branch of origin. Push a branch before pinning it.
 
 [pinned]
-ubu_schemas         = "02e4c91ce149ef594f1d08408216097b48dd7afb"  # P1B-62 prerequisite: review replacement/removal schemas and fixtures
-ubu_core            = "c4b624d76f210f77f865c61801e02c89219763ce"  # P1B-61 B: candidate kind and canonical round trips; 161 tests
-ubu_store           = "9e471a46b357f99cff567c250ae59084a6768b52"  # P1B-62 prerequisite: context-aware candidate persistence; 110 tests
-ubu_planning_kernel = "8af10ece07043c307fe351ac867cfd8449e08c4f"  # P1B-61 C: core pin only; 83 tests
-ubu_github_adapter  = "50fae565e6d48fb5c41107ab3259096ad243ccf3"  # P1B-61 C: core pin only; 23 tests
-ubu_orchestrator    = "cb7a607b7d443e02ba23910c8e8b1b3d1343442e"  # P1B-66 B/D: three proposals per run and review-backlog guard; 590 tests, 56 paths
-ubu_ui              = "0873f314b5412d56e279d543395d132209e1068e"  # P1B-66 A: opt-in diagnostic count lines; 179 tests, 43 endpoint constants
+ubu_schemas         = "926636041ded437d101aa51bb123559f52bc155e"  # P1B-67 published branch
+ubu_core            = "46135fea0312bab3606e467c3012d7327096d400"  # P1B-67 published branch
+ubu_store           = "b80787d86c235a754b285cb80c800fea2e178e54"  # P1B-67 published branch
+ubu_planning_kernel = "8413a270cd2525b515501563e78fde474f112f48"  # P1B-67 published branch
+ubu_github_adapter  = "2a253029b8dea8a824aff970532face21a6c354e"  # P1B-67 published branch
+ubu_orchestrator    = "3459428b7d2ed28fca529ec163f2dfbdc0ebc469"  # P1B-67 published branch
+ubu_ui              = "ec404a4fa53393dbc36e3de2f8924a2c6a32725f"  # P1B-67 published branch
 ubu_design          = "f7c4a1dbe2979fa498ae115bb2ee74e6772d4c2c"  # P1B-41 H: unchanged design baseline; inventory previously unset
 ubu_brand           = "faf2005a8bd9e64742dd76ee6d1f91f45223946b"  # P1B-41 H: unchanged brand baseline; inventory previously unset

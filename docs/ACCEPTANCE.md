@@ -761,3 +761,53 @@ asks for the information list's count line and names its absent-line outcome;
 it never calls an absent count line proof that no failure diagnostic exists.
 Finite-snooze live acceptance still belongs to precondition_review and remains
 outstanding. The initial-proposal rejection path stays durable.
+
+
+## P1B-67
+
+A manual step must name the absence of every figure it asks for. Three instances
+establish the rule: the operator invented [value] for a condition that had none,
+NONE for an absent operation, and “no Diagnostic counts line” when capture's
+list correctly rendered no count line. A step that assumes presence produces an
+invented phrase, a reporting defect even when the system is correct. Audit all
+copy-back fields, including failed requests that leave result lines absent.
+Use named absence phrases; do not restore a hand tally or diagnostic transcription.
+
+Grounding corrected two descriptions with operator approval. Step 7 already
+named “no Diagnostic counts line” after P1B-66; it is preserved, not claimed as
+new work. The audit also covers all other eight items. Core's schemas-ref is a
+fixture compatibility input, not runtime enum validation; its pointer moves to
+section A and whole-fixture round trips are checked. Runtime core types remain
+handwritten. The report records the moved pointer and coverage explicitly.
+
+Vocabulary is the first advisory output whose admission writes an object the
+candidate does not reference. target_refs names its evidence Task, while admission
+writes UniverseState. That distinction must be documented rather than treating
+refs as a destination contract. UbU proposes only names; every value is supplied
+by the operator and recorded as asserted through the shared UniverseState
+mutation service. No value is defaulted, inferred, derived or sent to a model.
+
+Only facts and numeric_values names are proposed in this phase. Sets require a
+member form and Event markers an occurrence form. This is a scope choice, not a
+statement about those collections. Controlled subject vocabulary remains open.
+The three-proposal and ten-awaiting bounds are independent of the precondition
+queue. Rejection is durable by name and Task; finite review snooze remains live
+unaccepted. Nothing is retired.
+
+Scenario 30 proves the two-click sequence over stub-backed loopback HTTP: a
+cold-start title-only Task, a bounded three-name response with one reserved-name
+refusal, no-value admission refused without a seed, an operator-supplied value
+written as asserted, and a separate precondition context containing the new name
+and no observation. The live step judges the names, not those deterministic
+admission or context assertions. Hand-authoring stays as fallback if no proposal
+is admitted; neither producer's output is a prerequisite that can strand the
+rehearsal. Every model outcome remains a result, with no reruns to force a candidate.
+
+The rehearsal stays at 13 steps and eight copy-back items. Item 7 includes both
+producer result lines and the operator's judgment of the names without adding
+an item. Step 11's protected paragraph and step 9's converged-state explanation
+remain verbatim. The operator's precondition transcription waiver remains in
+force; no hand redaction is restored. No new real data is placed in repositories.
+Passing the runner and UI tests is not operator acceptance: the operator must
+run LIVE_REHEARSAL.md end to end against his own calendar and return its copy-back.
+The new first half of step 12 is whether a suggested name is worth recording.
