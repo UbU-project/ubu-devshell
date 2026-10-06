@@ -718,3 +718,46 @@ Its essential namespace contract therefore ships in section A, with broader
 context in section D. Deferring the whole contract to D would violate that
 same-commit requirement; combining A and D would violate the ticket's separate
 section commits. No behavior is changed to resolve either documentation conflict.
+
+## P1B-66
+
+P1B-62 established that no copy-back may ask for a hand tally of rendered
+items. P1B-65's own “each diagnostic code and how many lines carry it” wording
+broke that rule. This is a recurrence by the same ticket author within three
+tickets, not a new UI principle: any copy-back phrased as “each X and how many”
+is a tally in disguise. The repair is the same as P1B-62's placement count:
+the screen states the number. Calendar capture and Today's information lists
+now expose one selectable “Diagnostic counts:” status line, in first-seen code
+order. Their diagnostic sentences remain on screen for understanding the week.
+The other twenty-nine DiagnosticsList call sites are unchanged.
+
+The audit covers all eight items. Items 1 and 2 copy already-counted lines;
+item 3 copies the whole Plan risk panel rather than extracting each finding's
+name and severity; item 4 copies the operations count and the first Dynamic
+Update, or “no Update operation”; items 5 and 6 copy existing approval and
+Entries lines; item 7 copies Run status and Candidates enqueued, the precondition
+as rendered and the rejection outcome, without tallying Review diagnostics;
+item 8 is the operator's own assessment. Named absence phrases cover empty
+diagnostic lists, placements, the Plan risk panel and zero updates. No item
+asks for a hand count or per-item naming exercise.
+Step 11's UniverseState restriction and step 9's converged-state explanation
+remain verbatim. The rehearsal remains thirteen steps and eight copy-back items.
+The operator's P1B-65 transcription waiver remains; repository fixtures are
+still invented. No redaction or copy-for-report control is added.
+
+A producer that works is a labour source. Assume the first newly working
+advisory producer will flood its queue unless something bounds it. A
+precondition run now considers up to 25 Tasks but proposes for at most three,
+and ten proposed or resurfaced precondition candidates block another run before
+a transport is consulted. Deferred candidates do not block it. The refusal
+states the current count and asks the operator to review, defer or reject what
+is waiting; no model was asked. Ten is an attention judgment that the operator
+may want lower, and a model may choose the first three. These caps make review
+manageable; they do not improve proposal relevance. The small vocabulary is
+the cold-start problem for P1B-67. Nothing is retired.
+
+Today's separate failure list retains its existing rendering. The rehearsal
+asks for the information list's count line and names its absent-line outcome;
+it never calls an absent count line proof that no failure diagnostic exists.
+Finite-snooze live acceptance still belongs to precondition_review and remains
+outstanding. The initial-proposal rejection path stays durable.
