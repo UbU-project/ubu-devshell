@@ -2152,6 +2152,65 @@ const scenarios = [
 
 ];
 
+scenarios.push({
+  name: "precondition proposal cap and review backlog boundary",
+  async run(o) {
+    const ids = [];
+    for (let index = 0; index < 25; index += 1) {
+      ids.push((await captureTask(o, { title: `Synthetic bounded teapot ${index}`, duration_estimate: fixed(5) })).task_id);
+    }
+    await call(o.base, "PATCH", endpoints.UNIVERSE_STATE_PATH, { schema_version: endpoints.UNIVERSE_STATE_SCHEMA_VERSION, mutations: [
+      { operation: "set_numeric", target: "numeric_values.synthetic.orbital_teapot_charge", payload: 30 }
+    ] });
+    const stub = await startModelStub();
+    stub.mode = "precondition";
+    await putSetting(o, "advisory.model", "synthetic-bounded-model");
+    await putSetting(o, "advisory.endpoint", stub.endpoint);
+    const run = () => call(o.base, "POST", endpoints.ADVISORY_RUN_PATH, { schema_version: endpoints.ADVISORY_RUN_SCHEMA_VERSION, producer: "precondition", limit: 25 });
+    const queue = () => call(o.base, "GET", endpoints.ADVISORY_QUEUE_PATH);
+    const refuse = async () => {
+      const before = stub.requests.length;
+      const result = await run();
+      same(result.diagnostics, [{ code: "precondition_queue_full", message: "10 precondition candidates are waiting in Review; review, defer or reject them before asking for more. No model was asked." }], "ten awaiting candidates refuse with the count and three dispositions");
+      same([result.status, result.candidates_enqueued, result.selected, result.report], ["ok", 0, [], null], "the run did not happen");
+      same(stub.requests.length, before, "the refusal asks no model");
+    };
+    stub.preconditionTaskIds = ids.slice(0, 4);
+    const oversized = await run();
+    same(oversized.status, "malformed_result", "four proposals refuse the whole response");
+    same(oversized.candidates_enqueued, 0, "no part of that response is enqueued");
+    same(JSON.parse(stub.requests[0].body.prompt).tasks.length, 25, "the run still considers 25 Tasks");
+    same(stub.requests[0].body.format.properties.proposals.maxItems, 3, "the wire grammar caps proposals at three");
+    ok(stub.requests[0].body.system.includes("The response is bounded to at most three proposals in total, regardless of how many Tasks are supplied."), "the system states the bound");
+    for (let start = 0; start < 9; start += 3) {
+      stub.preconditionTaskIds = ids.slice(start, start + 3);
+      same((await run()).candidates_enqueued, 3, "a run can enqueue three distinct proposals");
+    }
+    same((await queue()).candidates.length, 9, "nine await review");
+    stub.preconditionTaskIds = ids.slice(9, 10);
+    same((await run()).candidates_enqueued, 1, "a run at nine is permitted and creates the tenth");
+    const waiting = (await queue()).candidates.map((row) => row.candidate);
+    same(waiting.length, 10, "ten now await review");
+    await refuse();
+    const first = waiting[0];
+    const defer = (candidate, version) => call(o.base, "POST", fill(endpoints.ADVISORY_DEFER_PATH, { candidate_id: candidate.advisory_candidate_id }), { observed_version: version });
+    await defer(first, first.version);
+    stub.preconditionTaskIds = [];
+    const asked = stub.requests.length;
+    same((await run()).status, "ok", "deferring one permits a run at nine");
+    same(stub.requests.length, asked + 1, "that permitted run asks the model");
+    await call(o.base, "POST", fill(endpoints.ADVISORY_RESURFACE_PATH, { candidate_id: first.advisory_candidate_id }), { observed_version: first.version + 1, trigger: "user_request" });
+    await refuse();
+    for (const candidate of waiting) await defer(candidate, candidate.version + (candidate === first ? 2 : 0));
+    same((await queue()).deferred_candidates.length, 10, "ten were explicitly deferred");
+    const before = stub.requests.length;
+    const result = await run();
+    same([result.status, result.candidates_enqueued], ["ok", 0], "ten deferred candidates do not block another run");
+    same(stub.requests.length, before + 1, "the all-deferred case reaches the model");
+    return "three proposals per run; four refuse whole; nine awaiting permits, ten proposed/resurfaced refuses without a model call, ten deferred permits";
+  }
+});
+
 // ----------------------------------------------------- the live flags (§E)
 
 // Off by default. Unset, each is reported as skipped, never as passed, and

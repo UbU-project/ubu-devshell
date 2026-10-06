@@ -16,8 +16,9 @@ is retired, and recorded in the ledger in [ACCEPTANCE.md](ACCEPTANCE.md).
 There are thirteen steps and eight copy-back items. The colour setup and
 colouring steps are retired in P1B-60; their preconditions are below.
 
-When a step cannot be completed, write down what the screen said and go on to
-the next step.
+When a step cannot be completed, copy its named result line or absence phrase
+and go on to the next step. Read any diagnostic remedy; do not transcribe its
+sentences or count its lines.
 
 ## What changed, and what to expect
 
@@ -50,9 +51,9 @@ coverage figure about the whole week printed as a statement about the next 60
 minutes, and an affect state nobody had recorded reported as exactly at its
 limit. Both were fixed in P1B-56, and its run read medium, with “low
 coverage”, “affect margin” and “post plan depletion” all absent. Step 8
-still asks for the badge and for every finding's name and severity, in the
-order the panel lists them, so that nobody has to scan a list and conclude
-that something is not in it.
+now asks for the whole Plan risk panel as one selected block, so nobody has
+to extract findings by name or scan a list and conclude that something is
+not in it.
 
 **The preview counts itself.** Until P1B-58 step 9 asked for three counts
 that no screen showed, and a preview of ninety operations could only be
@@ -243,12 +244,17 @@ Read: six counters appear: “captured”, “updated”, “unchanged”, “sk
   - `calendar_event_skipped`, `capture_event_invalid`: an event that was not
     captured, and why.
 
+Read: above the grey list, one line beginning “Diagnostic counts:”. It gives
+each code and its line count in the order its first line appears. The screen
+counts them; you do not. If the list is empty, there is no count line.
+
 Copy back three things, and only these:
 
 - the six counters with their numbers;
-- the sentence that begins “N events had no colour.”;
-- each diagnostic code in the grey box and how many lines carry it, or
-  “no diagnostics” if there is no grey box. Do not transcribe its sentences.
+- the sentence that begins “N events had no colour.” (or “1 event had no
+  colour.”), or “no no-colour sentence” if it is absent;
+- the line beginning “Diagnostic counts:”, exactly as shown, or “no Diagnostic
+  counts line” if it is absent. Do not transcribe its sentences or count lines.
 
 **Do not copy back the list under that sentence.** The lines there, one for
 each uncoloured event, are not in the grey box and are not wanted, whether
@@ -283,13 +289,19 @@ beside the heading reads “low risk”, “medium risk” or “high risk”. U
 each finding has a name in bold, such as “unplaced work”, and its severity
 on a badge beside the name.
 
-Copy back: each diagnostic code in the boxes above “Timed placements” and
-how many lines carry it, or “no diagnostics” if none carry a code. Do not
-transcribe their sentences. The line directly under “Timed placements” that begins “Placements:” and gives total, Skeleton and Static anchor counts. And the whole section
-“Not in this Plan”, or the words “no such section”.
+Read: above the quiet grey diagnostic list, one line beginning “Diagnostic
+counts:”. It states each code and its line count. Failure alerts keep their
+existing rendering; if there is no information list, there is no count line.
 
-Copy back: the words on the badge beside “Plan risk”, and every finding's
-name and severity, in order as the panel lists them.
+Copy back: the line beginning “Diagnostic counts:” above “Timed placements”,
+exactly as shown, or “no Diagnostic counts line” if it is absent. Do not
+transcribe their sentences or count lines. The line directly under “Timed placements” that begins “Placements:” and gives total, Skeleton and Static anchor counts. And the whole section
+“Not in this Plan”, or the words “no such section”. If there is no
+“Placements:” line, copy “no Placements line”.
+
+Copy back: the whole panel headed “Plan risk”, exactly as rendered, or “no
+Plan risk panel” if it is absent. Select the panel as one block; do not extract
+or name each finding separately.
 
 **9. Take a preview.** Open **Calendar**. Under the heading “1. Preview”,
 click “Take preview”. This calls nothing and writes nothing.
@@ -323,7 +335,8 @@ not tell you how much work was planned.
 
 Copy back: the line that begins “Operations proposed:”, exactly as it
 appears, and the whole of the first operation headed “Update:” that reads
-“Placement: Dynamic”. Do not count the operations yourself.
+“Placement: Dynamic”. If no operation is headed “Update:”, copy “no Update
+operation” instead of an operation. Do not count the operations yourself.
 
 **10. Decide whether to approve. Read this before you press it.**
 
@@ -398,10 +411,17 @@ existing precondition. Only a Task with neither a non-blank title nor non-blank
 notes has nothing to reason over. A captured Task's first notes now come from
 its event's own notes, so the advisor can read what you wrote in your calendar;
 existing Task notes are kept. A title alone is enough to ask the model. This
-step does not require an interview or promise any candidate.
+step does not require an interview or promise any candidate. A run considers up
+to 25 Tasks but proposes for at most three; a small candidate count is the
+design, not a thin result.
 A replacement shows “Currently required” and “Proposed requirement” together,
 with a line saying that admitting replaces the first with the second.
-Read “Run status” and “Candidates enqueued”, then the first precondition proposal
+Read “Run status” and “Candidates enqueued”. If `precondition_queue_full` is
+shown, ten or more proposed or resurfaced precondition candidates already await
+review: the run did not happen and no model was asked. Review, defer or reject
+what is waiting before asking for more; deferred candidates do not block a run.
+For this rehearsal, copy the two result lines and “queue full; no model asked”,
+then go to Stop. Do not rerun just to get a candidate. Otherwise read the first precondition proposal
 in the queue, if there is one. A first-time proposal says “Before this Task
 can be planned:” and the condition in words; a replacement uses the two labels
 above. First read the proposal's words as rendered, then decide:
@@ -413,7 +433,7 @@ above. First read the proposal's words as rendered, then decide:
   proposal for the Task can still arrive.” Enter a brief reason in “Reason”,
   then click “Confirm reject”. Read the queue again: the proposal should have
   left it. Copy “rejected; proposal left the queue”, or “rejection failed”
-  and each diagnostic code with its line count if the proposal remains.
+  if the proposal remains. Read any diagnostic remedy; do not tally its lines.
 - If no candidate appears: copy “no candidate appeared, so nothing was rejected”.
 
 This is durable suppression of a proposed requirement, with no finite snooze
@@ -426,22 +446,24 @@ agrees. `precondition_missing_targets` means needed targets were not recorded
 and no candidate for that Task was enqueued. `precondition_task_skipped` means
 a routine occurrence should be edited on its template, or the Task has neither
 a title nor notes to reason over. At most three Tasks are named, followed by
-one count of the rest; copy only the diagnostic code and count, never a Task id.
+one count of the rest. Read the explanation, but do not transcribe diagnostic
+sentences, select code names for copy-back or tally their lines.
 `precondition_no_facts` means no supported targets were available
 and no model was asked. `advisory_unconfigured` means set the named configuration
 in Setup; no model was asked. `precondition_proposal_refused` means the model
 proposed something UbU cannot evaluate: that one Task got no candidate, and the
 rest of the run stands. `advisory_malformed_result` means the response was not a
 proposal result at all, so no candidates were enqueued. Connection, timeout and
-HTTP diagnostics mean the run failed; read its remedy, copy the code and its line count, and
+HTTP diagnostics mean the run failed; read its remedy, copy the two result lines, and
 go on to Stop. A valid result with zero candidates is also a result.
 
-Copy back: the candidate count and the words of the first precondition **as
+Copy back: the “Run status:” and “Candidates enqueued:” lines, exactly as
+shown, and the words of the first precondition **as
 the screen renders them**, with no substitution or hand redaction, plus the
 rejection outcome above. For a replacement, copy both “Currently required”
 and “Proposed requirement” as rendered. If there is no candidate, copy “no
-candidate appeared, so nothing was rejected” and each diagnostic code with
-its line count, or “no diagnostics”.
+candidate appeared, so nothing was rejected”. If rejection failed, copy
+“rejection failed”; read the diagnostic remedy without tallying its lines.
 
 ## Finish
 
@@ -454,26 +476,29 @@ calendar, at its step 6, so there is nothing to clean up after this one.
 
 ## What to copy back, in order
 
-1. From step 7: the six counters with their numbers, the sentence that
-   begins “N events had no colour.”, and each diagnostic code in the grey
-   box with how many lines carry it, or “no diagnostics”. Do not expand or copy the list behind “The N events with no colour”.
-2. From step 8: each diagnostic code in the boxes above “Timed placements”
-   with how many lines carry it, or “no diagnostics”; the
-   “Placements:” count line, and the whole section “Not in this Plan”
-   or the words “no such section”.
-3. From step 8: the words on the badge beside “Plan risk”, and every
-   finding's name and severity, in order.
-4. From step 9: the line that begins “Operations proposed:”, and the whole
-   of the first operation headed “Update:” that reads “Placement: Dynamic”.
+1. From step 7: the six counters with their numbers; the sentence beginning
+   “N events had no colour.” or “1 event had no colour.”, or “no no-colour
+   sentence”; and the “Diagnostic counts:” line exactly as shown, or “no
+   Diagnostic counts line”. Do not expand or copy the list behind “The N
+   events with no colour”, transcribe diagnostic sentences or count lines.
+2. From step 8: the “Diagnostic counts:” line above “Timed placements”, or
+   “no Diagnostic counts line”; the “Placements:” count line, or “no Placements
+   line”; and the whole section “Not in this Plan”, or “no such section”.
+3. From step 8: the whole panel headed “Plan risk”, exactly as rendered,
+   or “no Plan risk panel”. Select it as one block; do not extract each finding.
+4. From step 9: the line beginning “Operations proposed:”, and the whole of
+   the first operation headed “Update:” that reads “Placement: Dynamic”,
+   or “no Update operation” if none is headed “Update:”.
 5. From step 10: the two approval lines, or “I did not approve”.
 6. From step 11: the line that begins “Entries:”. The names and the counts
    only, never a value.
-7. From step 12: the candidate count and the first precondition’s words as
-   rendered, with no substitution or hand redaction (both requirements for a
-   replacement); and “left in Review”, “rejected; proposal left the queue”,
-   or “rejection failed” with diagnostic codes and line counts. If none
-   appeared: “no candidate appeared, so nothing was rejected”, with diagnostic
-   codes and line counts, or “no diagnostics”.
+7. From step 12: the “Run status:” and “Candidates enqueued:” lines; the first
+   precondition’s words as rendered, with no substitution or hand redaction
+   (both requirements for a replacement); and “left in Review”, “rejected;
+   proposal left the queue”, or “rejection failed”. If none appeared: “no
+   candidate appeared, so nothing was rejected”. If the queue blocked the run:
+   the two result lines and “queue full; no model asked”, with no proposal words.
+   Do not name diagnostic codes for copy-back or tally their lines.
 8. And one answer, in your own words: is what it chose to schedule what you
    would have chosen, and is this a store you would plan tomorrow on? If
    not, what is missing?

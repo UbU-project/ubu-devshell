@@ -1,7 +1,7 @@
 # The scenario runner
 
 `scripts/check-ui-contract.sh` builds the real `ubu-orchestrator` and walks
-the daily loop against it over HTTP, in twenty-eight scenarios. It needs no
+the daily loop against it over HTTP, in twenty-nine scenarios. It needs no
 webview, no Google account and no model. A full walk takes about ten seconds
 once the orchestrator is built.
 
@@ -46,7 +46,7 @@ at that time:
 
 Those two assertions are still scenario 1, and still run first.
 
-## The twenty-eight scenarios
+## The twenty-nine scenarios
 
 Every scenario starts its own orchestrator on its own ephemeral loopback
 port with its own empty store. Nothing is carried from one to the next. All
@@ -82,6 +82,7 @@ calendar requests ask for `export_mode: "mock"`.
 | 26 | calendar notes and title-only advice | Two calendar events, one with notes and one without, enter through calendar capture. Both titles reach the model, only one description is sent, and the title-only Task receives a candidate. Task edits survive recapture, and approved projections omit notes. |
 | 27 | facts-only grammar and mixed refusals | A facts-only request offers exactly equals and absent. Three stub proposals include one equals leaf without expected; two candidates survive, status stays ok, one refusal names the third Task, and canonical Tasks and UniverseState are unchanged. |
 | 28 | reserved namespaces and legacy cleanup | Five manual writes refuse reserved first key segments with exact diagnostics. Existing Task effects stage invented legacy keys, which remain readable and can be cleared or removed in one version. |
+| 29 | bounded proposals and review backlog | A run considers 25 Tasks with maxItems 3, refuses four proposals whole, permits nine awaiting candidates, blocks ten proposed/resurfaced without a model call, and permits ten deferred candidates. |
 
 The seeded scenarios first apply a day with no seed, then restart the
 orchestrator on the same store with a fixture built from the events that
@@ -408,10 +409,10 @@ scenario 7 of 16: colour means done (seeded mock calendar)
 PASS  7 colour means done: a colour on an applied Dynamic event completes its Task at capture, and only that Task
 ```
 
-A complete walk ends with twenty-eight `PASS` lines, two `SKIP` lines and:
+A complete walk ends with twenty-nine `PASS` lines, two `SKIP` lines and:
 
 ```text
-RESULT: 28 of 28 scenarios passed, 0 failed, 2 skipped, 527 requests, all to 127.0.0.1
+RESULT: 29 of 29 scenarios passed, 0 failed, 2 skipped, 579 requests, all to 127.0.0.1
 ```
 
 The walk stops at the first failure. The `FAIL` line names the scenario and
@@ -437,7 +438,7 @@ Two scripts, one boundary.
 | | `check-ui-contract.sh` | `acceptance.sh` |
 |---|---|---|
 | Covers | The HTTP layer: what the orchestrator does with a request. | The rendered layer: what a human sees in the app. |
-| Asserts | Everything it checks, in twenty-eight scenarios, each on its own store. | Nothing about behaviour. It stages a store and prints steps. |
+| Asserts | Everything it checks, in twenty-nine scenarios, each on its own store. | Nothing about behaviour. It stages a store and prints steps. |
 | Store | One throwaway store per scenario, and two for the rehearsal, on ephemeral ports. | One throwaway store on the app's default port, held until Ctrl-C. |
 | Preconditions | Each scenario stages exactly what it asserts. | Each step declares the seeds it needs; each seed checks itself over HTTP. |
 | A human | Reads PASS and FAIL lines. | Opens the app and follows the steps. |
@@ -544,3 +545,14 @@ assertions. Their numeric proposals already fit the tightened grammar; no
 fixture correction was needed for either during P1B-64. There are 27 mock
 scenarios and two opt-in live scenarios. The rehearsal remains 13 steps and
 eight redacted copy-back items; operator acceptance is separate.
+
+## P1B-66: bounded proposal labour
+
+Scenario 29 observes the real schema and system bound over 25 invented Tasks.
+A stub deliberately returns four valid trees; the whole response is malformed
+and none is enqueued. Three capped runs leave nine candidates, and a run at
+nine creates the tenth. The next run refuses before another stub request.
+Deferring one frees capacity; resurfacing it blocks again. Deferring all ten
+permits a model call. Both caps concern review labour, not relevance, and
+P1B-67 remains the vocabulary cold-start work. No existing diagnostic sentence
+is reworded. There are 29 mock scenarios and two opt-in live scenarios.
