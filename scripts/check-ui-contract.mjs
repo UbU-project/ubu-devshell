@@ -2440,7 +2440,7 @@ scenarios.push({
     const result = await call(o.base, "POST", endpoints.PLANNING_GENERATE_PATH, body);
     ok(result.plan, "the invented fixture store yielded a committed Plan");
     const replacements = [[a.task_id, "task_fixture_a"], [b.task_id, "task_fixture_b"], [result.plan.id, "plan_fixture"]];
-    const volatileTimes = new Set(["created_at", "risk_report/generated_at", "human_complete_plan_quality/generated_at"]);
+    const volatileTimes = new Set(["created_at", "risk_report/generated_at", "human_complete_plan_quality/generated_at", "replay_metadata/generated_at"]);
     function normalized(value, path = []) {
       if (volatileTimes.has(path.join("/"))) {
         ok(typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/.test(value) && Number.isFinite(Date.parse(value)), `existing ${path.join("/")} remains a valid UTC timestamp`);
@@ -2457,6 +2457,8 @@ scenarios.push({
     const actualBytes = JSON.stringify(normalized(projection), null, 2) + "\n";
     const goldenBytes = readFileSync(new URL("../fixtures/planning-worker/pre-ticket-plan.json", import.meta.url), "utf8");
     ok(actualBytes === goldenBytes, "every pre-existing Plan field is byte-identical after only old volatile IDs and three explicit generation timestamps are normalized");
+    const fullGoldenBytes = readFileSync(new URL("../fixtures/planning-worker/p1b70-complete-plan.json", import.meta.url), "utf8");
+    ok(JSON.stringify(normalized(result.plan), null, 2) + "\n" === fullGoldenBytes, "the complete P1B-70 Plan including provenance and replay metadata remains byte-identical after only volatile IDs and four named generation timestamps are normalized");
     function cpuProvenance(response) {
       same(response.engine_provenance.backend_kind, "cpu_reference", "actual computation is CPU reference");
       same(response.engine_provenance.invocation_kind, "in_process_cpu", "actual invocation is in-process CPU");

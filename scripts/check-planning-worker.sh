@@ -38,6 +38,19 @@ else
   [[ "$failed_status" -eq 0 ]] && rg -q '^SKIP: suitable local Python unavailable' "$WORK_DIR/failing-owner.log" || { cat "$WORK_DIR/failing-owner.log"; exit 1; }
   echo "SKIP: suitable local Python unavailable for failing-run process check"
 fi
-# A distinct, sequential invocation, with kernel's own environment/target.
-(cd "$KERNEL_DIR" && source "$SCRIPT_DIR/env.sh" && cargo test --locked --offline -p ubu_planning_worker --test invocation -- --nocapture)
-echo "PASS CPU-only parity and bounded worker boundary (Python checks skip if absent)"
+# Build under Cargo's exclusion, then execute the existing bounded worker
+# tests outside the build lock. A torch-positive test must not be hidden by
+# the very lock that proves Cargo excludes compute. These are the same owned
+# kernel worker tests; no orchestrator/UI/advisory process permission changes.
+(cd "$KERNEL_DIR" && source "$SCRIPT_DIR/env.sh" && cargo test --locked --offline -p ubu_planning_worker --lib --tests --no-run --message-format=json > "$WORK_DIR/worker-tests.jsonl")
+node -e '
+  const fs = require("fs");
+  const artifacts = fs.readFileSync(process.argv[1], "utf8").split("\n").filter(Boolean).map(JSON.parse)
+    .filter(m => m.reason === "compiler-artifact" && m.executable && m.profile.test && ["ubu_planning_worker", "invocation", "stage1"].includes(m.target.name));
+  if (artifacts.length !== 3) throw new Error("expected three owned worker test executables");
+  for (const m of artifacts) process.stdout.write(m.executable + "\n");
+' "$WORK_DIR/worker-tests.jsonl" > "$WORK_DIR/worker-tests.list"
+while IFS= read -r executable; do
+  "$executable" --nocapture
+done < "$WORK_DIR/worker-tests.list"
+echo "PASS CPU-only ChunkedSweep parity, exact atomic Stage 1 goldens and bounded worker boundary (Python/torch checks report skips when absent)"

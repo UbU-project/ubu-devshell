@@ -1,0 +1,1006 @@
+{
+  "alternatives": [
+    {
+      "candidate_id": "plan-fixture-golden-0000000000000011-d07",
+      "candidate_role": "other",
+      "coverage": null,
+      "display_probability": null,
+      "feasibility_summary": {
+        "affect_feasible": true,
+        "hard_constraints_assumed_satisfied_by_engine": true,
+        "violated_affect_dimensions": []
+      },
+      "probability_interval_high": null,
+      "probability_interval_low": null,
+      "probability_quality": "not_estimated",
+      "rank": 2,
+      "robustness_score": 0.8079999999999999,
+      "score_summary": {
+        "affect_margin_score": 1,
+        "robustness_score": 0.8079999999999999,
+        "schedule_diversity_score": 0.18,
+        "total_score": 0.6842916666666667,
+        "utility_score": 0.7491666666666668
+      },
+      "semi_legitimization_summary": {
+        "affect_budget_ok": true,
+        "result": "passes_cheap_checks",
+        "slack_preserved": true
+      },
+      "steps": [
+        {
+          "depends_on": [],
+          "end": 1791331500,
+          "end_at": "2026-10-07T00:05:00Z",
+          "index": 0,
+          "occupies_capacity": true,
+          "placement_authority": "planner",
+          "start": 1791331200,
+          "start_at": "2026-10-07T00:00:00Z",
+          "static_anchor": false,
+          "summary": "Synthetic golden copper teapot",
+          "task_id": "task_fixture_a"
+        },
+        {
+          "depends_on": [
+            "task_fixture_a"
+          ],
+          "end": 1791334512,
+          "end_at": "2026-10-07T00:55:12Z",
+          "index": 1,
+          "occupies_capacity": true,
+          "placement_authority": "planner",
+          "start": 1791334092,
+          "start_at": "2026-10-07T00:48:12Z",
+          "static_anchor": false,
+          "summary": "Synthetic golden silver shelf",
+          "task_id": "task_fixture_b"
+        }
+      ]
+    },
+    {
+      "candidate_id": "plan-fixture-golden-0000000000000011-d02",
+      "candidate_role": "other",
+      "coverage": null,
+      "display_probability": null,
+      "feasibility_summary": {
+        "affect_feasible": true,
+        "hard_constraints_assumed_satisfied_by_engine": true,
+        "violated_affect_dimensions": []
+      },
+      "probability_interval_high": null,
+      "probability_interval_low": null,
+      "probability_quality": "not_estimated",
+      "rank": 3,
+      "robustness_score": 0.7899999999999999,
+      "score_summary": {
+        "affect_margin_score": 1,
+        "robustness_score": 0.7899999999999999,
+        "schedule_diversity_score": 0.15,
+        "total_score": 0.6797916666666667,
+        "utility_score": 0.7791666666666667
+      },
+      "semi_legitimization_summary": {
+        "affect_budget_ok": true,
+        "result": "passes_cheap_checks",
+        "slack_preserved": true
+      },
+      "steps": [
+        {
+          "depends_on": [],
+          "end": 1791331500,
+          "end_at": "2026-10-07T00:05:00Z",
+          "index": 0,
+          "occupies_capacity": true,
+          "placement_authority": "planner",
+          "start": 1791331200,
+          "start_at": "2026-10-07T00:00:00Z",
+          "static_anchor": false,
+          "summary": "Synthetic golden copper teapot",
+          "task_id": "task_fixture_a"
+        },
+        {
+          "depends_on": [
+            "task_fixture_a"
+          ],
+          "end": 1791334080,
+          "end_at": "2026-10-07T00:48:00Z",
+          "index": 1,
+          "occupies_capacity": true,
+          "placement_authority": "planner",
+          "start": 1791333660,
+          "start_at": "2026-10-07T00:41:00Z",
+          "static_anchor": false,
+          "summary": "Synthetic golden silver shelf",
+          "task_id": "task_fixture_b"
+        }
+      ]
+    },
+    {
+      "candidate_id": "plan-fixture-golden-0000000000000011-d09",
+      "candidate_role": "other",
+      "coverage": null,
+      "display_probability": null,
+      "feasibility_summary": {
+        "affect_feasible": true,
+        "hard_constraints_assumed_satisfied_by_engine": true,
+        "violated_affect_dimensions": []
+      },
+      "probability_interval_high": null,
+      "probability_interval_low": null,
+      "probability_quality": "not_estimated",
+      "rank": 4,
+      "robustness_score": 0.7719999999999999,
+      "score_summary": {
+        "affect_margin_score": 1,
+        "robustness_score": 0.7719999999999999,
+        "schedule_diversity_score": 0.12,
+        "total_score": 0.6752916666666666,
+        "utility_score": 0.8091666666666666
+      },
+      "semi_legitimization_summary": {
+        "affect_budget_ok": true,
+        "result": "passes_cheap_checks",
+        "slack_preserved": true
+      },
+      "steps": [
+        {
+          "depends_on": [],
+          "end": 1791331500,
+          "end_at": "2026-10-07T00:05:00Z",
+          "index": 0,
+          "occupies_capacity": true,
+          "placement_authority": "planner",
+          "start": 1791331200,
+          "start_at": "2026-10-07T00:00:00Z",
+          "static_anchor": false,
+          "summary": "Synthetic golden copper teapot",
+          "task_id": "task_fixture_a"
+        },
+        {
+          "depends_on": [
+            "task_fixture_a"
+          ],
+          "end": 1791333648,
+          "end_at": "2026-10-07T00:40:48Z",
+          "index": 1,
+          "occupies_capacity": true,
+          "placement_authority": "planner",
+          "start": 1791333228,
+          "start_at": "2026-10-07T00:33:48Z",
+          "static_anchor": false,
+          "summary": "Synthetic golden silver shelf",
+          "task_id": "task_fixture_b"
+        }
+      ]
+    },
+    {
+      "candidate_id": "plan-fixture-golden-0000000000000011-d05",
+      "candidate_role": "other",
+      "coverage": null,
+      "display_probability": null,
+      "feasibility_summary": {
+        "affect_feasible": true,
+        "hard_constraints_assumed_satisfied_by_engine": true,
+        "violated_affect_dimensions": []
+      },
+      "probability_interval_high": null,
+      "probability_interval_low": null,
+      "probability_quality": "not_estimated",
+      "rank": 5,
+      "robustness_score": 0.754,
+      "score_summary": {
+        "affect_margin_score": 1,
+        "robustness_score": 0.754,
+        "schedule_diversity_score": 0.09,
+        "total_score": 0.6707916666666667,
+        "utility_score": 0.8391666666666666
+      },
+      "semi_legitimization_summary": {
+        "affect_budget_ok": true,
+        "result": "passes_cheap_checks",
+        "slack_preserved": true
+      },
+      "steps": [
+        {
+          "depends_on": [],
+          "end": 1791331500,
+          "end_at": "2026-10-07T00:05:00Z",
+          "index": 0,
+          "occupies_capacity": true,
+          "placement_authority": "planner",
+          "start": 1791331200,
+          "start_at": "2026-10-07T00:00:00Z",
+          "static_anchor": false,
+          "summary": "Synthetic golden copper teapot",
+          "task_id": "task_fixture_a"
+        },
+        {
+          "depends_on": [
+            "task_fixture_a"
+          ],
+          "end": 1791333216,
+          "end_at": "2026-10-07T00:33:36Z",
+          "index": 1,
+          "occupies_capacity": true,
+          "placement_authority": "planner",
+          "start": 1791332796,
+          "start_at": "2026-10-07T00:26:36Z",
+          "static_anchor": false,
+          "summary": "Synthetic golden silver shelf",
+          "task_id": "task_fixture_b"
+        }
+      ]
+    },
+    {
+      "candidate_id": "plan-fixture-golden-0000000000000011-d11",
+      "candidate_role": "other",
+      "coverage": null,
+      "display_probability": null,
+      "feasibility_summary": {
+        "affect_feasible": true,
+        "hard_constraints_assumed_satisfied_by_engine": true,
+        "violated_affect_dimensions": []
+      },
+      "probability_interval_high": null,
+      "probability_interval_low": null,
+      "probability_quality": "not_estimated",
+      "rank": 6,
+      "robustness_score": 0.718,
+      "score_summary": {
+        "affect_margin_score": 1,
+        "robustness_score": 0.718,
+        "schedule_diversity_score": 0.03,
+        "total_score": 0.6617916666666667,
+        "utility_score": 0.8991666666666667
+      },
+      "semi_legitimization_summary": {
+        "affect_budget_ok": true,
+        "result": "passes_cheap_checks",
+        "slack_preserved": true
+      },
+      "steps": [
+        {
+          "depends_on": [],
+          "end": 1791331500,
+          "end_at": "2026-10-07T00:05:00Z",
+          "index": 0,
+          "occupies_capacity": true,
+          "placement_authority": "planner",
+          "start": 1791331200,
+          "start_at": "2026-10-07T00:00:00Z",
+          "static_anchor": false,
+          "summary": "Synthetic golden copper teapot",
+          "task_id": "task_fixture_a"
+        },
+        {
+          "depends_on": [
+            "task_fixture_a"
+          ],
+          "end": 1791332352,
+          "end_at": "2026-10-07T00:19:12Z",
+          "index": 1,
+          "occupies_capacity": true,
+          "placement_authority": "planner",
+          "start": 1791331932,
+          "start_at": "2026-10-07T00:12:12Z",
+          "static_anchor": false,
+          "summary": "Synthetic golden silver shelf",
+          "task_id": "task_fixture_b"
+        }
+      ]
+    },
+    {
+      "candidate_id": "plan-fixture-golden-0000000000000011-d08",
+      "candidate_role": "other",
+      "coverage": null,
+      "display_probability": null,
+      "feasibility_summary": {
+        "affect_feasible": true,
+        "hard_constraints_assumed_satisfied_by_engine": true,
+        "violated_affect_dimensions": []
+      },
+      "probability_interval_high": null,
+      "probability_interval_low": null,
+      "probability_quality": "not_estimated",
+      "rank": 7,
+      "robustness_score": 0.7,
+      "score_summary": {
+        "affect_margin_score": 1,
+        "robustness_score": 0.7,
+        "schedule_diversity_score": 0.12,
+        "total_score": 0.6572916666666667,
+        "utility_score": 0.8091666666666667
+      },
+      "semi_legitimization_summary": {
+        "affect_budget_ok": true,
+        "result": "passes_cheap_checks",
+        "slack_preserved": true
+      },
+      "steps": [
+        {
+          "depends_on": [],
+          "end": 1791332364,
+          "end_at": "2026-10-07T00:19:24Z",
+          "index": 0,
+          "occupies_capacity": true,
+          "placement_authority": "planner",
+          "start": 1791332064,
+          "start_at": "2026-10-07T00:14:24Z",
+          "static_anchor": false,
+          "summary": "Synthetic golden copper teapot",
+          "task_id": "task_fixture_a"
+        },
+        {
+          "depends_on": [
+            "task_fixture_a"
+          ],
+          "end": 1791332784,
+          "end_at": "2026-10-07T00:26:24Z",
+          "index": 1,
+          "occupies_capacity": true,
+          "placement_authority": "planner",
+          "start": 1791332364,
+          "start_at": "2026-10-07T00:19:24Z",
+          "static_anchor": false,
+          "summary": "Synthetic golden silver shelf",
+          "task_id": "task_fixture_b"
+        }
+      ]
+    },
+    {
+      "candidate_id": "plan-fixture-golden-0000000000000011-d12",
+      "candidate_role": "other",
+      "coverage": null,
+      "display_probability": null,
+      "feasibility_summary": {
+        "affect_feasible": true,
+        "hard_constraints_assumed_satisfied_by_engine": true,
+        "violated_affect_dimensions": []
+      },
+      "probability_interval_high": null,
+      "probability_interval_low": null,
+      "probability_quality": "not_estimated",
+      "rank": 8,
+      "robustness_score": 0.7,
+      "score_summary": {
+        "affect_margin_score": 1,
+        "robustness_score": 0.7,
+        "schedule_diversity_score": 0.18,
+        "total_score": 0.6572916666666667,
+        "utility_score": 0.7491666666666666
+      },
+      "semi_legitimization_summary": {
+        "affect_budget_ok": true,
+        "result": "passes_cheap_checks",
+        "slack_preserved": true
+      },
+      "steps": [
+        {
+          "depends_on": [],
+          "end": 1791332796,
+          "end_at": "2026-10-07T00:26:36Z",
+          "index": 0,
+          "occupies_capacity": true,
+          "placement_authority": "planner",
+          "start": 1791332496,
+          "start_at": "2026-10-07T00:21:36Z",
+          "static_anchor": false,
+          "summary": "Synthetic golden copper teapot",
+          "task_id": "task_fixture_a"
+        },
+        {
+          "depends_on": [
+            "task_fixture_a"
+          ],
+          "end": 1791333216,
+          "end_at": "2026-10-07T00:33:36Z",
+          "index": 1,
+          "occupies_capacity": true,
+          "placement_authority": "planner",
+          "start": 1791332796,
+          "start_at": "2026-10-07T00:26:36Z",
+          "static_anchor": false,
+          "summary": "Synthetic golden silver shelf",
+          "task_id": "task_fixture_b"
+        }
+      ]
+    },
+    {
+      "candidate_id": "plan-fixture-golden-0000000000000011-d04",
+      "candidate_role": "other",
+      "coverage": null,
+      "display_probability": null,
+      "feasibility_summary": {
+        "affect_feasible": true,
+        "hard_constraints_assumed_satisfied_by_engine": true,
+        "violated_affect_dimensions": []
+      },
+      "probability_interval_high": null,
+      "probability_interval_low": null,
+      "probability_quality": "not_estimated",
+      "rank": 9,
+      "robustness_score": 0.7,
+      "score_summary": {
+        "affect_margin_score": 1,
+        "robustness_score": 0.7,
+        "schedule_diversity_score": 0.6,
+        "total_score": 0.6572916666666667,
+        "utility_score": 0.32916666666666666
+      },
+      "semi_legitimization_summary": {
+        "affect_budget_ok": true,
+        "result": "passes_cheap_checks",
+        "slack_preserved": true
+      },
+      "steps": [
+        {
+          "depends_on": [],
+          "end": 1791335820,
+          "end_at": "2026-10-07T01:17:00Z",
+          "index": 0,
+          "occupies_capacity": true,
+          "placement_authority": "planner",
+          "start": 1791335520,
+          "start_at": "2026-10-07T01:12:00Z",
+          "static_anchor": false,
+          "summary": "Synthetic golden copper teapot",
+          "task_id": "task_fixture_a"
+        },
+        {
+          "depends_on": [
+            "task_fixture_a"
+          ],
+          "end": 1791336240,
+          "end_at": "2026-10-07T01:24:00Z",
+          "index": 1,
+          "occupies_capacity": true,
+          "placement_authority": "planner",
+          "start": 1791335820,
+          "start_at": "2026-10-07T01:17:00Z",
+          "static_anchor": false,
+          "summary": "Synthetic golden silver shelf",
+          "task_id": "task_fixture_b"
+        }
+      ]
+    },
+    {
+      "candidate_id": "plan-fixture-golden-0000000000000011",
+      "candidate_role": "highest_utility",
+      "coverage": null,
+      "display_probability": null,
+      "feasibility_summary": {
+        "affect_feasible": true,
+        "hard_constraints_assumed_satisfied_by_engine": true,
+        "violated_affect_dimensions": []
+      },
+      "probability_interval_high": null,
+      "probability_interval_low": null,
+      "probability_quality": "not_estimated",
+      "rank": 10,
+      "robustness_score": 0.7,
+      "score_summary": {
+        "affect_margin_score": 1,
+        "robustness_score": 0.7,
+        "schedule_diversity_score": 0,
+        "total_score": 0.6572916666666666,
+        "utility_score": 0.9291666666666667
+      },
+      "semi_legitimization_summary": {
+        "affect_budget_ok": true,
+        "result": "passes_cheap_checks",
+        "slack_preserved": true
+      },
+      "steps": [
+        {
+          "depends_on": [],
+          "end": 1791331500,
+          "end_at": "2026-10-07T00:05:00Z",
+          "index": 0,
+          "occupies_capacity": true,
+          "placement_authority": "planner",
+          "start": 1791331200,
+          "start_at": "2026-10-07T00:00:00Z",
+          "static_anchor": false,
+          "summary": "Synthetic golden copper teapot",
+          "task_id": "task_fixture_a"
+        },
+        {
+          "depends_on": [
+            "task_fixture_a"
+          ],
+          "end": 1791331920,
+          "end_at": "2026-10-07T00:12:00Z",
+          "index": 1,
+          "occupies_capacity": true,
+          "placement_authority": "planner",
+          "start": 1791331500,
+          "start_at": "2026-10-07T00:05:00Z",
+          "static_anchor": false,
+          "summary": "Synthetic golden silver shelf",
+          "task_id": "task_fixture_b"
+        }
+      ]
+    },
+    {
+      "candidate_id": "plan-fixture-golden-0000000000000011-d03",
+      "candidate_role": "other",
+      "coverage": null,
+      "display_probability": null,
+      "feasibility_summary": {
+        "affect_feasible": true,
+        "hard_constraints_assumed_satisfied_by_engine": true,
+        "violated_affect_dimensions": []
+      },
+      "probability_interval_high": null,
+      "probability_interval_low": null,
+      "probability_quality": "not_estimated",
+      "rank": 11,
+      "robustness_score": 0.7,
+      "score_summary": {
+        "affect_margin_score": 1,
+        "robustness_score": 0.7,
+        "schedule_diversity_score": 0.24,
+        "total_score": 0.6572916666666666,
+        "utility_score": 0.6891666666666666
+      },
+      "semi_legitimization_summary": {
+        "affect_budget_ok": true,
+        "result": "passes_cheap_checks",
+        "slack_preserved": true
+      },
+      "steps": [
+        {
+          "depends_on": [],
+          "end": 1791333228,
+          "end_at": "2026-10-07T00:33:48Z",
+          "index": 0,
+          "occupies_capacity": true,
+          "placement_authority": "planner",
+          "start": 1791332928,
+          "start_at": "2026-10-07T00:28:48Z",
+          "static_anchor": false,
+          "summary": "Synthetic golden copper teapot",
+          "task_id": "task_fixture_a"
+        },
+        {
+          "depends_on": [
+            "task_fixture_a"
+          ],
+          "end": 1791333648,
+          "end_at": "2026-10-07T00:40:48Z",
+          "index": 1,
+          "occupies_capacity": true,
+          "placement_authority": "planner",
+          "start": 1791333228,
+          "start_at": "2026-10-07T00:33:48Z",
+          "static_anchor": false,
+          "summary": "Synthetic golden silver shelf",
+          "task_id": "task_fixture_b"
+        }
+      ]
+    },
+    {
+      "candidate_id": "plan-fixture-golden-0000000000000011-d10",
+      "candidate_role": "other",
+      "coverage": null,
+      "display_probability": null,
+      "feasibility_summary": {
+        "affect_feasible": true,
+        "hard_constraints_assumed_satisfied_by_engine": true,
+        "violated_affect_dimensions": []
+      },
+      "probability_interval_high": null,
+      "probability_interval_low": null,
+      "probability_quality": "not_estimated",
+      "rank": 12,
+      "robustness_score": 0.7,
+      "score_summary": {
+        "affect_margin_score": 1,
+        "robustness_score": 0.7,
+        "schedule_diversity_score": 0.3,
+        "total_score": 0.6572916666666666,
+        "utility_score": 0.6291666666666667
+      },
+      "semi_legitimization_summary": {
+        "affect_budget_ok": true,
+        "result": "passes_cheap_checks",
+        "slack_preserved": true
+      },
+      "steps": [
+        {
+          "depends_on": [],
+          "end": 1791333660,
+          "end_at": "2026-10-07T00:41:00Z",
+          "index": 0,
+          "occupies_capacity": true,
+          "placement_authority": "planner",
+          "start": 1791333360,
+          "start_at": "2026-10-07T00:36:00Z",
+          "static_anchor": false,
+          "summary": "Synthetic golden copper teapot",
+          "task_id": "task_fixture_a"
+        },
+        {
+          "depends_on": [
+            "task_fixture_a"
+          ],
+          "end": 1791334080,
+          "end_at": "2026-10-07T00:48:00Z",
+          "index": 1,
+          "occupies_capacity": true,
+          "placement_authority": "planner",
+          "start": 1791333660,
+          "start_at": "2026-10-07T00:41:00Z",
+          "static_anchor": false,
+          "summary": "Synthetic golden silver shelf",
+          "task_id": "task_fixture_b"
+        }
+      ]
+    },
+    {
+      "candidate_id": "plan-fixture-golden-0000000000000011-d01",
+      "candidate_role": "other",
+      "coverage": null,
+      "display_probability": null,
+      "feasibility_summary": {
+        "affect_feasible": true,
+        "hard_constraints_assumed_satisfied_by_engine": true,
+        "violated_affect_dimensions": []
+      },
+      "probability_interval_high": null,
+      "probability_interval_low": null,
+      "probability_quality": "not_estimated",
+      "rank": 13,
+      "robustness_score": 0.7,
+      "score_summary": {
+        "affect_margin_score": 1,
+        "robustness_score": 0.7,
+        "schedule_diversity_score": 0.54,
+        "total_score": 0.6572916666666666,
+        "utility_score": 0.38916666666666666
+      },
+      "semi_legitimization_summary": {
+        "affect_budget_ok": true,
+        "result": "passes_cheap_checks",
+        "slack_preserved": true
+      },
+      "steps": [
+        {
+          "depends_on": [],
+          "end": 1791335388,
+          "end_at": "2026-10-07T01:09:48Z",
+          "index": 0,
+          "occupies_capacity": true,
+          "placement_authority": "planner",
+          "start": 1791335088,
+          "start_at": "2026-10-07T01:04:48Z",
+          "static_anchor": false,
+          "summary": "Synthetic golden copper teapot",
+          "task_id": "task_fixture_a"
+        },
+        {
+          "depends_on": [
+            "task_fixture_a"
+          ],
+          "end": 1791335808,
+          "end_at": "2026-10-07T01:16:48Z",
+          "index": 1,
+          "occupies_capacity": true,
+          "placement_authority": "planner",
+          "start": 1791335388,
+          "start_at": "2026-10-07T01:09:48Z",
+          "static_anchor": false,
+          "summary": "Synthetic golden silver shelf",
+          "task_id": "task_fixture_b"
+        }
+      ]
+    },
+    {
+      "candidate_id": "plan-fixture-golden-0000000000000011-d06",
+      "candidate_role": "other",
+      "coverage": null,
+      "display_probability": null,
+      "feasibility_summary": {
+        "affect_feasible": true,
+        "hard_constraints_assumed_satisfied_by_engine": true,
+        "violated_affect_dimensions": []
+      },
+      "probability_interval_high": null,
+      "probability_interval_low": null,
+      "probability_quality": "not_estimated",
+      "rank": 14,
+      "robustness_score": 0.7,
+      "score_summary": {
+        "affect_margin_score": 1,
+        "robustness_score": 0.7,
+        "schedule_diversity_score": 0.78,
+        "total_score": 0.6572916666666666,
+        "utility_score": 0.14916666666666667
+      },
+      "semi_legitimization_summary": {
+        "affect_budget_ok": true,
+        "result": "passes_cheap_checks",
+        "slack_preserved": true
+      },
+      "steps": [
+        {
+          "depends_on": [],
+          "end": 1791337116,
+          "end_at": "2026-10-07T01:38:36Z",
+          "index": 0,
+          "occupies_capacity": true,
+          "placement_authority": "planner",
+          "start": 1791336816,
+          "start_at": "2026-10-07T01:33:36Z",
+          "static_anchor": false,
+          "summary": "Synthetic golden copper teapot",
+          "task_id": "task_fixture_a"
+        },
+        {
+          "depends_on": [
+            "task_fixture_a"
+          ],
+          "end": 1791337536,
+          "end_at": "2026-10-07T01:45:36Z",
+          "index": 1,
+          "occupies_capacity": true,
+          "placement_authority": "planner",
+          "start": 1791337116,
+          "start_at": "2026-10-07T01:38:36Z",
+          "static_anchor": false,
+          "summary": "Synthetic golden silver shelf",
+          "task_id": "task_fixture_b"
+        }
+      ]
+    },
+    {
+      "candidate_id": "plan-fixture-golden-0000000000000011-d13",
+      "candidate_role": "other",
+      "coverage": null,
+      "display_probability": null,
+      "feasibility_summary": {
+        "affect_feasible": true,
+        "hard_constraints_assumed_satisfied_by_engine": true,
+        "violated_affect_dimensions": []
+      },
+      "probability_interval_high": null,
+      "probability_interval_low": null,
+      "probability_quality": "not_estimated",
+      "rank": 15,
+      "robustness_score": 0.7,
+      "score_summary": {
+        "affect_margin_score": 1,
+        "robustness_score": 0.7,
+        "schedule_diversity_score": 0.84,
+        "total_score": 0.6572916666666666,
+        "utility_score": 0.08916666666666667
+      },
+      "semi_legitimization_summary": {
+        "affect_budget_ok": true,
+        "result": "passes_cheap_checks",
+        "slack_preserved": true
+      },
+      "steps": [
+        {
+          "depends_on": [],
+          "end": 1791337548,
+          "end_at": "2026-10-07T01:45:48Z",
+          "index": 0,
+          "occupies_capacity": true,
+          "placement_authority": "planner",
+          "start": 1791337248,
+          "start_at": "2026-10-07T01:40:48Z",
+          "static_anchor": false,
+          "summary": "Synthetic golden copper teapot",
+          "task_id": "task_fixture_a"
+        },
+        {
+          "depends_on": [
+            "task_fixture_a"
+          ],
+          "end": 1791337968,
+          "end_at": "2026-10-07T01:52:48Z",
+          "index": 1,
+          "occupies_capacity": true,
+          "placement_authority": "planner",
+          "start": 1791337548,
+          "start_at": "2026-10-07T01:45:48Z",
+          "static_anchor": false,
+          "summary": "Synthetic golden silver shelf",
+          "task_id": "task_fixture_b"
+        }
+      ]
+    },
+    {
+      "candidate_id": "plan-fixture-golden-0000000000000011-d14",
+      "candidate_role": "most_schedule_diverse",
+      "coverage": null,
+      "display_probability": null,
+      "feasibility_summary": {
+        "affect_feasible": true,
+        "hard_constraints_assumed_satisfied_by_engine": true,
+        "violated_affect_dimensions": []
+      },
+      "probability_interval_high": null,
+      "probability_interval_low": null,
+      "probability_quality": "not_estimated",
+      "rank": 16,
+      "robustness_score": 0.7,
+      "score_summary": {
+        "affect_margin_score": 1,
+        "robustness_score": 0.7,
+        "schedule_diversity_score": 0.9,
+        "total_score": 0.6572916666666666,
+        "utility_score": 0.029166666666666674
+      },
+      "semi_legitimization_summary": {
+        "affect_budget_ok": true,
+        "result": "passes_cheap_checks",
+        "slack_preserved": true
+      },
+      "steps": [
+        {
+          "depends_on": [],
+          "end": 1791337980,
+          "end_at": "2026-10-07T01:53:00Z",
+          "index": 0,
+          "occupies_capacity": true,
+          "placement_authority": "planner",
+          "start": 1791337680,
+          "start_at": "2026-10-07T01:48:00Z",
+          "static_anchor": false,
+          "summary": "Synthetic golden copper teapot",
+          "task_id": "task_fixture_a"
+        },
+        {
+          "depends_on": [
+            "task_fixture_a"
+          ],
+          "end": 1791338400,
+          "end_at": "2026-10-07T02:00:00Z",
+          "index": 1,
+          "occupies_capacity": true,
+          "placement_authority": "planner",
+          "start": 1791337980,
+          "start_at": "2026-10-07T01:53:00Z",
+          "static_anchor": false,
+          "summary": "Synthetic golden silver shelf",
+          "task_id": "task_fixture_b"
+        }
+      ]
+    }
+  ],
+  "created_at": "2026-10-07T00:00:00Z",
+  "engine_provenance": {
+    "backend_kind": "cpu_reference",
+    "cpu_certification_status": "certified",
+    "device_summary": "cpu",
+    "engine_version": "0.1.0",
+    "invocation_kind": "in_process_cpu",
+    "tolerance_profile": "boundary-v1"
+  },
+  "human_complete_plan_quality": {
+    "affect_margin": 0,
+    "checkpoint_coverage": "absent",
+    "failure_pattern": "none",
+    "feedback_latency": 3744,
+    "generated_at": "2026-10-07T00:00:00Z",
+    "plan_ref": "plan_fixture",
+    "post_plan_state_delta": "depleted",
+    "revision_suggestions": [
+      "Add observable checkpoints to shorten the plan's feedback loop.",
+      "Add recovery time or reduce the plan's stretch load."
+    ],
+    "stretch_pressure": "sustainable_stretch"
+  },
+  "id": "plan_fixture",
+  "legitimization": {
+    "affect_feasible": true,
+    "dimensions": {},
+    "mode": "enforce",
+    "result": "passed",
+    "stale_dimensions": [],
+    "violated_dimensions": []
+  },
+  "replay_metadata": {
+    "effective_time": "2026-10-07T00:00:00Z",
+    "generated_at": "2026-10-07T00:00:00Z",
+    "planner_version": "0.1.0",
+    "rng_seed_echo": 17
+  },
+  "risk_report": {
+    "findings": [],
+    "generated_at": "2026-10-07T00:00:00Z",
+    "level": "low"
+  },
+  "selected_candidate": {
+    "candidate_id": "plan-fixture-golden-0000000000000011-d15",
+    "candidate_role": "most_robust",
+    "coverage": null,
+    "display_probability": null,
+    "feasibility_summary": {
+      "affect_feasible": true,
+      "hard_constraints_assumed_satisfied_by_engine": true,
+      "violated_affect_dimensions": []
+    },
+    "probability_interval_high": null,
+    "probability_interval_low": null,
+    "probability_quality": "not_estimated",
+    "rank": 1,
+    "robustness_score": 0.826,
+    "score_summary": {
+      "affect_margin_score": 1,
+      "robustness_score": 0.826,
+      "schedule_diversity_score": 0.21,
+      "total_score": 0.6887916666666667,
+      "utility_score": 0.7191666666666667
+    },
+    "semi_legitimization_summary": {
+      "affect_budget_ok": true,
+      "result": "passes_cheap_checks",
+      "slack_preserved": true
+    },
+    "steps": [
+      {
+        "depends_on": [],
+        "end": 1791331500,
+        "end_at": "2026-10-07T00:05:00Z",
+        "index": 0,
+        "occupies_capacity": true,
+        "placement_authority": "planner",
+        "start": 1791331200,
+        "start_at": "2026-10-07T00:00:00Z",
+        "static_anchor": false,
+        "summary": "Synthetic golden copper teapot",
+        "task_id": "task_fixture_a"
+      },
+      {
+        "depends_on": [
+          "task_fixture_a"
+        ],
+        "end": 1791334944,
+        "end_at": "2026-10-07T01:02:24Z",
+        "index": 1,
+        "occupies_capacity": true,
+        "placement_authority": "planner",
+        "start": 1791334524,
+        "start_at": "2026-10-07T00:55:24Z",
+        "static_anchor": false,
+        "summary": "Synthetic golden silver shelf",
+        "task_id": "task_fixture_b"
+      }
+    ]
+  },
+  "status": "admitted",
+  "steps": [
+    {
+      "depends_on": [],
+      "end": 1791331500,
+      "end_at": "2026-10-07T00:05:00Z",
+      "index": 0,
+      "occupies_capacity": true,
+      "placement_authority": "planner",
+      "start": 1791331200,
+      "start_at": "2026-10-07T00:00:00Z",
+      "static_anchor": false,
+      "summary": "Synthetic golden copper teapot",
+      "task_id": "task_fixture_a"
+    },
+    {
+      "depends_on": [
+        "task_fixture_a"
+      ],
+      "end": 1791334944,
+      "end_at": "2026-10-07T01:02:24Z",
+      "index": 1,
+      "occupies_capacity": true,
+      "placement_authority": "planner",
+      "start": 1791334524,
+      "start_at": "2026-10-07T00:55:24Z",
+      "static_anchor": false,
+      "summary": "Synthetic golden silver shelf",
+      "task_id": "task_fixture_b"
+    }
+  ]
+}
