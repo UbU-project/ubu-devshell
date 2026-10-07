@@ -4,19 +4,18 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ "${1:-}" == --help ]]; then
   cat <<'HELP'
-Usage: run-live-rehearsal.sh [--compare]
+Usage: run-live-rehearsal.sh
 Required environment: UBU_DB_PATH (fresh absolute store path),
 UBU_GOOGLE_CALENDAR_ID, UBU_GOOGLE_CREDENTIALS_PATH,
 UBU_GOOGLE_TOKEN_CACHE_PATH (absolute paths, kept private).
 Optional UBU_REHEARSAL_INPUTS: private JSON authoring instructions; see
  docs/LIVE_REHEARSAL_DRIVER.md. Optional UBU_REHEARSAL_BINARY: built binary.
 Owns an orchestrator. Type live before startup; approval is a separate decision.
---compare forwards the appendix's UI actions once, without replaying them.
 Reset your calendar yourself. No default store or calendar is selected.
 HELP
   exit 0
 fi
-if [[ $# -gt 1 || ( $# -eq 1 && "$1" != --compare ) ]]; then
+if [[ $# -gt 0 ]]; then
   echo 'REFUSED: unsupported argument; no approval flag exists.' >&2; exit 2
 fi
 [[ -t 0 ]] || { echo 'REFUSED: terminal required.' >&2; exit 2; }

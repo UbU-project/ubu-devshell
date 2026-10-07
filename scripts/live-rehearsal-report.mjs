@@ -36,32 +36,25 @@ export function previewLines(preview,route) {
 const sources={capture:['POST','CALENDAR_CAPTURE_PATH'],plan:['POST','PLANNING_GENERATE_PATH'],preview:['GET','CALENDAR_PREVIEW_PATH'],approval:['POST','CALENDAR_APPROVE_PATH'],universe_before:['GET','UNIVERSE_STATE_PATH'],authoring:['PATCH','UNIVERSE_STATE_PATH'],requirement:['PATCH','TASK_PATH'],requirement_readback:['GET','TASK_PATH'],vocabulary:['POST','ADVISORY_RUN_PATH'],precondition:['POST','ADVISORY_RUN_PATH'],risk:['POST','PLANNING_GENERATE_PATH'],queue:['GET','ADVISORY_QUEUE_PATH'],routine:['POST','OBJECTIVE_CREATE_PATH'],session:['POST','GOOGLE_CALENDAR_SESSION_PATH'],subject:['PUT','SETTING_PUT_PATH'],colour_setting:['PUT','SETTING_PUT_PATH']};
 const safeSkips=new Set(['private_input_missing','unsupported_private_setting','invalid_private_input','existing_tree_preserved','task_unavailable','task_selector_missing_or_ambiguous','operator_did_not_approve_or_preview_stale','preview_unavailable']);
 export class PublicReport {
-  constructor(endpoints,{compare=false}={}) {this.e=endpoints;this.compare=compare;this.rows=new Map();this.decisions=[];this.universeWritten=false;this.requirementWritten=false;this.attempts=[];}
+  constructor(endpoints) {this.e=endpoints;this.rows=new Map();this.decisions=[];this.attempts=[];}
   observe(record,forwarded=false) {
     const e=this.e;let label=record.label;
     if(forwarded){
-      // Normal visual reads cannot overwrite automation's immutable snapshots.
-      if(!this.compare && !['ADVISORY_ADMIT_PATH','ADVISORY_REJECT_PATH'].some(k=>record.route===e[k]))return;
-      label=Object.keys(sources).filter(k=>k!=='risk').find(k=>sources[k][0]===record.method&&e[sources[k][1]]===record.route);
-      if(record.route===e.ADVISORY_RUN_PATH)label=['vocabulary','precondition'].includes(record.body?.producer)?record.body.producer:undefined;
-      if(record.route===e.UNIVERSE_STATE_PATH&&record.method==='GET'){
-        if(this.universeWritten)return;
-        label='universe_before';
-      }
-      if(record.route===e.UNIVERSE_STATE_PATH&&record.method==='PATCH')this.universeWritten=true;
-      if(record.route===e.TASK_PATH&&record.method==='PATCH'){
-        if(!record.body||!Object.hasOwn(record.body,'preconditions'))return;
-        this.requirementWritten=true;this.requirementIdentity=record.identity;
-      }
-      if(record.route===e.TASK_PATH&&record.method==='GET')label=this.requirementWritten&&record.identity===this.requirementIdentity?'requirement_readback':undefined;
-      if(['ADVISORY_ADMIT_PATH','ADVISORY_REJECT_PATH'].some(k=>record.route===e[k])){
-        const route=record.route,status=count(record.result?.status);this.decisions.push(`${record.method} ${route} HTTP: ${status}; private decision body/response withheld`);return;
-      }
+      // UI reads/writes never replace the driver's observed action snapshots.
+      if(!['ADVISORY_ADMIT_PATH','ADVISORY_REJECT_PATH'].some(k=>record.route===e[k]))return;
+      const route=record.route,status=count(record.result?.status);
+      this.decisions.push(`${record.method} ${route} HTTP: ${status}; private decision body/response withheld`);
+      return;
     }
     if(!Object.hasOwn(sources,label))return;
     const [method,key]=sources[label],route=e[key],r=record.result,d=r?.data;
     const lines=[`${method} ${route} HTTP: ${count(r?.status)}; outcome: ${record.skip?(safeSkips.has(record.skip)?record.skip:'unavailable'):r?.error?'transport_or_status_failure':'response_observed'}`];
-    if(label==='plan')this.rows.set('risk',[`${method} ${route} risk_report: unavailable`]);
+    if(label==='plan')this.rows.set('risk',[`${method} ${route}: unavailable; action not observed`]);
+    if(record.skip || r?.error || !Number.isInteger(r?.status) || r.status<200 || r.status>=300) {
+      lines.push(`${method} ${route}: unavailable; action not observed`);
+      this.attempts.push(`${method} ${route} HTTP: ${count(r?.status)}; ${label}`);
+      this.rows.set(label,lines);return;
+    }
     if(d&&typeof d==='object') {
       if(!['capture','plan','vocabulary','precondition'].includes(label)&&Array.isArray(d.diagnostics))lines.push(`${method} ${route} diagnostics[].code: ${JSON.stringify(diagnostics(d.diagnostics))} (client-computed histogram; messages withheld)`);
       if(label==='capture') {
@@ -100,7 +93,7 @@ export class PublicReport {
   }
   render(answers=[]) {
     const section=(n,labels)=>[`${n}.`,...labels.flatMap(label=>this.rows.get(label)??[`${sources[label][0]} ${this.e[sources[label][1]]}: unavailable; action not observed`])];
-    return ['BEGIN LIVE REHEARSAL COPY-BACK',`mode: ${this.compare?'comparison (same UI responses)':'driver (API fields, UI-only words read privately)'}`,
+    return ['BEGIN LIVE REHEARSAL COPY-BACK',
       ...section(1,['capture']),...section(2,['plan']),
       ...section(3,['risk']),...section(4,['preview']),...section(5,['approval']),...section(6,['universe_before']),...section(7,['subject','authoring','requirement','requirement_readback']),...section(8,['vocabulary','precondition','queue']),...this.decisions,
       '9. Operator judgments (deliberate public sentences; never API data):',...answers.map((a,i)=>`answer ${i+1}: ${typeof a==='string'?JSON.stringify(a):'unavailable'}`),

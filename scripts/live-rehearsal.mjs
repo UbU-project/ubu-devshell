@@ -123,7 +123,7 @@ export function createForwarder({base,port,endpoints:e,fetchImpl=globalThis.fetc
 }
 async function freePort(){const server=net.createServer();await new Promise((yes,no)=>{server.once('error',no);server.listen(0,'127.0.0.1',yes);});const port=server.address().port;await new Promise(yes=>server.close(yes));return port;}
 export async function cli(env=process.env,args=process.argv.slice(2)) {
-  if (args.length>1 || args.some(a=>a!=='--compare')) throw new Error('unsupported_argument');
+  if (args.length) throw new Error('unsupported_argument');
   if (!process.stdin.isTTY) throw new Error('terminal_required');
   const ui=env.UI_DIR ? pathToFileURL(`${env.UI_DIR}/src/api/endpoints.ts`) : new URL('../../ubu-ui/src/api/endpoints.ts',import.meta.url);
   const e=await import(ui.href),config=liveConfig(env,e);
@@ -153,7 +153,7 @@ export async function cli(env=process.env,args=process.argv.slice(2)) {
     console.log(`store: ${JSON.stringify(config.store)}\ncalendar: ${JSON.stringify(config.calendar)}\nSecond invocation is a second rehearsal. Reset the calendar yourself before starting.`);
     if(await readline.question('Type live to confirm these destinations and the calendar reset prerequisite: ')!=='live')return;
     const backendPort=await freePort(),base=`http://127.0.0.1:${backendPort}`;
-    const report=new PublicReport(e,{compare:args.includes('--compare')});
+    const report=new PublicReport(e);
     const observe=(record,forwarded)=>report.observe(record,forwarded);
     server=http.createServer(createForwarder({base,port:backendPort,endpoints:e,observe}));
     await new Promise((yes,no)=>{server.once('error',no);server.listen(config.port,'127.0.0.1',yes);});
@@ -163,10 +163,6 @@ export async function cli(env=process.env,args=process.argv.slice(2)) {
     const deadline=Date.now()+60000;
     for(;;){if(child.exitCode!==null || stopping)throw new Error('owned_orchestrator_unavailable');try{const health=await requestJson(base,'GET',e.HEALTH_PATH,undefined,{allowedPorts:new Set([backendPort]),timeoutMs:1000});if(health.status!==200)throw new Error('health_unavailable');break;}catch{if(Date.now()>deadline)throw new Error('startup_timeout');await new Promise(resolve=>setTimeout(resolve,100));}}
     const call=(method,path,body)=>requestJson(base,method,path,body,{allowedPorts:new Set([backendPort])});
-    if(args.includes('--compare')) {
-      console.log('Comparison: perform the appendix UI actions once through this forwarding port. Do not run a second orchestrator or repeat the driver actions. Finish manual reading before returning here.');
-      await readline.question('Press Enter after the manual comparison readings are complete: ');
-    } else {
       await runActions({endpoints:e,inputs:config.inputs,call,observe,approve:async preview=>{
         console.log(previewLines(preview,e.CALENDAR_PREVIEW_PATH).join('\n'));
         console.log('Operation summaries and identities withheld. Inspect your Plan in Calendar before deciding. This API preview is not the UI preview snapshot.');
@@ -174,7 +170,6 @@ export async function cli(env=process.env,args=process.argv.slice(2)) {
       }});
       console.log('Open Today, Calendar, Tasks and Review. Read private requirement/proposal contents there. Admissions/rejections remain your deliberate actions.');
       await readline.question('Press Enter after the visual pass: ');
-    }
     console.log('Four public judgment sentences follow. Do not paste a title, name, condition, fact key/value/row, credential or token. Describe your judgment in your own words.');
     const answers=await collectJudgments(prompt=>readline.question(prompt),{withheld:privateStrings([config.inputs,env.UBU_GOOGLE_CREDENTIALS_PATH,env.UBU_GOOGLE_TOKEN_CACHE_PATH,env.UBU_REHEARSAL_BINARY])});
     console.log(report.render(answers));
