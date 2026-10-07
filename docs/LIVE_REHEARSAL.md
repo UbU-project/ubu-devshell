@@ -1,3 +1,16 @@
+# P1B-72: decisions that remain manual
+
+The driver is documented in [LIVE_REHEARSAL_DRIVER.md](LIVE_REHEARSAL_DRIVER.md).
+Startup consent stays explicit because the destinations are live. Approval
+stays explicit because it authorizes real calendar writes. The visual pass
+stays human because it exercises the operator's own week, titles and collisions.
+The four judgments stay human because only the operator can assess preference,
+meaning and usefulness. Genuine authoring, admissions and rejections likewise
+belong to the operator; optional private inputs carry observations, not defaults.
+No automated response supplies a decision or becomes a quoted private value.
+
+The existing manual procedure below remains intact while the driver is checked.
+
 # The live rehearsal
 
 This is the procedure. It is the single source for the live sequence: a
