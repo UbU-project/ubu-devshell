@@ -18,6 +18,7 @@
 // Nothing here leaves the machine. Every request goes through `call`, which
 // refuses any address that is not 127.0.0.1 on a port this run opened itself.
 import { spawn } from "node:child_process";
+import { requestJson, TransportError } from "./loopback-json.mjs";
 import { appendFileSync, mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import net from "node:net";
@@ -111,37 +112,19 @@ function same(actual, expected, description) {
 /// kind of answer that is not JSON: the framework's own refusal of a body that is not the route's shape.
 async function call(base, method, path, body, expect = 200, plain = false) {
   const url = `${base}${path}`;
-  const target = new URL(url);
-  if (target.hostname !== "127.0.0.1" || !ownPorts.has(Number(target.port))) {
-    throw new CheckFailure(`refusing ${url}: this run only talks to 127.0.0.1 on ports it opened itself`);
+  let result;
+  try { result = await requestJson(base, method, path, body, { allowedPorts: ownPorts, plain }); }
+  catch (error) {
+    if (error instanceof TransportError) throw new CheckFailure(`${method} ${url}: ${error.code}`);
+    throw error;
   }
-  const init = { method, headers: { Accept: "application/json" } };
-  if (body !== undefined) {
-    init.headers["Content-Type"] = "application/json";
-    init.body = JSON.stringify(body);
-  }
-  const response = await fetch(url, init);
-  const text = await response.text();
+  const { status, data, text } = result;
   requestCount += 1;
-  lastRequest = { method, url, sent: body, status: response.status, body: text };
-  if (verbose) {
-    console.log(`  ${response.status} ${method} ${url}`);
-  }
+  lastRequest = { method, url, sent: body, status, body: text };
+  if (verbose) console.log(`  ${status} ${method} ${url}`);
   const accepted = Array.isArray(expect) ? expect : [expect];
-  if (!accepted.includes(response.status)) {
-    throw new CheckFailure(`${method} ${url} returned ${response.status}, expected ${accepted.join(" or ")}`);
-  }
-  if (!text) {
-    return null;
-  }
-  if (plain) {
-    return text;
-  }
-  try {
-    return JSON.parse(text);
-  } catch {
-    throw new CheckFailure(`${method} ${url} returned ${response.status} with a body that is not JSON`);
-  }
+  if (!accepted.includes(status)) throw new CheckFailure(`${method} ${url} returned ${status}, expected ${accepted.join(" or ")}`);
+  return data;
 }
 
 function fill(path, values) {

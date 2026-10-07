@@ -211,6 +211,8 @@ run_fake_github_import_diagnostics
 run_fake_github_adapter_diagnostics
 run_hard_boundary_diagnostics
 
+# Pure injected-effects tests; never execute the operator's live CLI.
+node --experimental-strip-types --no-warnings "$SCRIPT_DIR/live-rehearsal.test.mjs"
 "$SCRIPT_DIR/test-build-exclusion.sh"
 "$SCRIPT_DIR/check-planning-worker.sh"
 
