@@ -101,7 +101,8 @@ first made it first.
 ## Whether a step belongs in the list at all
 
 From P1B-50, three rules decide it, from P1B-51 a fourth, from P1B-53 a
-fifth, from P1B-55 a sixth, and from P1B-56 a seventh, and from P1B-60 an eighth. A step that fails any
+fifth, from P1B-55 a sixth, from P1B-56 a seventh, from P1B-60 an eighth,
+from P1B-61 a ninth, and from P1B-73 the tenth and eleventh. A step that fails any
 one of them is not written; it is moved to the runner, dropped, moved to where
 it breaks nothing, rewritten until it says exactly what to do, or retired. The
 seventh is about what a step may ask the operator to read at all.
@@ -137,9 +138,10 @@ seventh is about what a step may ask the operator to read at all.
      earlier step that could fail. The notes step reads a description the
      harness staged itself, not one an interview wrote.
 
-A model that declines to ask is a result to copy back, not a reason to stop.
-The harness prints, under the list: **when a step cannot be completed, write
-down what the screen said and go on to the next step. Every step is done.**
+A valid model result with zero proposals is still a result. P1B-73 supersedes
+the live continuation instruction: a failed action stops with a named fault and
+remedy in the public artifact. No human transcribes an absence or retries for
+a preferred model result. Historical continuation rules below describe earlier runs.
 
 5. **A step says exactly what to open, exactly what to click, exactly what to
    read, and exactly what to copy back. It never asks the operator to infer.
@@ -250,6 +252,10 @@ down what the screen said and go on to the next step. Every step is done.**
    - the harness follows the same rule. A seed that only a retired step
      needed goes with it; a seed another step needs stays.
 
+   P1B-73 explicitly retires duplicate numeric/status transcription under existing
+   runner/UI coverage plus new projection tests. That is an operator withdrawal
+   of redundant work, not an inferred live confirmation; the ledger says so.
+
    The ledger is what makes the rule safe. Without it, "that was proven once"
    is a memory, and in six months nobody can say whether Google's consent
    flow was ever exercised against a real account.
@@ -289,6 +295,19 @@ down what the screen said and go on to the next step. Every step is done.**
    correct.** Otherwise an empty proposal is indistinguishable from a failure.
    P1B-60's preview count and sentence make matching current Plan placements
    visible beside proposed operations; retained completed history is excluded.
+
+### P1B-73 operative rules 10 and 11
+
+10. **A manual step exists only for rendering.** The harness's own justification
+    is: “Three things it cannot see remain for a human: the Tauri HTTP plugin
+    transport, the capability scope, and anything rendered.” It then says:
+    “The third is the only reason a human opens the app.” A verification that
+    does not inspect rendering moves to the runner or driver. Human consent and
+    judgments remain choices; deterministic verifications do not become choices.
+11. **A manual instrument has one line of execution.** It completes or stops
+    with a named reason and remedy. It may not branch on what the operator sees
+    or ask for a phrase describing an absence. Live numeric readings belong to
+    the script. Rendering inspection belongs to the pre-release visual pass.
 
 A step with no diagnostic to meet says so: its `codes` is `[]` and the
 harness prints `none`.
@@ -406,25 +425,24 @@ that nobody takes them for one:
 | step 10, the sentence saying whether the store was new and what was deleted | the P1B-55 ticket: "the check ran but the hazard was never exercised live". The instruction stays | the runner's scenario 20 asserts the hazard; no live run has |
 | step 11, the titles of commitments that did not come in, and of any title listed twice | it asked the operator to compare two lists and draw a conclusion, which the fifth rule forbids | the capture counters and the grey box, which are still copied back |
 
-### P1B-72 proposed retirements — pending operator comparison
+### P1B-73 retirements of the eight proposed P1B-72 transcriptions
 
-These are **proposals, not retirements**. The nine item numbers are the P1B-71
-copy-back numbers retained in the fallback appendix. P1B-72's opening reports
-P1B-71 accepted as a whole, but supplies no individual capture/Plan/approval
-measurements. Its named producer evidence is stated separately below. No row
-claims that new machinery was verified live. A ticket that changes the thing
-a line names brings that check back; a failed comparison keeps it active.
+The comparison requirement is withdrawn under rule 1. These retirements rest
+on the existing runner/UI coverage **plus P1B-73 §B projection tests**, by the
+operator's explicit correction. They do not certify P1B-72 acceptance or invent
+a new live run. The older evidence qualifications remain. Item 9 stays active.
+A ticket changing a named surface brings its check back under the ledger rule.
 
 | retired | what it proved | proved in | on record | what covers it now | retired |
 |---|---|---|---|---|---|
-| proposed item 1 transcription | live capture counters, no-colour observation and diagnostic counts | P1B-71 whole run; new instrument unverified | P1B-72 opening accepts P1B-71 as a whole; no item-1 measurements quoted | existing capture scenarios/UI tests; driver API counters and labelled diagnostic-entry histograms, pending comparison | pending P1B-72 operator comparison |
-| proposed item 2 transcription | live placements, exclusions and planning diagnostics | P1B-71 whole run; new instrument unverified | P1B-72 opening accepts P1B-71 as a whole; no item-2 measurements quoted | existing Plan scenarios/UI tests; driver labelled cardinalities/histograms, private excluded-work prose withheld, pending comparison | pending P1B-72 operator comparison |
-| proposed item 3 transcription | live risk level and findings | P1B-71 whole run; new instrument unverified | P1B-72 opening accepts P1B-71 as a whole; no item-3 measurements quoted | existing risk scenario/UI tests; driver fixed risk fields, private detail withheld, pending comparison | pending P1B-72 operator comparison |
-| proposed item 4 transcription | live operation counts, matching placements and first Dynamic Update | P1B-71 whole run; new instrument unverified | P1B-72 opening accepts P1B-71 as a whole; no item-4 measurements quoted | existing preview scenarios/UI tests; driver operation fields and counts, identity/gesture prose withheld, pending comparison | pending P1B-72 operator comparison |
-| proposed item 5 transcription | explicit live approval result and operations applied | P1B-71 whole run; new instrument unverified | P1B-72 opening accepts P1B-71 as a whole; no item-5 measurements quoted | existing apply scenarios/UI tests; driver approval status and operation-result histogram, human approval retained, pending comparison | pending P1B-72 operator comparison |
-| proposed item 6 transcription | UniverseState's four pre-authoring entry counts | P1B-71 whole run; new instrument unverified | P1B-72 opening accepts P1B-71 as a whole; no item-6 measurements quoted | existing UniverseState scenarios/UI tests; driver collection cardinalities only, pending comparison | pending P1B-72 operator comparison |
-| proposed item 7 status transcription only | genuine authoring and saved requirement outcome | P1B-71 whole run; new instrument unverified | P1B-72 opening accepts P1B-71 as a whole; no item-7 measurements quoted | existing authoring scenarios/UI tests; driver HTTP outcomes/readback presence, meaning/words remain operator-owned, pending comparison | pending P1B-72 operator comparison |
-| proposed item 8 numeric transcription only | each advisory producer's separate result/selection counts | P1B-71 named producer readings; new instrument unverified | P1B-72 opening quotes Vocabulary and Precondition candidates_enqueued 3 and selection none; no new-driver measurements | existing advisory scenarios/UI tests; driver separate producer snapshots, words/names/decisions remain operator-owned, pending comparison | pending P1B-72 operator comparison |
+| item 1 transcription | live capture counters, no-colour observation and diagnostic counts | P1B-71 whole run; projection verified by P1B-73 §B; no new live confirmation | P1B-72 opening accepts P1B-71 as a whole; no item-1 measurements quoted | existing capture scenarios/UI tests; P1B-73 §B field-by-field projection tests and driver API counters and labelled diagnostic-entry histograms | P1B-73, explicit operator correction 2026-10-07 |
+| item 2 transcription | live placements, exclusions and planning diagnostics | P1B-71 whole run; projection verified by P1B-73 §B; no new live confirmation | P1B-72 opening accepts P1B-71 as a whole; no item-2 measurements quoted | existing Plan scenarios/UI tests; P1B-73 §B field-by-field projection tests and driver labelled cardinalities/histograms, private excluded-work prose withheld | P1B-73, explicit operator correction 2026-10-07 |
+| item 3 transcription | live risk level and findings | P1B-71 whole run; projection verified by P1B-73 §B; no new live confirmation | P1B-72 opening accepts P1B-71 as a whole; no item-3 measurements quoted | existing risk scenario/UI tests; P1B-73 §B field-by-field projection tests and driver fixed risk fields, private detail withheld | P1B-73, explicit operator correction 2026-10-07 |
+| item 4 transcription | live operation counts, matching placements and first Dynamic Update | P1B-71 whole run; projection verified by P1B-73 §B; no new live confirmation | P1B-72 opening accepts P1B-71 as a whole; no item-4 measurements quoted | existing preview scenarios/UI tests; P1B-73 §B field-by-field projection tests and driver operation fields and counts, identity/gesture prose withheld | P1B-73, explicit operator correction 2026-10-07 |
+| item 5 transcription | explicit live approval result and operations applied | P1B-71 whole run; projection verified by P1B-73 §B; no new live confirmation | P1B-72 opening accepts P1B-71 as a whole; no item-5 measurements quoted | existing apply scenarios/UI tests; P1B-73 §B field-by-field projection tests and driver approval status and operation-result histogram, human approval retained | P1B-73, explicit operator correction 2026-10-07 |
+| item 6 transcription | UniverseState's four pre-authoring entry counts | P1B-71 whole run; projection verified by P1B-73 §B; no new live confirmation | P1B-72 opening accepts P1B-71 as a whole; no item-6 measurements quoted | existing UniverseState scenarios/UI tests; P1B-73 §B field-by-field projection tests and driver collection cardinalities only | P1B-73, explicit operator correction 2026-10-07 |
+| item 7 status transcription only | genuine authoring and saved requirement outcome | P1B-71 whole run; projection verified by P1B-73 §B; no new live confirmation | P1B-72 opening accepts P1B-71 as a whole; no item-7 measurements quoted | existing authoring scenarios/UI tests; P1B-73 §B field-by-field projection tests and driver HTTP outcomes/readback presence, meaning/words remain operator-owned | P1B-73, explicit operator correction 2026-10-07 |
+| item 8 numeric transcription only | each advisory producer's separate result/selection counts | P1B-71 named producer readings; projection verified by P1B-73 §B; no new live confirmation | P1B-72 opening quotes Vocabulary and Precondition candidates_enqueued 3 and selection none; no new live-driver measurements | existing advisory scenarios/UI tests; P1B-73 §B field-by-field projection tests and driver separate producer snapshots, words/names/decisions remain operator-owned | P1B-73, explicit operator correction 2026-10-07 |
 | item 9 active human judgment; no retirement proposed | whether the chosen schedule and store suit the operator | P1B-71 whole run; judgment remains live each time | P1B-72 opening accepts P1B-71 as a whole; no schedule-judgment sentence quoted | operator's public judgment at every rehearsal; script cannot supply it | not retired |
 
 ### From `scripts/acceptance.mjs`
@@ -515,7 +533,7 @@ the whole staged store and not only what was made before it.
 
 ## How to add a step
 
-1. Check the step against the eight rules above, and decide where in the
+1. Check the step against all eleven acceptance rules, and decide where in the
    order it goes: before the first model-dependent step unless it is one.
 2. Write the step in `STEPS`, in order, with `needs` naming every seed it
    relies on, `open`, `click`, `read` and `copy` in the words the app uses,
@@ -998,7 +1016,7 @@ and policy off against the operator's own calendar and report its copy-back.
 The two readings are the Review copy-back length and the otherwise identical
 P1B-70 rehearsal. Automated passes are not operator acceptance.
 
-## P1B-72
+## P1B-72 (historical; comparison and sinks superseded by P1B-73)
 
 **An acceptance instrument that asks a human to transcribe will grow a branch
 for every absence, and the branches are a sign the wrong party is reading.**
@@ -1083,11 +1101,74 @@ contract enums; private Task identity is used only in memory to associate the
 readback. Both corrections have pure regression coverage. No route or content
 permission was expanded.
 
-P1B-71 is accepted by the P1B-72 opening; the preceding P1B-71 pending statement
-is historical. **P1B-72 operator acceptance has not been performed.** The
-operator must run `--compare`, perform the appendix actions once, and confirm
-that the block and manual reading agree. Disagreement is this ticket's defect,
-not a reason to repeat until it disappears. Proposed ledger entries remain
-pending. The ordinary flow reduces 14 steps/9 branching items to one invocation,
-one approval, one visual pass, four judgments and one paste; startup consent,
-calendar reset/private preparation and optional candidate decisions stay explicit.
+P1B-71 was accepted by the P1B-72 opening. The P1B-72 driver shipped, but its
+operator acceptance was refused. Its comparison mandate and pending retirement
+condition are withdrawn by P1B-73 below; no successful P1B-72 live run is claimed.
+
+## P1B-73 — one line of execution
+
+P1B-72's judgment call 8 is **withdrawn**, not repaired. Rule 1 says **“A manual
+step may not verify what the runner or a `ubu-ui` test already asserts.”** Its
+operator comparison duplicated those verifications. Section B replaces it with
+field-by-field projection tests against injected flow responses: every scalar,
+cardinality, histogram and enum in groups 1–8 must equal its observed source;
+one-field mutations may change only their dependent lines. Failed, skipped and
+unreached actions remain explicit; unknown strings are withheld but counted.
+There is no whole-block golden and no human comparison.
+
+The eight pending numeric/status retirements are retired **by this explicit
+operator correction**, with existing runner/UI coverage **and the projection
+tests** named in each ledger row. They do not claim P1B-72 live acceptance or
+new live confirmation. Item 9 remains an active human judgment. P1B-71 accepted
+readings remain historical evidence with their original quality qualifications.
+
+The two sinks reverse P1B-72: the screen is private and never pasted; one file
+is public and pasted whole. The approved terminal formatter consumes existing
+HTTP ASTs and the shared numeric-word helper, with no new API or UI code.
+Independent private-renderer canaries for a title, condition word, diagnostic
+message and risk detail must appear on screen and never in PublicReport.render().
+Three judgments remain; the visual-pass prompt/fourth judgment are gone.
+
+The instrument either completes its requested action sequence or stops with a
+named reason and remedy. Failed requests, unusable previews/selectors, disabled
+sessions and failed producers stop; valid zero-candidate responses are results.
+Omitted optional authoring inputs and a deliberate declined approval are recorded
+by code. No manual phrase is requested for them. Consent/approval never defaults.
+The same public artifact contains the completion block or refusal line, with
+no private renderer or startup stderr in it. Credential/token paths remain
+withheld. An unwritable output destination is diagnosed, not replaced by an
+undocumented private transcript or second fallback file.
+
+P1B-67's absence rule is retained for whatever manual readings remain. It is
+**dead letter for this live document**, which now asks for no figure transcription
+or missing-figure phrase. A new manual step still has to meet the rule and rules
+10/11; its existence cannot be justified by reviving the removed fallback.
+
+### The regime
+
+Per commit: check-all.sh and the scenario runner, no human. Per feature: the live
+driver, which gains a recorded action for each new feature. Its human surface
+is calendar reset, private environment, live, one approval decision, three public
+judgment sentences and one paste of the file. Pre-release only: the UI visual
+pass through actual operator data. Setup/consent/judgments are operator choices,
+not duplicate deterministic verifications.
+
+The cost is explicit: **per-ticket live rendering findings are given up**. The
+P1B-56 risk-report defects illustrate the class—scope wording and manufactured
+affect presented as measurement. Existing HTTP/UI tests cover known cases, but
+actual-data layout/rendering findings can now wait until the pre-release pass.
+No acceptance based only on automated counts is claimed.
+
+Measurement: fourteen steps and nine branching copy-back items; P1B-72 then one
+invocation with four judgment prompts plus a visual pass; P1B-73 now one invocation
+with three, no visual pass, no manual fallback and no numbered copy-back items.
+LIVE_REHEARSAL.md moves from 828 to 108 lines. Its 30 distinct curly-quoted phrases
+beginning “no ” (whitespace normalized) become zero, not replacement phrases.
+
+Three grounding corrections were approved before implementation. Existing HTTP
+supplies ASTs but not rendered condition words, so terminal presentation is
+explicitly permitted. The worker discards stderr and clears environment, so
+import warnings are counted in its existing framework-probe response and asserted
+zero by its existing owned-worker check. Finally, the kernel inventory pin must
+advance to its published correction commit; the other eight pins and consumer
+Cargo revisions stay unchanged. No test gains a new spawning/HTTP/signal path.
