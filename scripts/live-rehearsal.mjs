@@ -62,7 +62,7 @@ export async function runActions({ endpoints:e, inputs={}, call, approve=async()
   } else observe({label:'authoring',skip:'private_input_missing'});
   if (inputs.task && inputs.precondition) {
     const list=await action('task_lookup','GET',`${e.TASK_LIST_PATH}?schema_version=${encodeURIComponent(e.TASK_READ_SCHEMA_VERSION)}&status=active`);
-    const chosen=(list?.tasks ?? []).filter(t=>!t.is_routine_occurrence && (inputs.task.id ? t.task_id===inputs.task.id : typeof inputs.task.title==='string' && t.title===inputs.task.title));
+    const chosen=(Array.isArray(list?.tasks)?list.tasks:[]).filter(t=>t && typeof t.task_id==='string' && !t.is_routine_occurrence && (inputs.task.id ? t.task_id===inputs.task.id : typeof inputs.task.title==='string' && t.title===inputs.task.title));
     if (chosen.length===1) {
       const path=e.TASK_PATH.replace('{task_id}',encodeURIComponent(chosen[0].task_id));
       const current=await action('task_read','GET',path);
@@ -99,7 +99,11 @@ export function createForwarder({base,port,endpoints:e,fetchImpl=globalThis.fetc
       for await (const chunk of request) {bytes+=chunk.length;if(bytes>1024*1024) throw new Error('request_too_large');chunks.push(chunk);}
       const raw=Buffer.concat(chunks).toString('utf8');
       // Preserve exact UI request/response bytes. No response renderer or API.
-      const upstream=await fetchImpl(loopbackUrl(base,request.url,new Set([port])),{method:request.method,redirect:'error',headers:{'Content-Type':'application/json',Accept:'application/json'},...(raw?{body:raw}:{}),signal:AbortSignal.timeout(650000)});
+      const headers={'Content-Type':'application/json',Accept:'application/json'};
+      for(const name of ['content-type','accept','origin','access-control-request-method','access-control-request-headers']) {
+        const value=request.headers?.[name];if(typeof value==='string')headers[name]=value;
+      }
+      const upstream=await fetchImpl(loopbackUrl(base,request.url,new Set([port])),{method:request.method,redirect:'error',headers,...(raw?{body:raw}:{}),signal:AbortSignal.timeout(650000)});
       const reader=upstream.body?.getReader();let text;
       if (reader) {
         let size=0;const parts=[];try {for(;;){const next=await reader.read();if(next.done)break;size+=next.value.length;if(size>16*1024*1024)throw new Error('response_too_large');parts.push(next.value);}} finally {await reader.cancel().catch(()=>{});}
@@ -125,7 +129,8 @@ export async function cli(env=process.env,args=process.argv.slice(2)) {
   const e=await import(ui.href),config=liveConfig(env,e);
   // Validate only file metadata, not OAuth contents, and never log these paths.
   await access(env.UBU_GOOGLE_CREDENTIALS_PATH,constants.R_OK);await access(env.UBU_REHEARSAL_BINARY,constants.X_OK);
-  try {await access(env.UBU_GOOGLE_TOKEN_CACHE_PATH,constants.R_OK|constants.W_OK);} catch(error) {
+  if(!(await stat(env.UBU_GOOGLE_CREDENTIALS_PATH)).isFile()||!(await stat(env.UBU_REHEARSAL_BINARY)).isFile())throw new Error('configuration_file_required');
+  try {await access(env.UBU_GOOGLE_TOKEN_CACHE_PATH,constants.R_OK|constants.W_OK);if(!(await stat(env.UBU_GOOGLE_TOKEN_CACHE_PATH)).isFile())throw new Error('configuration_file_required');} catch(error) {
     if(error.code!=='ENOENT') throw new Error('token_unavailable');
     await access(dirname(env.UBU_GOOGLE_TOKEN_CACHE_PATH),constants.W_OK);
   }
@@ -139,13 +144,13 @@ export async function cli(env=process.env,args=process.argv.slice(2)) {
     if(server?.listening){server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}
     if(child?.pid && child.exitCode===null && child.signalCode===null){
       await new Promise(resolve=>{child.once('exit',()=>{clearTimeout(timer);resolve();});
-        const timer=setTimeout(()=>{child.kill('SIGKILL');resolve();},2000);child.kill('SIGTERM');});
+        const timer=setTimeout(()=>{child.kill('SIGKILL');},2000);child.kill('SIGTERM');});
     }
   })();
   // Runtime-only cleanup: tests never execute cli or install signal handlers.
   const interrupted=()=>{void stop();};
   try {
-    console.log(`store: ${config.store}\ncalendar: ${config.calendar}\nSecond invocation is a second rehearsal. Reset the calendar yourself before starting.`);
+    console.log(`store: ${JSON.stringify(config.store)}\ncalendar: ${JSON.stringify(config.calendar)}\nSecond invocation is a second rehearsal. Reset the calendar yourself before starting.`);
     if(await readline.question('Type live to confirm these destinations and the calendar reset prerequisite: ')!=='live')return;
     const backendPort=await freePort(),base=`http://127.0.0.1:${backendPort}`;
     const report=new PublicReport(e,{compare:args.includes('--compare')});
@@ -176,5 +181,9 @@ export async function cli(env=process.env,args=process.argv.slice(2)) {
   } finally {process.removeListener('SIGINT',interrupted);process.removeListener('SIGTERM',interrupted);await stop();}
 }
 if (process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) {
-  cli().catch(()=>{console.error('Rehearsal could not start or continue; configuration, destination or transport unavailable. Private details withheld.');process.exitCode=1;});
+  cli().catch(error=>{
+    const known=['unsupported_argument','terminal_required','required_configuration_missing','absolute_path_required','mock_configuration_refused','invalid_port','invalid_private_inputs','fresh_store_required','configuration_file_required','token_unavailable','owned_startup_failed','owned_orchestrator_unavailable','startup_timeout'];
+    const reason=known.includes(error?.message)?error.message:'configuration_destination_or_transport_unavailable';
+    console.error(`Rehearsal could not start or continue: ${reason}. Private details withheld.`);process.exitCode=1;
+  });
 }

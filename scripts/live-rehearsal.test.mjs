@@ -151,3 +151,15 @@ test('comparison requirement readback belongs to the edited Task, not an unrelat
   record('PATCH',other,{}, {description:secret()});record('GET',other,{payload:{}});
   assert(report.render().includes('payload.preconditions present: true'));assert(!report.render().includes(id));
 });
+test('comparison preserves actual UI preflight headers and prevents redirect forwarding',async()=>{
+  let received;const handler=createForwarder({base:owned,port:54321,endpoints:e,fetchImpl:async(url,init)=>{received=init;return new Response(null,{status:204});}});
+  const request=req('/calendar/current','', 'OPTIONS');request.headers={origin:'http://localhost:1420','access-control-request-method':'GET','access-control-request-headers':'content-type'};
+  const response=res();await handler(request,response);
+  assert.equal(response.status,204);assert.equal(received.headers.origin,request.headers.origin);assert.equal(received.headers['access-control-request-method'],'GET');assert.equal(received.redirect,'error');
+});
+test('malformed Task lists report unavailable selection and still reach both producers',async()=>{
+  for(const tasks of [{},[null],['untrusted']]){
+    const calls=[],records=[];await runActions({endpoints:e,inputs:{task:{id:secret()},precondition:{target:secret()}},call:async(m,p)=>{calls.push(p);return {status:200,data:{tasks}};},observe:r=>records.push(r)});
+    assert.equal(records.find(r=>r.label==='requirement').skip,'task_selector_missing_or_ambiguous');assert.equal(calls.filter(p=>p===e.ADVISORY_RUN_PATH).length,2);
+  }
+});

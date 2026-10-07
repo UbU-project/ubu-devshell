@@ -24,7 +24,9 @@ for ubu_required in UBU_DB_PATH UBU_GOOGLE_CALENDAR_ID UBU_GOOGLE_CREDENTIALS_PA
   [[ -n "${!ubu_required:-}" ]] || { echo 'REFUSED: required configuration missing; see --help.' >&2; exit 2; }
 done
 # Same exclusion/containment as every other devshell build. Diagnostics stay private.
-source "$SCRIPT_DIR/env.sh"
+if ! source "$SCRIPT_DIR/env.sh" >/dev/null 2>&1; then
+  echo 'REFUSED: build environment unavailable; private details withheld.' >&2; exit 1
+fi
 export ORCHESTRATOR_DIR="${ORCHESTRATOR_DIR:-$(cd "$SCRIPT_DIR/../.." && pwd)/ubu-orchestrator}"
 if [[ -z "${UBU_REHEARSAL_BINARY:-}" ]]; then
   ubu_build_scratch="$(mktemp -d)"
