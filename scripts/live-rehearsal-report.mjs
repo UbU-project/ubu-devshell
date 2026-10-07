@@ -4,11 +4,11 @@ const length=v=>Array.isArray(v)?v.length:'unavailable';
 const flag=v=>typeof v==='boolean'?v:'unavailable';
 const choice=(v,allowed)=>allowed.includes(v)?v:'withheld_or_unavailable';
 const kinds=['create','update','delete'];
-const statuses=['ok','unconfigured','failed','malformed_result','queue_full','applied','partial','refused','skipped','observed','drifted','rejected','admitted'];
+const statuses=['ok','unconfigured','failed','malformed_result','queue_full','applied','partial','refused','skipped','observed','drifted','rejected','admitted','timeout','worker_error','cancelled'];
 const levels=['low','medium','high'];
 const categories=['deadline_risk','dependency_fragility','worker_bottleneck','stale_affect','affect_margin','destructive_pressure','post_plan_depletion','low_coverage','skeleton_failure','routine_triage','unplaced_work'];
 // Closed vocabulary: an unexpected server code is counted but its text withheld.
-const codes=new Set(['capture_colour_absent','capture_stale_export','capture_event_invalid','capture_all_day_unsupported','capture_recurring_unsupported','capture_colour_unmapped','capture_colour_collision','routine_occurrence_overlaps_commitment','static_task_collision','calendar_event_retained','calendar_preview_stale','calendar_preview_missing','calendar_session_disabled','advisory_task_skipped','advisory_unconfigured','advisory_connection_failed','advisory_timeout','advisory_http_error','advisory_empty_response','advisory_malformed_result','precondition_queue_full','precondition_no_task','precondition_no_facts','precondition_missing_targets','precondition_proposal_refused','vocabulary_queue_full','vocabulary_no_task','vocabulary_proposal_refused','vocabulary_value_required','vocabulary_admission_refused','universe_mutation_invalid','universe_mutations_empty','version_conflict','unknown_schema_version','missing_schema_version']);
+const codes=new Set(['capture_occupancy_only','capture_event_not_ownable','capture_colour_ambiguous','capture_owned_drift','capture_unrecorded_event','advisory_result_too_large','advisory_http_failed','advisory_transport_unavailable','capture_colour_absent','capture_stale_export','capture_event_invalid','capture_all_day_unsupported','capture_recurring_unsupported','capture_colour_unmapped','capture_colour_collision','routine_occurrence_overlaps_commitment','static_task_collision','calendar_event_retained','calendar_preview_stale','calendar_preview_missing','calendar_session_disabled','advisory_task_skipped','advisory_unconfigured','advisory_connection_failed','advisory_timeout','advisory_http_error','advisory_empty_response','advisory_malformed_result','precondition_queue_full','precondition_no_task','precondition_no_facts','precondition_missing_targets','precondition_proposal_refused','vocabulary_queue_full','vocabulary_no_task','vocabulary_proposal_refused','vocabulary_value_required','vocabulary_admission_refused','universe_mutation_invalid','universe_mutations_empty','version_conflict','unknown_schema_version','missing_schema_version']);
 export function histogram(rows,key,allowed) {
   if(!Array.isArray(rows))return 'unavailable';
   const bins={};for(const row of rows){const code=allowed.has(row?.[key])?row[key]:'withheld_unknown';bins[code]=(bins[code]??0)+1;}return bins;
@@ -49,8 +49,11 @@ export class PublicReport {
         label='universe_before';
       }
       if(record.route===e.UNIVERSE_STATE_PATH&&record.method==='PATCH')this.universeWritten=true;
-      if(record.route===e.TASK_PATH&&record.method==='PATCH')this.requirementWritten=true;
-      if(record.route===e.TASK_PATH&&record.method==='GET')label=this.requirementWritten?'requirement_readback':undefined;
+      if(record.route===e.TASK_PATH&&record.method==='PATCH'){
+        if(!record.body||!Object.hasOwn(record.body,'preconditions'))return;
+        this.requirementWritten=true;this.requirementIdentity=record.identity;
+      }
+      if(record.route===e.TASK_PATH&&record.method==='GET')label=this.requirementWritten&&record.identity===this.requirementIdentity?'requirement_readback':undefined;
       if(['ADVISORY_ADMIT_PATH','ADVISORY_REJECT_PATH'].some(k=>record.route===e[k])){
         const route=record.route,status=count(record.result?.status);this.decisions.push(`${record.method} ${route} HTTP: ${status}; private decision body/response withheld`);return;
       }
@@ -58,6 +61,7 @@ export class PublicReport {
     if(!Object.hasOwn(sources,label))return;
     const [method,key]=sources[label],route=e[key],r=record.result,d=r?.data;
     const lines=[`${method} ${route} HTTP: ${count(r?.status)}; outcome: ${record.skip?(safeSkips.has(record.skip)?record.skip:'unavailable'):r?.error?'transport_or_status_failure':'response_observed'}`];
+    if(label==='plan')this.rows.set('risk',[`${method} ${route} risk_report: unavailable`]);
     if(d&&typeof d==='object') {
       if(!['capture','plan','vocabulary','precondition'].includes(label)&&Array.isArray(d.diagnostics))lines.push(`${method} ${route} diagnostics[].code: ${JSON.stringify(diagnostics(d.diagnostics))} (client-computed histogram; messages withheld)`);
       if(label==='capture') {
@@ -67,7 +71,7 @@ export class PublicReport {
       }
       if(label==='plan') {
         const steps=d.plan?.steps;
-        lines.push(`${method} ${route} status: ${choice(d.status,['planned','no_plan','ok','failed'])}`,
+        lines.push(`${method} ${route} status: ${choice(d.status,['candidate','admitted','rejected','superseded','planned','no_plan','ok','failed'])}`,
           `${method} ${route} diagnostics[].code: ${JSON.stringify(diagnostics(d.diagnostics))} (client-computed histogram; messages withheld)`,
           `${method} ${route} plan.steps: ${length(steps)} (client-computed cardinality); plan.steps[].static_anchor: ${JSON.stringify(histogram(steps,'static_anchor',new Set([true,false])))} (client-computed histogram)`);
         for(const field of ['unplaced_tasks','blocked_tasks','invalid_tasks']) lines.push(`${method} ${route} ${field}: ${length(d[field])} (client-computed cardinality; titles/ids/reasons/explanations/alternatives withheld)`);

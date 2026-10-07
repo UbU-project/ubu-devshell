@@ -136,3 +136,18 @@ test('known private configuration in a judgment is withheld, and interruptions/e
   const answers=await collectJudgments(async()=>{n++;if(n===1)return canary;if(n===2)throw Error(canary);if(n===3)return '';return 'The layout fits.';},{withheld});
   assert(!answers.join('\n').includes(canary));assert.deepEqual(answers.slice(1),['unanswered','unanswered','The layout fits.']);
 });
+test('public enum vocabulary preserves actual admitted plans and worker failure/timeout statuses',()=>{
+  const report=new PublicReport(e);
+  report.observe({label:'plan',result:{status:200,data:{status:'admitted'}}});
+  report.observe({label:'vocabulary',result:{status:200,data:{status:'timeout'}}});
+  report.observe({label:'precondition',result:{status:200,data:{status:'worker_error'}}});
+  const output=report.render();for(const status of ['admitted','timeout','worker_error'])assert(output.includes('status: '+status));
+});
+test('comparison requirement readback belongs to the edited Task, not an unrelated later UI read',()=>{
+  const report=new PublicReport(e,{compare:true}),id=secret(),other=secret();
+  const record=(method,identity,data,body)=>report.observe({method,route:e.TASK_PATH,identity,body,result:{status:200,data}},true);
+  record('PATCH',id,{}, {preconditions:{target:secret()}});record('GET',id,{payload:{preconditions:{target:secret()}}});record('GET',other,{payload:{}});
+  assert(report.render().includes('payload.preconditions present: true'));
+  record('PATCH',other,{}, {description:secret()});record('GET',other,{payload:{}});
+  assert(report.render().includes('payload.preconditions present: true'));assert(!report.render().includes(id));
+});

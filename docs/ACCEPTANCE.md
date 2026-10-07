@@ -406,6 +406,27 @@ that nobody takes them for one:
 | step 10, the sentence saying whether the store was new and what was deleted | the P1B-55 ticket: "the check ran but the hazard was never exercised live". The instruction stays | the runner's scenario 20 asserts the hazard; no live run has |
 | step 11, the titles of commitments that did not come in, and of any title listed twice | it asked the operator to compare two lists and draw a conclusion, which the fifth rule forbids | the capture counters and the grey box, which are still copied back |
 
+### P1B-72 proposed retirements — pending operator comparison
+
+These are **proposals, not retirements**. The nine item numbers are the P1B-71
+copy-back numbers retained in the fallback appendix. P1B-72's opening reports
+P1B-71 accepted as a whole, but supplies no individual capture/Plan/approval
+measurements. Its named producer evidence is stated separately below. No row
+claims that new machinery was verified live. A ticket that changes the thing
+a line names brings that check back; a failed comparison keeps it active.
+
+| retired | what it proved | proved in | on record | what covers it now | retired |
+|---|---|---|---|---|---|
+| proposed item 1 transcription | live capture counters, no-colour observation and diagnostic counts | P1B-71 whole run; new instrument unverified | P1B-72 opening accepts P1B-71 as a whole; no item-1 measurements quoted | existing capture scenarios/UI tests; driver API counters and labelled diagnostic-entry histograms, pending comparison | pending P1B-72 operator comparison |
+| proposed item 2 transcription | live placements, exclusions and planning diagnostics | P1B-71 whole run; new instrument unverified | P1B-72 opening accepts P1B-71 as a whole; no item-2 measurements quoted | existing Plan scenarios/UI tests; driver labelled cardinalities/histograms, private excluded-work prose withheld, pending comparison | pending P1B-72 operator comparison |
+| proposed item 3 transcription | live risk level and findings | P1B-71 whole run; new instrument unverified | P1B-72 opening accepts P1B-71 as a whole; no item-3 measurements quoted | existing risk scenario/UI tests; driver fixed risk fields, private detail withheld, pending comparison | pending P1B-72 operator comparison |
+| proposed item 4 transcription | live operation counts, matching placements and first Dynamic Update | P1B-71 whole run; new instrument unverified | P1B-72 opening accepts P1B-71 as a whole; no item-4 measurements quoted | existing preview scenarios/UI tests; driver operation fields and counts, identity/gesture prose withheld, pending comparison | pending P1B-72 operator comparison |
+| proposed item 5 transcription | explicit live approval result and operations applied | P1B-71 whole run; new instrument unverified | P1B-72 opening accepts P1B-71 as a whole; no item-5 measurements quoted | existing apply scenarios/UI tests; driver approval status and operation-result histogram, human approval retained, pending comparison | pending P1B-72 operator comparison |
+| proposed item 6 transcription | UniverseState's four pre-authoring entry counts | P1B-71 whole run; new instrument unverified | P1B-72 opening accepts P1B-71 as a whole; no item-6 measurements quoted | existing UniverseState scenarios/UI tests; driver collection cardinalities only, pending comparison | pending P1B-72 operator comparison |
+| proposed item 7 status transcription only | genuine authoring and saved requirement outcome | P1B-71 whole run; new instrument unverified | P1B-72 opening accepts P1B-71 as a whole; no item-7 measurements quoted | existing authoring scenarios/UI tests; driver HTTP outcomes/readback presence, meaning/words remain operator-owned, pending comparison | pending P1B-72 operator comparison |
+| proposed item 8 numeric transcription only | each advisory producer's separate result/selection counts | P1B-71 named producer readings; new instrument unverified | P1B-72 opening quotes Vocabulary and Precondition candidates_enqueued 3 and selection none; no new-driver measurements | existing advisory scenarios/UI tests; driver separate producer snapshots, words/names/decisions remain operator-owned, pending comparison | pending P1B-72 operator comparison |
+| item 9 active human judgment; no retirement proposed | whether the chosen schedule and store suit the operator | P1B-71 whole run; judgment remains live each time | P1B-72 opening accepts P1B-71 as a whole; no schedule-judgment sentence quoted | operator's public judgment at every rehearsal; script cannot supply it | not retired |
+
 ### From `scripts/acceptance.mjs`
 
 Step numbers are the ones the harness printed in P1B-54.
@@ -976,3 +997,97 @@ Operator acceptance is still pending: run LIVE_REHEARSAL.md with torch absent
 and policy off against the operator's own calendar and report its copy-back.
 The two readings are the Review copy-back length and the otherwise identical
 P1B-70 rehearsal. Automated passes are not operator acceptance.
+
+## P1B-72
+
+**An acceptance instrument that asks a human to transcribe will grow a branch
+for every absence, and the branches are a sign the wrong party is reading.**
+Item 1 acquired seven phrases: “no captured counter”, “no updated counter”,
+“no unchanged counter”, “no skipped counter”, “no moved counter”, “no resized
+counter” and “no no-colour sentence”. They express an appropriate manual rule
+applied to a task a script can perform. The ordinary path now records fields
+and unavailability, with no human figure transcription. The complete fallback
+retains those branches; P1B-67's absence rule is not repealed and applies to
+remaining manual readings/transcription and any new manual step.
+
+Rule 1 says: **“A manual step may not verify what the runner or a `ubu-ui`
+test already asserts.”** The former copy-back's rendering/count checks were
+already in tension with it. The fixture assertions stay in the runner and UI
+tests. One visual pass through Today, Calendar, Tasks and Review adds the
+operator's actual data, collisions, layouts and assessment of requirement words,
+rather than re-proving fixture rendering. The extra two screens are necessary
+because requirements and proposals are not all visible on Today or Calendar.
+
+Judgment call 2 makes automation safe by printing source API fields, rather
+than reconstructing rendered sentences or gesture business rules. The approved
+exception for generic cardinalities/histograms labels each **client-computed**
+and names its source route/field. Skip diagnostic entries may include an
+aggregate; their count is not a Task count. Judgment call 8 checks the new
+instrument against the manual one once, with the **same UI request responses**
+observed through a local forwarding proxy. Duplicate mutations/producer runs
+would alter the thing being compared. There is no UI scraping or new route.
+
+The seven approved grounding corrections are concrete:
+
+1. Genuine authoring comes from private operator inputs; missing inputs are
+   skipped. Fabricating routine hours/fact values or deciding admissions would
+   substitute a script's intent for the operator's observations.
+2. The API has no pre-computed placement/operation/diagnostic/collection counts.
+   Generic labelled counts are permitted; imitating UI prose would create a
+   second rendering implementation, while withholding every count would lose
+   the instrument's main benefit.
+3. The visual pass includes Tasks and Review as well as Today and Calendar.
+   PreconditionWords is UI-only and includes private targets/expectations;
+   implementing it in the script or publishing those words would be wrong.
+4. Four deliberately public operator judgment sentences are collected, as an
+   explicit content-policy exception. Raw API/configuration data stay withheld.
+   Refusing all answers would defeat section C; broad permission to echo data
+   would defeat the privacy requirement.
+5. Reset completeness is unverifiable. Stamped leftovers/collisions can be
+   reported, but a route cannot distinguish unstamped exports from original
+   events. Claiming a verified reset would manufacture evidence; operator reset
+   remains the prerequisite.
+6. Comparison mode forwards the UI's existing requests once. Capture, preview
+   and advisory result panels use local React state, so independently issuing
+   requests cannot populate them. Replaying the actions would compare different
+   runs; backend/UI modifications exceed this ticket.
+7. Ledger retirement is pending until the operator confirms the comparison.
+   Automated stub tests establish projection/plumbing behavior, not agreement
+   on a real calendar. Item 9 remains an active human judgment.
+
+The driver owns its orchestrator because no route attests an attached process's
+store/calendar identity. It prints those two destinations, requires typed
+`live`, presents a preview, and separately requires literal `approve` before a
+real write. Comparison approval comes from the UI's own explicit click after
+its own preview. No flag/timeout/default authorizes writes. Builds use the
+unchanged env.sh lock/scope and finish before human waiting. None of the new
+pure tests listens, spawns, signals, installs handlers or reaches external HTTP,
+Google, ollama or an editor. The P1B-70 five spawn conditions and the standing
+runner exemption are unchanged. check-all/test-all run only injected-effects
+unit tests, never the live CLI. Torch is neither installed nor executed.
+
+The public whitelist retains six capture counters; Plan placement/exclusion
+counts, fixed risk fields; operation kinds/static flags/timestamps/colour/busy
+flags/reminder counts; matching placements; approval status/results; the four
+UniverseState collection counts; authoring statuses and condition presence;
+and separate producer status/enqueue/selection/diagnostic-entry counts. Unknown
+strings/codes, diagnostic messages, Task/event IDs/titles/notes, excluded-work
+prose, risk detail/subjects, fact keys/values/rows and proposed names/condition
+words are withheld. Questions ask for judgments, never those contents.
+
+Final verification caught two projection defects before publication: the
+closed status vocabulary initially omitted admitted Plans and worker
+error/timeout outcomes, and comparison readback initially could confuse a later
+unrelated Task read with the edited Task. The whitelist now includes the actual
+contract enums; private Task identity is used only in memory to associate the
+readback. Both corrections have pure regression coverage. No route or content
+permission was expanded.
+
+P1B-71 is accepted by the P1B-72 opening; the preceding P1B-71 pending statement
+is historical. **P1B-72 operator acceptance has not been performed.** The
+operator must run `--compare`, perform the appendix actions once, and confirm
+that the block and manual reading agree. Disagreement is this ticket's defect,
+not a reason to repeat until it disappears. Proposed ledger entries remain
+pending. The ordinary flow reduces 14 steps/9 branching items to one invocation,
+one approval, one visual pass, four judgments and one paste; startup consent,
+calendar reset/private preparation and optional candidate decisions stay explicit.

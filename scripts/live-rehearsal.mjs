@@ -109,7 +109,7 @@ export function createForwarder({base,port,endpoints:e,fetchImpl=globalThis.fetc
       try{body=raw?JSON.parse(raw):null;}catch{}
       const route=routeTemplate(request.url,e);
       // Observe copies in memory; never print a request, URL parameter or body.
-      try {observe({method:request.method,route,body,result:{status:upstream.status,data}},true);} catch {}
+      try {observe({method:request.method,route,identity:new URL(request.url,base).pathname,body,result:{status:upstream.status,data}},true);} catch {}
       for (const name of ['content-type','access-control-allow-origin','access-control-allow-headers','access-control-allow-methods','etag']) {
         const value=upstream.headers.get(name);if(value)response.setHeader(name,value);
       }
