@@ -124,3 +124,15 @@ test('visual UI reads cannot overwrite driver snapshots; explicit decisions repo
   report.observe({method:'POST',route:e.ADVISORY_REJECT_PATH,body:{reason:canary},result:{status:200,data:{message:canary}}},true);
   assert(report.render().includes('captured: 7'));assert(!report.render().includes('captured: 8'));assert(!report.render().includes(canary));
 });
+const {QUESTIONS,collectJudgments,privateStrings}=await import('./live-rehearsal-questions.mjs');
+test('four judgments are asked at the end in order and included in the single block',async()=>{
+  const seen=[],answers=await collectJudgments(async prompt=>{seen.push(prompt);return 'The choice suits me.';});
+  assert.equal(QUESTIONS.length,4);assert.deepEqual(seen,QUESTIONS.map(q=>`${q}\nYour public judgment sentence: `));
+  assert.equal(answers.length,4);const output=new PublicReport(e).render(answers);
+  assert.equal(output.split('BEGIN LIVE REHEARSAL COPY-BACK').length,2);assert.equal(output.split('The choice suits me.').length,5);
+});
+test('known private configuration in a judgment is withheld, and interruptions/empty answers remain results',async()=>{
+  const canary=secret(),withheld=privateStrings({nested:[canary]});let n=0;
+  const answers=await collectJudgments(async()=>{n++;if(n===1)return canary;if(n===2)throw Error(canary);if(n===3)return '';return 'The layout fits.';},{withheld});
+  assert(!answers.join('\n').includes(canary));assert.deepEqual(answers.slice(1),['unanswered','unanswered','The layout fits.']);
+});

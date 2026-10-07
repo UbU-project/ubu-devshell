@@ -1,6 +1,7 @@
 // Real operator instrument, never executed by checks. Tests inject all effects.
 import { requestJson, loopbackUrl } from './loopback-json.mjs';
 import { PublicReport, previewLines } from './live-rehearsal-report.mjs';
+import { collectJudgments, privateStrings } from './live-rehearsal-questions.mjs';
 import { spawn } from 'node:child_process';
 import http from 'node:http';
 import net from 'node:net';
@@ -169,7 +170,9 @@ export async function cli(env=process.env,args=process.argv.slice(2)) {
       console.log('Open Today, Calendar, Tasks and Review. Read private requirement/proposal contents there. Admissions/rejections remain your deliberate actions.');
       await readline.question('Press Enter after the visual pass: ');
     }
-    console.log(report.render());
+    console.log('Four public judgment sentences follow. Do not paste a title, name, condition, fact key/value/row, credential or token. Describe your judgment in your own words.');
+    const answers=await collectJudgments(prompt=>readline.question(prompt),{withheld:privateStrings([config.inputs,env.UBU_GOOGLE_CREDENTIALS_PATH,env.UBU_GOOGLE_TOKEN_CACHE_PATH,env.UBU_REHEARSAL_BINARY])});
+    console.log(report.render(answers));
   } finally {process.removeListener('SIGINT',interrupted);process.removeListener('SIGTERM',interrupted);await stop();}
 }
 if (process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) {
