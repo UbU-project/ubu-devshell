@@ -1,8 +1,9 @@
 // Real operator instrument, never executed by checks. Tests inject all effects.
 import { requestJson, loopbackUrl } from './loopback-json.mjs';
-import { PublicReport, previewLines } from './live-rehearsal-report.mjs';
+import { PublicReport } from './live-rehearsal-report.mjs';
 import { RehearsalFault, finishFailure, writePublicArtifact, startupBuffer } from './live-rehearsal-diagnostics.mjs';
 import { collectJudgments, privateStrings } from './live-rehearsal-questions.mjs';
+import { PrivateRenderer } from './live-rehearsal-private.mjs';
 import { spawn } from 'node:child_process';
 import http from 'node:http';
 import net from 'node:net';
@@ -192,7 +193,8 @@ export async function cli(env=process.env,args=process.argv.slice(2)) {
     if(await question('Type live to confirm these destinations and the calendar reset prerequisite: ')!=='live')throw new RehearsalFault('startup_confirmation_declined');
     const backendPort=await freePort(),base=`http://127.0.0.1:${backendPort}`;
     const report=new PublicReport(e);
-    const observe=(record,forwarded)=>report.observe(record,forwarded);
+    const privateView=new PrivateRenderer({credentialPaths:[env.UBU_GOOGLE_CREDENTIALS_PATH,env.UBU_GOOGLE_TOKEN_CACHE_PATH]});
+    const observe=(record,forwarded)=>{report.observe(record,forwarded);if(!forwarded)privateView.observe(record);};
     server=http.createServer(createForwarder({base,port:backendPort,endpoints:e,observe}));
     await bindForwarder(server,config.port);
     child=spawn(env.UBU_REHEARSAL_BINARY,[],{cwd:env.ORCHESTRATOR_DIR ?? fileURLToPath(new URL('../../ubu-orchestrator',import.meta.url)),env:{...env,UBU_ORCHESTRATOR_PORT:String(backendPort),HOST:'127.0.0.1',BIND_ADDR:'127.0.0.1'},stdio:['ignore','ignore','pipe']});
@@ -206,14 +208,12 @@ export async function cli(env=process.env,args=process.argv.slice(2)) {
       child.stderr.removeListener('data',stderr.add);child.stderr.resume();stderr.clear();break;}catch{if(Date.now()>deadline)throw new RehearsalFault('startup_timeout');await new Promise(resolve=>setTimeout(resolve,100));}}
     const call=(method,path,body)=>requestJson(base,method,path,body,{allowedPorts:new Set([backendPort])});
       await runActions({endpoints:e,inputs:config.inputs,call,observe,approve:async preview=>{
-        console.log(previewLines(preview,e.CALENDAR_PREVIEW_PATH).join('\n'));
-        console.log('Operation summaries and identities withheld. Inspect your Plan in Calendar before deciding. This API preview is not the UI preview snapshot.');
+        console.log('Decide from the private Plan and exact preview operations printed above.');
         return await question('Type approve to WRITE this preview to the real calendar, or anything else to decline: ')==='approve';
       }});
-      console.log('Open Today, Calendar, Tasks and Review. Read private requirement/proposal contents there. Admissions/rejections remain your deliberate actions.');
-      await question('Press Enter after the visual pass: ');
-    console.log('Four public judgment sentences follow. Do not paste a title, name, condition, fact key/value/row, credential or token. Describe your judgment in your own words.');
-    const answers=await collectJudgments(prompt=>question(prompt),{withheld:privateStrings([config.inputs,env.UBU_GOOGLE_CREDENTIALS_PATH,env.UBU_GOOGLE_TOKEN_CACHE_PATH,env.UBU_REHEARSAL_BINARY])});
+
+    console.log('Three public judgment sentences follow. Do not paste a title, name, condition, fact key/value/row, credential or token. Describe your judgment in your own words.');
+    const answers=await collectJudgments(prompt=>question(prompt),{withheld:[...privateView.knownContent,...privateStrings([config.inputs,env.UBU_GOOGLE_CREDENTIALS_PATH,env.UBU_GOOGLE_TOKEN_CACHE_PATH,env.UBU_REHEARSAL_BINARY])]});
     const path=await writePublicArtifact(report.render(answers)+'\n',{env});
     console.log('Copy-back file: '+JSON.stringify(path));
   } catch(error) {

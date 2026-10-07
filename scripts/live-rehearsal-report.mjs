@@ -81,11 +81,11 @@ export class PublicReport {
       if(label==='approval') lines.push(`${method} ${route} status: ${choice(d.status,statuses)}; operation_results: ${length(d.operation_results)} (client-computed cardinality); operation_results[].status: ${JSON.stringify(histogram(d.operation_results,'status',new Set(['applied','failed','skipped'])))} (client-computed histogram; operation_id/message withheld)`);
       if(label==='universe_before') for(const field of ['facts','numeric_values','set_memberships','event_markers'])lines.push(`${method} ${route} ${field}: ${d[field]&&typeof d[field]==='object'&&!Array.isArray(d[field])?Object.keys(d[field]).length:'unavailable'} (client-computed entry cardinality; no keys/values/rows)`);
       if(['authoring','requirement','subject'].includes(label))lines.push(`${method} ${route} write response observed; content withheld`);
-      if(label==='requirement_readback')lines.push(`${method} ${route} payload.preconditions present: ${d.payload?flag(d.payload.preconditions!=null):'unavailable'}; AST/PreconditionWords withheld; words are UI-only`);
+      if(label==='requirement_readback')lines.push(`${method} ${route} payload.preconditions present: ${d.payload?flag(d.payload.preconditions!=null):'unavailable'}; AST/words withheld; terminal rendering stays private`);
       if(['vocabulary','precondition'].includes(label))lines.push(`${method} ${route} producer=${label}: status: ${choice(d.status,statuses)}; candidates_enqueued: ${count(d.candidates_enqueued)}; selected: ${length(d.selected)} (client-computed cardinality; ids/titles withheld)`,
         `${method} ${route} producer=${label} diagnostics[].code: ${JSON.stringify(diagnostics(d.diagnostics))} (client-computed histogram; messages withheld)`,
         `${method} ${route} producer=${label} diagnostics[].code == advisory_task_skipped: ${Array.isArray(d.diagnostics)?d.diagnostics.filter(x=>x?.code==='advisory_task_skipped').length:'unavailable'} (client-computed diagnostic-entry count; aggregate notes are not Task counts)`);
-      if(label==='queue')lines.push(`${method} ${route} candidates: ${length(d.candidates)} (client-computed cardinality; names/conditions/ids/titles withheld; proposal words are UI-only)`);
+      if(label==='queue')lines.push(`${method} ${route} candidates: ${length(d.candidates)} (client-computed cardinality; names/conditions/ids/titles withheld; proposal words stay on the private screen)`);
       if(label==='session')for(const field of ['accepted','enabled'])lines.push(`${method} ${route} ${field}: ${flag(d[field])}`);
     }
     this.attempts.push(`${method} ${route} HTTP: ${count(r?.status)}; ${label}`);
@@ -100,7 +100,7 @@ export class PublicReport {
       'Additional action outcomes:',...['routine','session','colour_setting'].flatMap(label=>this.rows.get(label)??[]),
       'Observed action attempts (no replay):',...this.attempts,
       'Reset completeness: unverifiable. capture_stale_export diagnoses stamped leftovers; plan collision codes are observations, not proof of reset.',
-      'UI-only/withheld: placement gesture prose, saved requirement words, proposal/replacement words, vocabulary names, Task/event ids/titles/notes, diagnostic messages and risk detail.',
+      'Withheld from this file: placement gesture prose, saved requirement words, proposal/replacement words, vocabulary names, Task/event ids/titles/notes, diagnostic messages and risk detail.',
       'END LIVE REHEARSAL COPY-BACK'].join('\n');
   }
 }

@@ -141,16 +141,17 @@ test('visual UI reads cannot overwrite driver snapshots; explicit decisions repo
   assert(report.render().includes('captured: 7'));assert(!report.render().includes('captured: 8'));assert(!report.render().includes(canary));
 });
 const {QUESTIONS,collectJudgments,privateStrings}=await import('./live-rehearsal-questions.mjs');
-test('four judgments are asked at the end in order and included in the single block',async()=>{
+test('three judgments are asked at the end in order and included in the single block',async()=>{
   const seen=[],answers=await collectJudgments(async prompt=>{seen.push(prompt);return 'The choice suits me.';});
-  assert.equal(QUESTIONS.length,4);assert.deepEqual(seen,QUESTIONS.map(q=>`${q}\nYour public judgment sentence: `));
-  assert.equal(answers.length,4);const output=new PublicReport(e).render(answers);
-  assert.equal(output.split('BEGIN LIVE REHEARSAL COPY-BACK').length,2);assert.equal(output.split('The choice suits me.').length,5);
+  assert.equal(QUESTIONS.length,3);assert.deepEqual(seen,QUESTIONS.map(q=>`${q}\nYour public judgment sentence: `));
+  assert.equal(answers.length,3);const output=new PublicReport(e).render(answers);
+  assert.equal(output.split('BEGIN LIVE REHEARSAL COPY-BACK').length,2);assert.equal(output.split('The choice suits me.').length,4);
 });
-test('known private configuration in a judgment is withheld, and interruptions/empty answers remain results',async()=>{
-  const canary=secret(),withheld=privateStrings({nested:[canary]});let n=0;
-  const answers=await collectJudgments(async()=>{n++;if(n===1)return canary;if(n===2)throw Error(canary);if(n===3)return '';return 'The layout fits.';},{withheld});
-  assert(!answers.join('\n').includes(canary));assert.deepEqual(answers.slice(1),['unanswered','unanswered','The layout fits.']);
+test('known private content and empty judgments stop with a public reason; question errors propagate',async()=>{
+  const canary=secret(),withheld=privateStrings({nested:[canary]});
+  await assert.rejects(collectJudgments(async()=>canary,{withheld}),error=>error.code==='judgment_private_content');
+  await assert.rejects(collectJudgments(async()=>''),error=>error.code==='judgment_unanswered');
+  await assert.rejects(collectJudgments(async()=>{throw new RehearsalFault('interrupted');}),error=>error.code==='interrupted');
 });
 test('public enum vocabulary preserves actual admitted plans and worker failure/timeout statuses',()=>{
   const report=new PublicReport(e);
@@ -306,4 +307,28 @@ test('C public artifact cannot overwrite credential/token/store paths; unwritabl
   await assert.rejects(writePublicArtifact('public',{env,fs:fakeFiles()}),error=>error.code==='copy_back_unwritable');
   const prints=[];const result=await finishFailure(new RehearsalFault('terminal_required'),{fs:fakeFiles({writeFails:true}),print:text=>prints.push(text)});
   assert.equal(result,null);assert(prints.some(line=>line.startsWith('copy_back_unwritable:')));
+});
+const {PrivateRenderer,conditionWords,PRIVATE_BANNER}=await import('./live-rehearsal-private.mjs');
+test('D private title, condition word, diagnostic message and risk detail never reach public render',()=>{
+  const title=secret(),word=secret(),message=secret(),detail=secret(),screen=[],privateView=new PrivateRenderer({print:text=>screen.push(text)}),report=new PublicReport(e);
+  const records=[
+    {label:'plan',result:{status:200,data:{status:'admitted',plan:{steps:[{summary:title,start_at:'2026-10-07T10:00:00Z',end_at:'2026-10-07T11:00:00Z',static_anchor:false}]},diagnostics:[{code:'static_task_collision',message}],risk_report:{level:'high',findings:[{category:'deadline_risk',severity:'high',blocking:true,detail}]}}}},
+    {label:'requirement_readback',result:{status:200,data:{payload:{preconditions:{target:word,predicate:'equals',expected:true}}}}},
+    {label:'queue',result:{status:200,data:{candidates:[{candidate:{candidate_kind:'universe_target',normalized_proposal:{target:word}}},{candidate:{candidate_kind:'precondition',normalized_proposal:{target:word,predicate:'absent'}}}]}}}
+  ];
+  for(const record of records){report.observe(record);const before=report.render();privateView.observe(record);assert.equal(report.render(),before);}
+  const output=report.render();for(const canary of [title,word,message,detail]){assert(screen.join('\n').includes(canary));assert(!output.includes(canary));assert(privateView.knownContent.has(canary));}
+  assert(screen.includes(PRIVATE_BANNER));
+});
+test('D private condition rendering preserves nested meaning and existing numeric vocabulary',()=>{
+  const target=secret(),numeric='numeric_values.'+secret();
+  assert.equal(conditionWords({target,predicate:'equals',expected:'x'}),target+' is "x"');
+  assert.equal(conditionWords({target,predicate:'member_of',expected:[1,2]}),target+' is one of [1,2]');
+  assert.equal(conditionWords({all_of:[{target,predicate:'absent'},{any_of:[{target:numeric,predicate:'at_least',expected:7},{target:numeric,predicate:'less_than',expected:9}]}]}),`(${target} is not set and (${numeric} is at least 7 or ${numeric} is less than 9))`);
+});
+test('D preview summaries/windows and excluded-work explanations are privately visible before approval',()=>{
+  const canary=secret(),screen=[],renderer=new PrivateRenderer({print:text=>screen.push(text)});
+  renderer.observe({label:'plan',result:{data:{plan:{steps:[]},unplaced_tasks:[{summary:canary,reason:'outside_allowed_window',explanation:canary,safe_alternatives:[{label:canary,resulting_change_summary:canary}]}]}}});
+  renderer.observe({label:'preview',result:{data:{operations:[{kind:'delete',summary:canary},{kind:'update',static_anchor:false,event:{summary:canary,start_at:'2026-10-07T10:00:00Z',end_at:'2026-10-07T11:00:00Z'}}]}}});
+  assert(screen.some(line=>line.includes('outside_allowed_window')));assert(screen.some(line=>line.includes('delete: '+canary)));assert(screen.some(line=>line.includes('Dynamic')&&line.includes('10:00')));
 });

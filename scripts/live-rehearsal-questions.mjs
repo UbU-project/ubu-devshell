@@ -1,9 +1,9 @@
+import { RehearsalFault } from './live-rehearsal-diagnostics.mjs';
 // These are deliberately public operator-authored judgments, never API fields.
 export const QUESTIONS=Object.freeze([
   'whether what it chose to schedule is what he would have chosen, and whether this is a store he would plan tomorrow on',
   "whether the precondition's words express his requirement",
-  'whether a proposed name was worth recording',
-  'whether anything on Today or Calendar looked visibly wrong'
+  'whether a proposed name was worth recording'
 ]);
 export function privateStrings(value) {
   if(typeof value==='string')return value.length>=4?[value]:[];
@@ -14,9 +14,9 @@ export function privateStrings(value) {
 export async function collectJudgments(question,{withheld=[]}={}) {
   const answers=[];
   for(const prompt of QUESTIONS) {
-    let answer;try {answer=await question(`${prompt}\nYour public judgment sentence: `);} catch {}
-    if(typeof answer!=='string'||!answer.trim())answers.push('unanswered');
-    else if(withheld.some(value=>answer.includes(value)))answers.push('answer withheld because it included known private configuration');
+    const answer=await question(`${prompt}\nYour public judgment sentence: `);
+    if(typeof answer!=='string'||!answer.trim())throw new RehearsalFault('judgment_unanswered');
+    else if(withheld.some(value=>answer.includes(value)))throw new RehearsalFault('judgment_private_content');
     else answers.push(answer);
   }
   return answers;
