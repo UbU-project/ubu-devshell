@@ -18,3 +18,7 @@ tmp/
 # Generated .cargo/config.toml files are written into sibling repos, not here.
 
 .cache/
+
+# Public operator copy-back is a local artifact, never repository content.
+live-rehearsal-copy-back.txt
+live-rehearsal-copy-back.txt.tmp-*

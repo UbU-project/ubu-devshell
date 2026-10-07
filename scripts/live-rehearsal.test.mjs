@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import * as e from '../../ubu-ui/src/api/endpoints.ts';
-import { liveConfig, runActions, createForwarder, routeTemplate } from './live-rehearsal.mjs';
+import { liveConfig, runActions, createForwarder, routeTemplate, validateFiles, bindForwarder } from './live-rehearsal.mjs';
 import { requestJson, loopbackUrl } from './loopback-json.mjs';
 const secret=()=>randomUUID();
 const owned='http://127.0.0.1:54321',ports=new Set([54321]);
@@ -61,27 +61,27 @@ test('actions follow document order with separate explicit approval and versione
   assert.deepEqual(patch.body,{schema_version:e.TASK_CAPTURE_SCHEMA_VERSION,expected_version:7,preconditions:f.inputs.precondition});
   assert.equal(Object.keys(patch.body).length,3);
 });
-test('decline cannot write; failed capture does not suppress later producers',async()=>{
-  const f=flow({failure:e.CALENDAR_CAPTURE_PATH});await f.run();
+test('failed capture stops before later producers and writes',async()=>{
+  const f=flow({failure:e.CALENDAR_CAPTURE_PATH});await assert.rejects(f.run(),error=>error.code==='action_request_failed');
   assert(!f.calls.some(c=>c.path===e.CALENDAR_APPROVE_PATH));
   assert(f.records.find(r=>r.label==='capture').result.error);
-  assert(f.records.find(r=>r.label==='precondition'));
+  assert(!f.records.find(r=>r.label==='precondition'));
 });
 test('missing private authoring stays skipped; existing trees are preserved',async()=>{
   const f=flow({tree:true});await f.run();
   assert.equal(f.records.find(r=>r.label==='requirement').skip,'existing_tree_preserved');
   assert(!f.calls.some(c=>c.method==='PATCH'&&c.path.startsWith('/task/')));
-  const records=[];await runActions({endpoints:e,call:async()=>({status:200,data:{}}),observe:r=>records.push(r)});
+  const records=[];await runActions({endpoints:e,call:async()=>({status:200,data:{enabled:true,stale:false,preview_id:secret(),status:'ok'}}),observe:r=>records.push(r)});
   for(const label of ['routine','authoring','requirement'])assert.equal(records.find(r=>r.label===label).skip,'private_input_missing');
 });
-test('stale or absent preview never asks for approval; thrown approval still continues',async()=>{
+test('stale or absent preview never asks for approval; interrupted approval stops',async()=>{
   for(const data of [{stale:true,preview_id:secret()},{}]) {
     let asked=false;const calls=[];
-    await runActions({endpoints:e,call:async(m,p)=>{calls.push(p);return {status:200,data};},approve:async()=>{asked=true;return true;}});
+    await assert.rejects(runActions({endpoints:e,call:async(m,p)=>{calls.push(p);return {status:200,data:{enabled:true,...data}};},approve:async()=>{asked=true;return true;}}),error=>error.code==='preview_unavailable');
     assert.equal(asked,false);assert(!calls.includes(e.CALENDAR_APPROVE_PATH));
   }
-  let end=false;await runActions({endpoints:e,call:async(m,p)=>{if(p===e.ADVISORY_QUEUE_PATH)end=true;return {status:200,data:{stale:false,preview_id:secret()}};},approve:async()=>{throw Error(secret());}});
-  assert(end);
+  let end=false;await assert.rejects(runActions({endpoints:e,call:async(m,p)=>{if(p===e.ADVISORY_QUEUE_PATH)end=true;return {status:200,data:{enabled:true,stale:false,preview_id:secret()}};},approve:async()=>{throw Error(secret());}}),error=>error.code==='approval_interrupted');
+  assert(!end);
 });
 test('configuration has no path/calendar defaults and refuses mock or malformed private inputs',()=>{
   assert.throws(()=>liveConfig({},e));
@@ -171,10 +171,10 @@ test('optional UI proxy preserves actual UI preflight headers and prevents redir
   const response=res();await handler(request,response);
   assert.equal(response.status,204);assert.equal(received.headers.origin,request.headers.origin);assert.equal(received.headers['access-control-request-method'],'GET');assert.equal(received.redirect,'error');
 });
-test('malformed Task lists report unavailable selection and still reach both producers',async()=>{
+test('malformed Task lists stop with a selector diagnosis',async()=>{
   for(const tasks of [{},[null],['untrusted']]){
-    const calls=[],records=[];await runActions({endpoints:e,inputs:{task:{id:secret()},precondition:{target:secret()}},call:async(m,p)=>{calls.push(p);return {status:200,data:{tasks}};},observe:r=>records.push(r)});
-    assert.equal(records.find(r=>r.label==='requirement').skip,'task_selector_missing_or_ambiguous');assert.equal(calls.filter(p=>p===e.ADVISORY_RUN_PATH).length,2);
+    const calls=[];await assert.rejects(runActions({endpoints:e,inputs:{task:{id:secret()},precondition:{target:secret()}},call:async(m,p)=>{calls.push(p);return {status:200,data:{tasks,enabled:true,stale:false,preview_id:secret()}};}}),error=>error.code==='task_selector_unavailable');
+    assert.equal(calls.filter(p=>p===e.ADVISORY_RUN_PATH).length,0);
   }
 });
 
@@ -188,7 +188,7 @@ function fields(output) {
   };
 }
 async function projected(options) {
-  const f=flow({approve:true,...options});await f.run();const report=new PublicReport(e);
+  const f=flow({approve:true,...options});try{await f.run();}catch(error){if(!options?.failure)throw error;}const report=new PublicReport(e);
   for(const record of f.records)report.observe(record);
   return {f,report,output:report.render()};
 }
@@ -249,4 +249,61 @@ test('B failed, skipped and unreached actions each retain explicit unavailable l
 test('B unknown enum/code entries are withheld and remain included in cardinalities',async()=>{
   const canary=secret();const {output}=await projected({mutate:r=>{r.plan.risk_report.level=canary;r.capture.diagnostics.push({code:canary,message:canary});r.preview.operations.push({kind:canary});r.approval.operation_results.push({status:canary});}});
   const check=fields(output);check('risk_report.level: ','withheld_or_unavailable');check('operations: ',4);check('operations[].kind: ',{update:1,create:1,delete:1,withheld_unknown:1});check('operation_results: ',5);check('operation_results[].status: ',{applied:2,failed:1,skipped:1,withheld_unknown:1});check(`POST ${e.CALENDAR_CAPTURE_PATH} diagnostics[].code: `,{capture_colour_absent:2,capture_stale_export:1,withheld_unknown:1});assert(!output.includes(canary));
+});
+const {RehearsalFault,REMEDIES,failureLine,writePublicArtifact,finishFailure,startupBuffer,shellPath}=await import('./live-rehearsal-diagnostics.mjs');
+const fakeEnv=()=>Object.fromEntries(['UBU_DB_PATH','UBU_GOOGLE_CALENDAR_ID','UBU_GOOGLE_CREDENTIALS_PATH','UBU_GOOGLE_TOKEN_CACHE_PATH','UBU_REHEARSAL_BINARY'].map(key=>[key,'/'+secret()]));
+const absent=()=>Object.assign(new Error(secret()),{code:'ENOENT'});
+function fakeFiles({present=[],badStat,badAccess,writeFails=false}={}) {
+  const writes=[],moves=[];
+  return {writes,moves,
+    async stat(path){if(path===badStat)throw Error(secret());return {isFile:()=>true};},
+    async lstat(path){if(present.includes(path))return {isFile:()=>true};throw absent();},
+    async access(path){if(path===badAccess)throw Error(secret());},
+    async writeFile(path,text,options){if(writeFails)throw Error(secret());writes.push({path,text,options});},
+    async rename(from,to){moves.push({from,to});},async rm(){}
+  };
+}
+test('C missing/relative variables are named without exposing their values',()=>{
+  const env=fakeEnv();delete env.UBU_GOOGLE_CREDENTIALS_PATH;
+  assert.throws(()=>liveConfig(env,e),error=>failureLine(error).includes('UBU_GOOGLE_CREDENTIALS_PATH'));
+  env.UBU_GOOGLE_CREDENTIALS_PATH=secret();assert.throws(()=>liveConfig(env,e),error=>error.code==='absolute_path_required'&&!failureLine(error).includes(env.UBU_GOOGLE_CREDENTIALS_PATH));
+});
+test('C file refusals name variable/check; all three SQLite files prevent a fresh run',async()=>{
+  const env=fakeEnv(),config=liveConfig(env,e);
+  for(const variable of ['UBU_GOOGLE_CREDENTIALS_PATH','UBU_REHEARSAL_BINARY','UBU_GOOGLE_TOKEN_CACHE_PATH'])await assert.rejects(validateFiles(config,env,fakeFiles({badStat:env[variable]})),error=>failureLine(error).includes(variable)&&!failureLine(error).includes(env[variable]));
+  for(const suffix of ['','-wal','-shm'])await assert.rejects(validateFiles(config,env,fakeFiles({present:[config.store+suffix]})),error=>{
+    const line=failureLine(error);assert(line.includes('rm -f -- '+[config.store,config.store+'-wal',config.store+'-shm'].map(shellPath).join(' ')));return error.code==='fresh_store_required';
+  });
+  await validateFiles(config,env,fakeFiles());
+});
+test('C token and store parent permission failures retain public variable names',async()=>{
+  const env=fakeEnv(),config=liveConfig(env,e),fs=fakeFiles();
+  fs.stat=async path=>{if(path===env.UBU_GOOGLE_TOKEN_CACHE_PATH)throw absent();return {isFile:()=>true};};fs.access=async path=>{if(path==='/')throw Error(secret());};
+  await assert.rejects(validateFiles(config,env,fs),error=>error.code==='token_unavailable'&&failureLine(error).includes('writable parent'));
+  const other=fakeFiles({badAccess:'/'});await assert.rejects(validateFiles(config,env,other),error=>failureLine(error).includes('UBU_DB_PATH'));
+});
+test('C port refusal names the port and the three listeners to stop, not raw socket errors',async()=>{
+  const handlers={},canary=secret();const server={once(name,callback){handlers[name]=callback;},listen(){handlers.error(Error(canary));}};
+  await assert.rejects(bindForwarder(server,54321),error=>{const line=failureLine(error);return line.includes('54321')&&line.includes('acceptance.sh')&&line.includes('run-live.sh')&&!line.includes(canary);});
+});
+test('C each known reason has a remedy; unknown error content is never made public',()=>{
+  for(const code of Object.keys(REMEDIES)){const line=failureLine(new RehearsalFault(code));assert(line.startsWith(code+': '));assert(line.includes('Remedy: '));assert.equal(line.split('\n').length,2);}
+  const canary=secret();assert(!failureLine(Error(canary)).includes(canary));assert(!failureLine(new RehearsalFault('required_configuration_missing',{variables:[canary]})).includes(canary));
+});
+test('C startup stderr is bounded, secret-path scrubbed, then permanently dropped at health',()=>{
+  const canary=secret(),buffer=startupBuffer([canary],128);buffer.add('x'.repeat(200));buffer.add('\n'+canary+'\nlocal startup error');assert(!buffer.lines().includes(canary));assert(buffer.lines().includes('local startup error'));
+  buffer.clear();buffer.add(secret());assert.equal(buffer.lines(),'');
+});
+test('C success and refusal replace the same public artifact atomically with owner-only permissions',async()=>{
+  const fs=fakeFiles(),env={UBU_REHEARSAL_OUTPUT:secret()},cwd='/tmp/'+secret();
+  const success=await writePublicArtifact('BEGIN LIVE REHEARSAL COPY-BACK\nEND LIVE REHEARSAL COPY-BACK\n',{env,cwd,fs});
+  const refusal=await finishFailure(new RehearsalFault('terminal_required'),{env,cwd,fs,print:()=>{}});
+  assert.equal(success,refusal);assert.equal(fs.writes.length,2);assert.equal(fs.writes[0].options.mode,0o600);assert.equal(fs.writes[0].options.flag,'wx');assert(fs.writes[1].text.startsWith('terminal_required:'));
+  assert.equal(fs.moves.length,2);
+});
+test('C public artifact cannot overwrite credential/token/store paths; unwritable destinations are diagnosed',async()=>{
+  const env=fakeEnv();env.UBU_REHEARSAL_OUTPUT=env.UBU_GOOGLE_TOKEN_CACHE_PATH;
+  await assert.rejects(writePublicArtifact('public',{env,fs:fakeFiles()}),error=>error.code==='copy_back_unwritable');
+  const prints=[];const result=await finishFailure(new RehearsalFault('terminal_required'),{fs:fakeFiles({writeFails:true}),print:text=>prints.push(text)});
+  assert.equal(result,null);assert(prints.some(line=>line.startsWith('copy_back_unwritable:')));
 });
