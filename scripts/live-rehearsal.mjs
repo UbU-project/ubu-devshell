@@ -1,5 +1,6 @@
 // Real operator instrument, never executed by checks. Tests inject all effects.
 import { requestJson, loopbackUrl } from './loopback-json.mjs';
+import { PublicReport, previewLines } from './live-rehearsal-report.mjs';
 import { spawn } from 'node:child_process';
 import http from 'node:http';
 import net from 'node:net';
@@ -146,7 +147,8 @@ export async function cli(env=process.env,args=process.argv.slice(2)) {
     console.log(`store: ${config.store}\ncalendar: ${config.calendar}\nSecond invocation is a second rehearsal. Reset the calendar yourself before starting.`);
     if(await readline.question('Type live to confirm these destinations and the calendar reset prerequisite: ')!=='live')return;
     const backendPort=await freePort(),base=`http://127.0.0.1:${backendPort}`;
-    const observe=record=>{console.log(`action: ${record.label ?? routeTemplate(record.route,e)}; status: ${record.skip ?? record.result?.status ?? 'unavailable'}`);};
+    const report=new PublicReport(e,{compare:args.includes('--compare')});
+    const observe=(record,forwarded)=>report.observe(record,forwarded);
     server=http.createServer(createForwarder({base,port:backendPort,endpoints:e,observe}));
     await new Promise((yes,no)=>{server.once('error',no);server.listen(config.port,'127.0.0.1',yes);});
     child=spawn(env.UBU_REHEARSAL_BINARY,[],{cwd:env.ORCHESTRATOR_DIR ?? fileURLToPath(new URL('../../ubu-orchestrator',import.meta.url)),env:{...env,UBU_ORCHESTRATOR_PORT:String(backendPort),HOST:'127.0.0.1',BIND_ADDR:'127.0.0.1'},stdio:'ignore'});
@@ -160,12 +162,14 @@ export async function cli(env=process.env,args=process.argv.slice(2)) {
       await readline.question('Press Enter after the manual comparison readings are complete: ');
     } else {
       await runActions({endpoints:e,inputs:config.inputs,call,observe,approve:async preview=>{
-        console.log(`GET ${e.CALENDAR_PREVIEW_PATH}: operations (client cardinality) ${Array.isArray(preview.operations)?preview.operations.length:'unavailable'}. Private operation contents withheld; inspect Calendar before deciding.`);
+        console.log(previewLines(preview,e.CALENDAR_PREVIEW_PATH).join('\n'));
+        console.log('Operation summaries and identities withheld. Inspect your Plan in Calendar before deciding. This API preview is not the UI preview snapshot.');
         return await readline.question('Type approve to WRITE this preview to the real calendar, or anything else to decline: ')==='approve';
       }});
       console.log('Open Today, Calendar, Tasks and Review. Read private requirement/proposal contents there. Admissions/rejections remain your deliberate actions.');
       await readline.question('Press Enter after the visual pass: ');
     }
+    console.log(report.render());
   } finally {process.removeListener('SIGINT',interrupted);process.removeListener('SIGTERM',interrupted);await stop();}
 }
 if (process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) {

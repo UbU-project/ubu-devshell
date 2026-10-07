@@ -85,3 +85,42 @@ test('comparison rejects external URL spellings and forwards despite observer fa
   for(const url of ['//example.invalid','/\\example.invalid','https://example.invalid']) {const response=res();await handler(req(url),response);assert.equal(response.status,502);}
   assert.equal(calls,0);const response=res();await handler(req('/health','', 'GET'),response);assert.equal(response.status,200);
 });
+
+const {PublicReport,previewLines}=await import('./live-rehearsal-report.mjs');
+test('public report withholds nested content and unknown codes, labels every computed count',()=>{
+  const canary=secret(),report=new PublicReport(e);
+  const record=(label,data)=>report.observe({label,result:{status:200,data}});
+  record('capture',{captured:4,updated:0,moved:0,resized:0,unchanged:1,skipped:2,diagnostics:[{code:'capture_colour_absent',message:canary},{code:canary,message:canary}]});
+  record('plan',{status:'ok',plan:{steps:[{static_anchor:true,summary:canary},{static_anchor:false,summary:canary}]},diagnostics:[],unplaced_tasks:[{title:canary,reason:canary}],blocked_tasks:[],invalid_tasks:[],risk_report:{level:'medium',findings:[{category:'unplaced_work',severity:'medium',blocking:false,detail:canary,subject_ref:canary}]}});
+  record('preview',{stale:false,matching_placements:0,operations:[{kind:'update',static_anchor:false,event:{summary:canary,external_id:canary,task_id:canary,start_at:'2026-10-06T10:00:00Z',end_at:'2026-10-06T11:00:00Z',color_id:null,transparent:false,reminders_minutes:[]}}]});
+  record('approval',{status:'applied',operation_results:[{status:'applied',message:canary}]});
+  record('universe_before',{facts:{[canary]:canary},numeric_values:{},set_memberships:{[canary]:[canary,canary]},event_markers:{}});
+  for(const label of ['vocabulary','precondition'])record(label,{status:'ok',candidates_enqueued:3,selected:[{id:canary,title:canary}],diagnostics:[{code:'advisory_task_skipped',message:canary}]});
+  record('queue',{candidates:[{candidate:{proposal:canary}}]});
+  const output=report.render();assert(!output.includes(canary));
+  assert(output.includes('facts: 1 (client-computed'));assert(output.includes('set_memberships: 1 (client-computed'));
+  assert(output.includes('withheld_unknown'));assert(output.includes('risk_report.findings[0]'));assert(output.includes('producer=vocabulary'));assert(output.includes('producer=precondition'));
+  assert(output.indexOf('3.')>output.indexOf('unplaced_tasks'));assert(output.indexOf('risk_report.level')>output.indexOf('3.'));
+});
+test('comparison records independent producer selection snapshots and freezes pre-authoring state',()=>{
+  const report=new PublicReport(e,{compare:true});
+  const record=(method,route,data,body)=>report.observe({method,route,body,result:{status:200,data}},true);
+  record('GET',e.UNIVERSE_STATE_PATH,{facts:{},numeric_values:{},set_memberships:{},event_markers:{}});
+  record('PATCH',e.UNIVERSE_STATE_PATH,{});record('GET',e.UNIVERSE_STATE_PATH,{facts:{[secret()]:true}});
+  for(const [producer,n] of [['vocabulary',3],['precondition',1]])record('POST',e.ADVISORY_RUN_PATH,{status:'ok',candidates_enqueued:0,selected:[],diagnostics:Array.from({length:n},()=>({code:'advisory_task_skipped',message:secret()}))},{producer});
+  const output=report.render();assert(output.includes('facts: 0 (client-computed'));assert(output.includes('producer=vocabulary diagnostics[].code == advisory_task_skipped: 3'));assert(output.includes('producer=precondition diagnostics[].code == advisory_task_skipped: 1'));
+});
+test('unknown enums, strings in counts, malformed fields and errors cannot enter public output',()=>{
+  const canary=secret(),report=new PublicReport(e);
+  report.observe({label:'vocabulary',skip:canary,result:{status:canary,error:canary,data:{status:canary,candidates_enqueued:canary,selected:canary,diagnostics:[{code:canary,message:canary}]}}});
+  const preview={stale:canary,matching_placements:canary,operations:[{kind:canary,event:{summary:canary}},{kind:'update',static_anchor:canary,event:{start_at:canary,end_at:canary,color_id:canary,reminders_minutes:canary,transparent:canary}}]};
+  assert(!previewLines(preview,e.CALENDAR_PREVIEW_PATH).join('\n').includes(canary));
+  assert(!report.render().includes(canary));
+});
+test('visual UI reads cannot overwrite driver snapshots; explicit decisions report only route and status',()=>{
+  const report=new PublicReport(e),canary=secret();
+  report.observe({label:'capture',result:{status:200,data:{captured:7}}});
+  report.observe({method:'POST',route:e.CALENDAR_CAPTURE_PATH,result:{status:200,data:{captured:8}}},true);
+  report.observe({method:'POST',route:e.ADVISORY_REJECT_PATH,body:{reason:canary},result:{status:200,data:{message:canary}}},true);
+  assert(report.render().includes('captured: 7'));assert(!report.render().includes('captured: 8'));assert(!report.render().includes(canary));
+});
