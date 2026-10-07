@@ -306,6 +306,7 @@ run_fake_github_import_diagnostics
 run_fake_github_adapter_diagnostics
 run_hard_boundary_diagnostics
 
+"$SCRIPT_DIR/test-build-exclusion.sh"
 "$SCRIPT_DIR/check-planning-worker.sh"
 
 # The fixture demo is quarantined: it runs only when UBU_RUN_FIXTURE_DEMO=1.

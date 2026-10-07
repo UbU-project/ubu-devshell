@@ -5,13 +5,15 @@ One file holds how these repositories are built on a given machine:
 cargo sources it first: `check-ui-contract.sh`, `acceptance.sh`,
 `run-live.sh`, `run-orchestrator.sh`, `check-all.sh`, `test-all.sh` and
 `fmt-all.sh`, `check-planning-worker.sh`, `gen-patch-config.sh`,
-`test-patch-config.sh` and `build-patch-config-tool.sh`. Source it yourself before running cargo by hand:
+`test-patch-config.sh`, `build-patch-config-tool.sh` and
+`test-build-exclusion.sh`. Source it yourself before running cargo by hand:
 
 ```sh
 source ../ubu-devshell/scripts/env.sh    # from inside the repository you are building
 ```
 
-It sets two things, exports nothing else, and writes no file.
+It exports the same two build variables and defines a Cargo wrapper. Sourcing
+writes no file; a Cargo invocation creates a shared advisory lock under `/tmp`.
 
 ## How parallel: `CARGO_BUILD_JOBS`
 
@@ -104,6 +106,49 @@ minutes.
 
 **No repository may commit a machine-specific path**: not in
 `.cargo/config.toml`, not in a script, not in a document. `env.sh` holds no
-path. It reads `UBU_TARGET_ROOT` from the environment of the machine it runs
+machine-specific target path; its shared `/tmp` lock convention is portable
+across Linux machines. It reads `UBU_TARGET_ROOT` from the environment of the machine it runs
 on. `.cargo/config.toml` is ignored by git in the repositories that have one,
 and stays for the generated `[patch]` overrides only.
+
+
+## Build/worker exclusion and memory containment (P1B-71)
+
+Every sourced-shell Cargo invocation acquires
+`/tmp/ubu-planning-build-worker-<uid>.lock` through `flock --nonblock`.
+The Rust compute session uses the same Linux flock via `File::try_lock`.
+Both acquisitions refuse contention immediately. Cargo exits 75; planning
+uses the authoritative CPU reference. Nothing blocks, retries, or changes the
+one-job cap. The owner-only regular file persists between invocations, while
+the advisory lock lasts only as long as its owner. A symlink or another owner's
+file is refused. Echo and environment-probe children do no device computation
+and do not acquire the compute reservation. A persistent compute session keeps
+its own reservation across requests and releases it on stop, error or Drop,
+including panic. Eligibility probes cannot reserve future availability; a
+racing compute spawn must acquire again and can still fall back to CPU.
+
+When the user systemd manager is available, the wrapper executes Cargo inside
+its own `systemd-run --user --scope` with the flock owner inside that scope
+too, so a build surviving terminal loss retains its reservation. It uses **MemoryHigh=16G** and
+**MemoryMax=20G** (GiB). Throttling starts below the hard limit. These deliberately
+generous limits contain a build separately from the operator's terminal; they
+do not guarantee other applications cannot exhaust system memory. A complete
+clean kernel build under this ceiling is recorded in P1B-71_PINS.md. The larger
+orchestrator's standing builds/tests also use the wrapper; that is not a claim
+that its entire dependency graph was rebuilt from clean under this ceiling.
+If the manager/tool is unavailable, the wrapper prints that fact and uses the
+lock alone. A scoped build failure is returned, never silently rerun outside
+containment. No test installs a signal handler.
+
+Call `cargo` directly in the sourced shell. An external program such as
+`/usr/bin/time cargo ...` resolves the executable itself and bypasses shell
+functions. To time a protected build, time a shell/script that sources env.sh
+and invokes Cargo. Unsourced external invocations cannot be protected by a
+shell function. Source it in every build entry point as required above.
+
+`test-build-exclusion.sh` uses fake Cargo and an unavailable-manager fixture;
+it verifies bidirectional flock contention, immediate refusal, lock release,
+argument preservation, and the lock-only fallback without compiling anything.
+The owned Python/Stage 1 test executables are built while Cargo holds the lock
+and run afterwards, outside it; otherwise an installed torch path would always
+be skipped because Cargo correctly excludes compute.

@@ -597,3 +597,24 @@ lifecycle tests run through scripts/check-planning-worker.sh, included by
 check-all.sh and test-all.sh. See [the explicit invocation profile](PLANNING_WORKER.md)
 and [the five-condition exemption](ACCEPTANCE.md#p1b-70). No GPU computation,
 framework installation or interpreter requirement is added to checks.
+
+
+## P1B-71: complete Plan and a separate atomic Stage 1 oracle
+
+Scenario 36 additionally compares the complete captured P1B-70 Plan, including
+provenance and replay metadata, to p1b70-complete-plan.json. Only the same
+volatile Task/Plan identifiers and four named generation-time paths normalize:
+created_at, risk_report.generated_at, human_complete_plan_quality.generated_at,
+and replay_metadata.generated_at. UTC shape is asserted before replacement.
+Effective time, seed, version and all semantic fields remain exact. The old
+P1B-69 projection assertion remains too; no HTTP request or scenario is added.
+
+The existing ChunkedSweep boundary-v1 oracle stays intact. A separate
+stage1-atomic-v1 profile compares CpuStrategy with the independent worker
+implementation over eleven CPU-only fixtures. Every named tensor/mask,
+feasibility flag, rejection, omission order and CandidateSet is exact. Shared
+new envelope bytes are asserted in Rust and Python. Build the owned kernel
+worker test binaries under Cargo's lock, then run them outside it so a real
+installed torch test can run. Missing Python/torch reports explicit skips;
+CPU oracle, codec and stub tests remain mandatory. No checks install packages.
+See STAGE1_WORKER.md and P1B-71_PINS.md for scope and verification limits.

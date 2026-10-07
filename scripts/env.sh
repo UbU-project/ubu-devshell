@@ -2,13 +2,15 @@
 #
 #   source ./scripts/env.sh        # from any repo, or from a script here
 #
-# It sets two things, and only for the shell that sources it:
+# It sets two variables and defines the Cargo exclusion/scope wrapper, only
+# for the shell that sources it:
 #
 #   CARGO_BUILD_JOBS   how many rustc and link jobs cargo runs at once
 #   CARGO_TARGET_DIR   where cargo builds, when UBU_TARGET_ROOT says where
 #
-# It exports nothing else and writes no file. With nothing set it changes one
-# thing only, the job cap, and every repo builds in its own `target` as before.
+# It exports nothing else. Sourcing writes no file; invoking Cargo creates the
+# shared /tmp advisory lock. With no target root, repositories still build in
+# their own `target`. Cargo runs with exclusion and an available user scope.
 #
 # No repo may commit a machine-specific path. The root comes from the
 # environment of the machine, never from a file in a repository.
@@ -86,3 +88,48 @@ ubu_cargo_env() {
 
 # Sourced from inside a repository, set that repository's target directory now.
 ubu_target_root_check && ubu_cargo_env
+
+# ---- exclusion and containment (Linux, P1B-71)
+#
+# Only invoking Cargo creates the shared /tmp lock. Sourcing still writes no
+# file. An owned tensor worker takes this same flock without waiting; echo and
+# metadata probes perform no device compute and do not take the compute lock.
+# The wrapper is a subshell so its umask and descriptor policy do not leak.
+cargo() (
+  local ubu_cargo_bin ubu_lock_path ubu_lock_owner
+  ubu_cargo_bin="$(type -P cargo)" || {
+    echo "env.sh: cargo executable unavailable" >&2; return 127;
+  }
+  command -v flock >/dev/null 2>&1 || {
+    echo "env.sh: REFUSED: flock unavailable; build/worker exclusion is required" >&2; return 75;
+  }
+  ubu_lock_path="/tmp/ubu-planning-build-worker-${EUID}.lock"
+  if [[ ! -e "$ubu_lock_path" && ! -L "$ubu_lock_path" ]]; then
+    (umask 077; set -o noclobber; : > "$ubu_lock_path") 2>/dev/null || {
+      echo "env.sh: REFUSED: shared lock creation raced; retry explicitly" >&2; return 75;
+    }
+  fi
+  [[ -f "$ubu_lock_path" && ! -L "$ubu_lock_path" ]] || {
+    echo "env.sh: REFUSED: shared lock is not a regular file" >&2; return 75;
+  }
+  ubu_lock_owner="$(stat -c '%u' "$ubu_lock_path")" || return 75
+  [[ "$ubu_lock_owner" == "$EUID" ]] || {
+    echo "env.sh: REFUSED: shared lock has another owner" >&2; return 75;
+  }
+  local ubu_cargo_status=0
+  if command -v systemd-run >/dev/null 2>&1 && command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then
+    # Put the lock owner in Cargo's scope too. If the terminal disappears,
+    # a surviving scoped build must keep excluding compute until it exits.
+    systemd-run --user --scope --quiet -p MemoryHigh=16G -p MemoryMax=20G \
+      -- flock --nonblock --conflict-exit-code 75 --close "$ubu_lock_path" \
+      "$ubu_cargo_bin" "$@" || ubu_cargo_status=$?
+  else
+    echo "env.sh: user systemd scope unavailable; using exclusion lock alone" >&2
+    flock --nonblock --conflict-exit-code 75 --close "$ubu_lock_path" \
+      "$ubu_cargo_bin" "$@" || ubu_cargo_status=$?
+  fi
+  if [[ "$ubu_cargo_status" == 75 ]]; then
+    echo "env.sh: REFUSED: build or compute session holds shared lock; no wait" >&2
+  fi
+  return "$ubu_cargo_status"
+)

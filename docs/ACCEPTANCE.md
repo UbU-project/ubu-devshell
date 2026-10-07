@@ -942,3 +942,37 @@ The worker is persistent inside its owned session, transient across sessions,
 with no socket or daemon. See [the boundary and parity profile](PLANNING_WORKER.md).
 Transport engine_error/cancelled outcomes never certify a Plan; no streamed
 chunk is exposed. Future streaming must obey CPU certification before surfacing.
+
+
+## P1B-71
+
+Two operator actions are two results. The P1B-68 prompt's condition “Where both
+run in one operator action” is withdrawn: Vocabulary and Precondition are two
+separate clicks, each with its own selection result and count. Cross-action
+deduplication would hide the second run. The existing sentence-copying ban is
+preserved; copy each rendered selection count once immediately after its run,
+or its named absence/failure answer, and keep both even when they are equal.
+Screens and diagnostic sentences are unchanged. The live procedure remains
+fourteen steps and nine copy-back items; its stale introduction is corrected.
+
+A parity tolerance is never widened to make a test pass. The existing
+boundary-v1 float profile remains unchanged for scores and rollout summaries.
+Stage 1's atomic placement-duration bootstrap has entirely exact structural,
+feasibility, padding, omission and candidate-batch comparisons. Its CPU uses
+fixed seconds or log-normal mode, not stochastic draws. Stages 2–4 already
+exist in planning core and are unchanged. Split support remains deferred;
+unsupported split input is explicitly rejected, never silently made atomic.
+
+The operator approved six grounding corrections, including a narrowly bounded
+internal Stage 1 envelope exception to D0283; the canonical four frame kinds
+and schema 0.1 remain unchanged. Repair stays on CPU because prior_plan is not
+serialized. The P1B-70 five spawn conditions remain unchanged. Framework
+probing and Stage 1 execution occur only through owned, bounded workers in the
+kernel worker tests and devshell suite; no other test gains worker spawning.
+Installing torch is documented, never performed by checks or this execution.
+Real tensor tests skip without it; skipped tests do not certify tensor parity.
+
+Operator acceptance is still pending: run LIVE_REHEARSAL.md with torch absent
+and policy off against the operator's own calendar and report its copy-back.
+The two readings are the Review copy-back length and the otherwise identical
+P1B-70 rehearsal. Automated passes are not operator acceptance.

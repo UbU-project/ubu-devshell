@@ -149,3 +149,13 @@ resolve offline from existing cache. This preserves full TOML parsing rather
 than using a partial Node parser, and preserves the standing regression checks
 rather than skipping them when Python is absent. No npm dependency, Python
 package, upstream lockfile, new service or planner behavior changes.
+
+
+## P1B-71 extension
+
+The preceding sections describe the preserved P1B-70 profile. P1B-71 adds an
+explicitly approved internal atomic Stage 1 envelope and a separate exact
+CpuStrategy oracle, without replacing that profile, its echo or ChunkedSweep
+goldens. See [Stage 1's inputs, dtypes and invocation](STAGE1_WORKER.md). The
+orchestrator remains pinned to P1B-70 and CPU; no live handoff is implied by
+moving only devshell's kernel inventory pin.
