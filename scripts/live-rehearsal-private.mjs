@@ -1,4 +1,5 @@
 // Private presentation has no import, callback or output connection to PublicReport.
+import { scrubPrivatePaths } from './live-rehearsal-diagnostics.mjs';
 import { numericComparisonWords } from '../../ubu-ui/src/presentation/precondition.ts';
 export const PRIVATE_BANNER='PRIVATE REHEARSAL DATA — your own content; never paste this screen.';
 const plain=value=>typeof value==='string'?value:JSON.stringify(value)??'unavailable';
@@ -28,10 +29,11 @@ export class PrivateRenderer {
       for(const group of ['all_of','any_of'])if(Array.isArray(condition[group]))condition[group].forEach(part=>this.rememberCondition(part));
     }
   }
-  say(value){let text=safeText(value);for(const path of this.credentialPaths.filter(Boolean))text=text.split(path).join('[credential/token path withheld]');this.print(text);}
+  say(value){this.print(safeText(scrubPrivatePaths(plain(value),this.credentialPaths)));}
   observe(record) {
     const data=record.result?.data;if(!data||typeof data!=='object')return;
     this.say(PRIVATE_BANNER);
+    for(const field of ['error','message'])if(data[field]!=null){this.remember(typeof data[field]==='string'?data[field]:undefined);this.say(`${field}: ${plain(data[field])}`);}
     if(Array.isArray(data.diagnostics))for(const diagnostic of data.diagnostics){this.remember(diagnostic?.message);this.say(`${plain(diagnostic?.code)}: ${plain(diagnostic?.message)}`);}
     if(record.label==='plan') {
       this.say('Plan placements:');

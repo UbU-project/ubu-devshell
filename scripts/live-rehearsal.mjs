@@ -1,5 +1,5 @@
 // Real operator instrument, never executed by checks. Tests inject all effects.
-import { requestJson, loopbackUrl } from './loopback-json.mjs';
+import { requestJson, loopbackUrl, TransportError } from './loopback-json.mjs';
 import { PublicReport } from './live-rehearsal-report.mjs';
 import { RehearsalFault, finishFailure, writePublicArtifact, startupBuffer } from './live-rehearsal-diagnostics.mjs';
 import { collectJudgments, privateStrings } from './live-rehearsal-questions.mjs';
@@ -68,10 +68,13 @@ export async function runActions({ endpoints:e, inputs={}, call, approve=async()
   async function action(label,method,path,body,expected=200) {
     let result;
     try { result=await call(method,path,body); }
-    catch { result={status:null,data:null,error:'connection_or_response_failure'}; }
+    catch(error) {
+      if(error instanceof RehearsalFault&&error.code==='interrupted')throw error;
+      result={status:null,data:null,error:error instanceof TransportError?error.code:'connection_or_response_failure'};
+    }
     if (result.status !== expected && !result.error) result.error='unexpected_status';
     const record={ label,method,route:path,result }; results.push(record);observe(record);
-    if(result.error)throw new RehearsalFault('action_request_failed',{action:label,status:result.status});
+    if(result.error)throw new RehearsalFault('action_request_failed',{action:label,status:result.status,check:result.error});
     if(label==='session'&&result.data?.enabled!==true)throw new RehearsalFault('calendar_session_unavailable',{action:label});
     if(['vocabulary','precondition'].includes(label)&&result.data?.status!=='ok')throw new RehearsalFault('advisory_run_failed',{action:label});
     return result.data;
@@ -189,6 +192,7 @@ export async function cli(env=process.env,args=process.argv.slice(2)) {
   // Runtime-only cleanup: tests never execute cli or install signal handlers.
   const interrupted=()=>{inputAbort.abort();void stop();};
   try {
+    process.once('SIGINT',interrupted);process.once('SIGTERM',interrupted);
     console.log(`store: ${JSON.stringify(config.store)}\ncalendar: ${JSON.stringify(config.calendar)}\nSecond invocation is a second rehearsal. Reset the calendar yourself before starting.`);
     if(await question('Type live to confirm these destinations and the calendar reset prerequisite: ')!=='live')throw new RehearsalFault('startup_confirmation_declined');
     const backendPort=await freePort(),base=`http://127.0.0.1:${backendPort}`;
@@ -197,16 +201,20 @@ export async function cli(env=process.env,args=process.argv.slice(2)) {
     const observe=(record,forwarded)=>{report.observe(record,forwarded);if(!forwarded)privateView.observe(record);};
     server=http.createServer(createForwarder({base,port:backendPort,endpoints:e,observe}));
     await bindForwarder(server,config.port);
-    child=spawn(env.UBU_REHEARSAL_BINARY,[],{cwd:env.ORCHESTRATOR_DIR ?? fileURLToPath(new URL('../../ubu-orchestrator',import.meta.url)),env:{...env,UBU_ORCHESTRATOR_PORT:String(backendPort),HOST:'127.0.0.1',BIND_ADDR:'127.0.0.1'},stdio:['ignore','ignore','pipe']});
-    child.stderr.on('data',stderr.add);
+    try {child=spawn(env.UBU_REHEARSAL_BINARY,[],{cwd:env.ORCHESTRATOR_DIR ?? fileURLToPath(new URL('../../ubu-orchestrator',import.meta.url)),env:{...env,UBU_ORCHESTRATOR_PORT:String(backendPort),HOST:'127.0.0.1',BIND_ADDR:'127.0.0.1'},stdio:['ignore','ignore','pipe']});
+    child.stderr?.on('data',stderr.add);
     await new Promise((yes,no)=>{child.once('spawn',yes);child.once('error',()=>no(new RehearsalFault('owned_startup_failed')));});
-    process.once('SIGINT',interrupted);process.once('SIGTERM',interrupted);
+    } catch {throw new RehearsalFault('owned_startup_failed',{variables:['UBU_REHEARSAL_BINARY','ORCHESTRATOR_DIR']});}
     const deadline=Date.now()+60000;
     for(;;){if(stopping)throw new RehearsalFault('interrupted');if(child.exitCode!==null||child.signalCode!==null)throw new RehearsalFault('owned_orchestrator_unavailable');try{const health=await requestJson(base,'GET',e.HEALTH_PATH,undefined,{allowedPorts:new Set([backendPort]),timeoutMs:1000});if(health.status!==200)throw new Error('health_unavailable');
       // Startup diagnosis is bounded/private and captured only before health.
       // After health, capture/advice can contain operator content: discard it.
-      child.stderr.removeListener('data',stderr.add);child.stderr.resume();stderr.clear();break;}catch{if(Date.now()>deadline)throw new RehearsalFault('startup_timeout');await new Promise(resolve=>setTimeout(resolve,100));}}
-    const call=(method,path,body)=>requestJson(base,method,path,body,{allowedPorts:new Set([backendPort])});
+      child.stderr?.removeListener('data',stderr.add);child.stderr?.resume();stderr.clear();break;}catch{if(Date.now()>deadline)throw new RehearsalFault('startup_timeout');await new Promise(resolve=>setTimeout(resolve,100));}}
+    const call=async(method,path,body)=>{
+      if(inputAbort.signal.aborted)throw new RehearsalFault('interrupted');
+      try{return await requestJson(base,method,path,body,{allowedPorts:new Set([backendPort])});}
+      catch(error){if(inputAbort.signal.aborted)throw new RehearsalFault('interrupted');throw error;}
+    };
       await runActions({endpoints:e,inputs:config.inputs,call,observe,approve:async preview=>{
         console.log('Decide from the private Plan and exact preview operations printed above.');
         return await question('Type approve to WRITE this preview to the real calendar, or anything else to decline: ')==='approve';

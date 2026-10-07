@@ -39,7 +39,9 @@ else
   echo "SKIP: suitable local Python unavailable for failing-run process check"
 fi
 # Build under Cargo's exclusion, then execute the existing bounded worker
-# tests outside the build lock. A torch-positive test must not be hidden by
+# tests outside the build lock. Invocation now also asserts zero warnings from
+# the worker's actual import path; successful resolution/nonzero-exit checks alone
+# cannot verify a quiet torch/numpy install. The existing owned session is reused. A torch-positive test must not be hidden by
 # the very lock that proves Cargo excludes compute. These are the same owned
 # kernel worker tests; no orchestrator/UI/advisory process permission changes.
 (cd "$KERNEL_DIR" && source "$SCRIPT_DIR/env.sh" && cargo test --locked --offline -p ubu_planning_worker --lib --tests --no-run --message-format=json > "$WORK_DIR/worker-tests.jsonl")

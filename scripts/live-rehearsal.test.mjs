@@ -332,3 +332,24 @@ test('D preview summaries/windows and excluded-work explanations are privately v
   renderer.observe({label:'preview',result:{data:{operations:[{kind:'delete',summary:canary},{kind:'update',static_anchor:false,event:{summary:canary,start_at:'2026-10-07T10:00:00Z',end_at:'2026-10-07T11:00:00Z'}}]}}});
   assert(screen.some(line=>line.includes('outside_allowed_window')));assert(screen.some(line=>line.includes('delete: '+canary)));assert(screen.some(line=>line.includes('Dynamic')&&line.includes('10:00')));
 });
+test('final transport faults retain a safe specific diagnosis and no private exception text',async()=>{
+  const {TransportError}=await import('./loopback-json.mjs');let fault;
+  try {await runActions({endpoints:e,call:async()=>{throw new TransportError('invalid_json');}});}catch(error){fault=error;}
+  assert(failureLine(fault).includes('invalid_json'));assert(failureLine(fault).includes('action: session'));
+});
+test('private API error messages are visible on screen and credential path spellings are scrubbed',()=>{
+  const path='/'+secret()+'"'+secret(),message=secret(),screen=[],privateView=new PrivateRenderer({credentialPaths:[path],print:text=>screen.push(text)}),report=new PublicReport(e);
+  const record={label:'capture',result:{status:400,error:'unexpected_status',data:{error:message+' '+JSON.stringify(path)}}};
+  report.observe(record);privateView.observe(record);assert(screen.join('\n').includes(message));assert(!screen.join('\n').includes(JSON.stringify(path).slice(1,-1)));assert(!report.render().includes(message));
+});
+test('public artifact filesystem smoke overwrites only its file, uses 0600 and leaves no temporary transcript',async()=>{
+  const fs=await import('node:fs/promises'),os=await import('node:os'),path=await import('node:path');
+  const cwd=await fs.mkdtemp(path.join(os.tmpdir(),'ubu-public-artifact-'));
+  try {
+    const first=await writePublicArtifact('BEGIN LIVE REHEARSAL COPY-BACK\nEND LIVE REHEARSAL COPY-BACK\n',{cwd});
+    await finishFailure(new RehearsalFault('terminal_required'),{cwd,print:()=>{}});
+    assert.equal(await fs.readFile(first,'utf8'),failureLine(new RehearsalFault('terminal_required')));
+    assert.equal((await fs.stat(first)).mode&0o777,0o600);
+    assert.deepEqual(await fs.readdir(cwd),['live-rehearsal-copy-back.txt']);
+  }finally{await fs.rm(cwd,{recursive:true,force:true});}
+});

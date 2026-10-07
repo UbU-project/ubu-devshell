@@ -17,7 +17,9 @@ seed-based source without inventing a new frame kind. P1B-71 implements no RNG.
 
 ## Optional CPU-only dependency
 
-The extra pins **torch==2.6.0+cpu**. The official v2.6.0 wheel build matrix includes
+The extra pins **torch==2.6.0+cpu** and **numpy==2.2.6**.
+The stable NumPy v2.2.6 metadata requires Python >=3.10 and names Python 3.13;
+see [its tagged metadata](https://github.com/numpy/numpy/blob/v2.2.6/pyproject.toml). The official v2.6.0 wheel build matrix includes
 CPU wheels for Python 3.9–3.13, covering the repository minimum 3.10 and this
 execution's 3.13. See [the pinned upstream matrix](https://github.com/pytorch/pytorch/blob/v2.6.0/.github/scripts/generate_binary_build_matrix.py).
 This is a deliberate stable CPU-wheel pin, not a claim it is the latest release.
@@ -25,8 +27,19 @@ Use a supported Linux Python 3.10–3.13 environment for the optional extra.
 Unsupported versions retain CPU fallback. Documented installation, **not run**:
 
 ```sh
+python3 -m pip install --index-url https://pypi.org/simple 'numpy==2.2.6'
 python3 -m pip install --index-url https://download.pytorch.org/whl/cpu 'torch==2.6.0+cpu'
 ```
+
+**A documented install is verified when a run under it is quiet, not when it
+resolves.** A successful pip resolution can still leave a NumPy initialization
+warning. Select that installed interpreter through UBU_WORKER_TEST_PYTHON and
+run scripts/check-planning-worker.sh from ubu-devshell. Its existing owned probe
+counts warnings from the actual worker import path, and the owned invocation
+check asserts zero before considering availability. Any warning fails the suite,
+even if import subsequently falls back; stderr redirection cannot hide it.
+Absent Python/torch remains an explicit skip, never evidence of a quiet install.
+No new spawning path, native stderr reader or signal handler is introduced.
 
 No check installs torch or another compute dependency. Python and pytest are
 optional to the mandatory Rust CPU-only goldens. Existing pytest can run the
@@ -110,7 +123,7 @@ D0171 makes deterministic seed conventions canonical; it does not itself name
 this generator or transform. The following is P1B-71's explicit implementation
 decision for a future stochastic Stage 1, not a claim it is implemented today.
 It neither changes the existing Stage 4 correlated sampler nor authorizes a
-change to today's deterministic placements. P1B-72 must implement and certify
+change to today's deterministic placements. P1B-74 must implement and certify
 both sides against the same specification before changing that behavior.
 
 Use **Philox4x32-10**, stateless and keyed on
@@ -140,7 +153,7 @@ Apply the same shifted-log-normal calibration as core rollout.sample_duration:
 Fixed durations stay fixed. Convert occupied duration to whole seconds by ceil,
 with checked int64 range; overflow is an explicit unsupported-profile fallback.
 These math/rounding choices are part of the stream profile, not implementation
-freedom to exchange one transform for another. P1B-72 must freeze boundary and
+freedom to exchange one transform for another. P1B-74 must freeze boundary and
 transform vectors, including near-window placements, before activation.
 
 Stage 1 structural equality has no statistical acceptance substitute. The

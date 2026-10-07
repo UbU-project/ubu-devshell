@@ -37,7 +37,7 @@ export const REMEDIES=Object.freeze({
   help_requested:'Set your private environment and run run-live-rehearsal.sh without arguments.'
 });
 const variables=new Set(['UBU_DB_PATH','UBU_GOOGLE_CALENDAR_ID','UBU_GOOGLE_CREDENTIALS_PATH','UBU_GOOGLE_TOKEN_CACHE_PATH','UBU_REHEARSAL_BINARY','UBU_REHEARSAL_INPUTS','UBU_ORCHESTRATOR_PORT','ORCHESTRATOR_DIR','UBU_REHEARSAL_OUTPUT','CARGO_BUILD_JOBS','UBU_TARGET_ROOT']);
-const checks=new Set(['missing','absolute path','stat','readable regular file','executable regular file','readable/writable regular file','writable parent','invalid JSON/field shape']);
+const checks=new Set(['missing','absolute path','stat','connection_or_timeout','invalid_json','response_too_large','unexpected_status','readable regular file','executable regular file','readable/writable regular file','writable parent','invalid JSON/field shape']);
 const actions=new Set(['routine','colour_setting','session','capture','plan','preview','approval','universe_before','subject','authoring','task_lookup','task_read','requirement','requirement_readback','vocabulary','precondition','queue']);
 export class RehearsalFault extends Error {
   constructor(code,context={}) {super(Object.hasOwn(REMEDIES,code)?code:'configuration_destination_or_transport_unavailable');this.code=this.message;this.context=context;}
@@ -80,11 +80,18 @@ export async function finishFailure(error,{print=console.error,...options}={}) {
   try {const path=await writePublicArtifact(line,options);print('Copy-back file: '+JSON.stringify(path));return path;}
   catch(writeError){print(failureLine(writeError).trimEnd());return null;}
 }
+export function scrubPrivatePaths(text,withheld=[]) {
+  let result=text;
+  for(const value of withheld.filter(v=>typeof v==='string'&&v)) {
+    for(const spelling of [value,JSON.stringify(value).slice(1,-1),encodeURIComponent(value)])result=result.split(spelling).join('[credential/token path withheld]');
+  }
+  return result;
+}
 export function startupBuffer(withheld=[],limit=65536) {
   let text='',active=true;
   return {
     add(chunk){if(active)text=(text+chunk.toString('utf8')).slice(-limit);},
-    lines(){let result=text.split(/\r?\n/).slice(-20).join('\n');for(const value of withheld.filter(v=>typeof v==='string'&&v))for(const spelling of [value,JSON.stringify(value).slice(1,-1),encodeURIComponent(value)])result=result.split(spelling).join('[credential/token path withheld]');return result.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g,c=>'\\u'+c.charCodeAt(0).toString(16).padStart(4,'0'));},
+    lines(){const result=scrubPrivatePaths(text.split(/\r?\n/).slice(-20).join('\n'),withheld);return result.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g,c=>'\\u'+c.charCodeAt(0).toString(16).padStart(4,'0'));},
     clear(){active=false;text='';}
   };
 }

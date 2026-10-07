@@ -18,7 +18,7 @@
 ubu_schemas         = "070d0a6f9a6ad7833dd523042925008316ce923b"  # P1B-70 published branch
 ubu_core            = "fa26bf678977f5e077229eb97a39cc1b8b960c9b"  # P1B-70 published branch
 ubu_store           = "83a099f55220b1286ffb2dee3c9d19006e2090b5"  # P1B-70 published branch
-ubu_planning_kernel = "097a6197ed8694168c38f98a360d6306c89f9c67"  # P1B-71 published branch
+ubu_planning_kernel = "ea6b453c26120b095f6ea91da90f3742e3b55f4f"  # P1B-73 published correction
 ubu_github_adapter  = "e14a43b47aeb0a928f4dfdc83cd78ea9a2e044f6"  # P1B-70 published branch
 ubu_orchestrator    = "b42cadd9b3a6a010021a080e5a4f4af16ac2095a"  # P1B-70 published branch
 ubu_ui              = "698a15fde8244dca96a03b07ad144a4c2b65af15"  # P1B-69 published branch
