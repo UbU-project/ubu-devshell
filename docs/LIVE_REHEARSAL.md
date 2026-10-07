@@ -1,17 +1,153 @@
-# P1B-72: decisions that remain manual
-
-The driver is documented in [LIVE_REHEARSAL_DRIVER.md](LIVE_REHEARSAL_DRIVER.md).
-Startup consent stays explicit because the destinations are live. Approval
-stays explicit because it authorizes real calendar writes. The visual pass
-stays human because it exercises the operator's own week, titles and collisions.
-The four judgments stay human because only the operator can assess preference,
-meaning and usefulness. Genuine authoring, admissions and rejections likewise
-belong to the operator; optional private inputs carry observations, not defaults.
-No automated response supplies a decision or becomes a quoted private value.
-
-The existing manual procedure below remains intact while the driver is checked.
-
 # The live rehearsal
+
+The driver performs the HTTP actions and produces one public copy-back block.
+You supply your own observations and decisions. It uses your real Google
+Calendar; only the operator runs it. Automated checks never run this instrument.
+The acceptance result for P1B-72 is **agreement between the driver's block and
+your manual reading in one rehearsal**, not merely a successful driver exit.
+
+## Prerequisites and private preparation
+
+Keep torch absent and planning policy off for this ticket; the next Stage 1
+prerequisite is separate. Use the existing sibling orchestrator/UI checkouts,
+Node 22 or newer and the existing offline build environment. Stop any listener
+on the UI's orchestrator port. Back up your own store; choose a fresh rehearsal
+store. The driver refuses an existing store and never removes one for you.
+
+Set the required environment privately: `UBU_DB_PATH`,
+`UBU_GOOGLE_CALENDAR_ID`, `UBU_GOOGLE_CREDENTIALS_PATH` and
+`UBU_GOOGLE_TOKEN_CACHE_PATH`. Paths are absolute, no store/calendar is inferred,
+and credential/token paths are never printed. The selected **store path and
+calendar id are printed before startup**, for you to check. Set a prebuilt
+`UBU_REHEARSAL_BINARY` if compilation is unnecessary. Otherwise the launcher
+sources `scripts/env.sh`, builds offline under its lock and available scope,
+then removes build scratch and releases the lock before waiting on you.
+
+Prepare genuine routine hours/timezone, colour settings, facts and the Task
+requirement privately in optional `UBU_REHEARSAL_INPUTS`, using the field shapes
+in [the driver reference](LIVE_REHEARSAL_DRIVER.md#private-configuration).
+Missing inputs are skipped and reported; a script cannot invent observations
+or infer what requirement you mean. Never paste those inputs into copy-back.
+Optional Vocabulary admissions and proposal rejections remain deliberate app
+choices; their private value/reason is not collected into the public block.
+
+Reset the rehearsal calendar with your own copy tool **before invocation**,
+then glance at its coming week. It must contain your coloured commitments and
+uncoloured to-dos, with no earlier exports. The driver never resets it. Stamped
+leftovers and collision diagnostics are observations; unstamped leftovers are
+indistinguishable from your own events. Reset completeness remains unverifiable.
+A second invocation is a second rehearsal, requiring a fresh store and reset.
+
+## The normal driver sequence
+
+From `ubu-devshell`:
+
+```sh
+./scripts/run-live-rehearsal.sh
+```
+
+Check the displayed destinations, then type `live` to consent to startup. This
+is the equivalent of `run-live.sh`'s safety word. The driver owns an orchestrator
+and a local forwarding port; start your UI against that port as in the appendix,
+without starting a second orchestrator. No attached process's store identity
+can be verified over the existing API, which is why the driver owns startup.
+
+It creates the supplied routine, applies supplied settings, enables the Google
+session, captures, generates, and previews in order. Google consent may open
+its own browser flow. Read any remedy privately in the app; API/transport
+failures are recorded and later actions continue where possible.
+
+After preview, read the printed operation fields and inspect the current Plan
+in Calendar. Summaries and identities are withheld from stdout. **Type
+`approve` to authorize writing this preview to your real calendar, or decline.**
+No flag, timeout or default can authorize approval; stale/missing preview is
+not offered. Approval remains human because it is the sovereignty decision.
+Do not take another UI preview merely to duplicate the driver's snapshot.
+
+The driver then reads UniverseState's four entry counts before authoring,
+records the supplied genuine mutations and Task requirement with its version,
+and runs Vocabulary and Precondition separately. It preserves an existing
+compound requirement rather than replacing it with a leaf. It fabricates no
+value and makes no proposal decision. No key, value or row of UniverseState
+is requested for sharing; the protection in appendix step 11 still governs.
+
+Make **one visual pass over Today, Calendar, Tasks and Review**. The actual
+week, titles and collisions may expose a layout defect fixtures do not. Read
+saved requirement and proposed/replacement words privately in Tasks and Review;
+the driver has no human-word renderer. Admissions/rejections, if you choose
+them, remain your actions. Do not rerun producers for preferred candidates or
+for result panels: in normal mode their responses are in the driver, not the
+UI's local result state. The proposals themselves are available in Review.
+Press Enter when the visual pass is finished.
+
+The driver asks four questions **at the end**, each answered with your own
+public judgment sentence:
+
+- whether what it chose to schedule is what he would have chosen, and whether this is a store he would plan tomorrow on
+- whether the precondition's words express his requirement
+- whether a proposed name was worth recording
+- whether anything on Today or Calendar looked visibly wrong
+
+These remain human because preference, meaning and usefulness cannot come
+from API counters. Describe your assessment without quoting names, conditions,
+fact keys/values/rows or secrets. This deliberate public prose is the only
+answer-content exception. Known private configuration in an answer is withheld.
+
+Paste **only the single block from `BEGIN LIVE REHEARSAL COPY-BACK` to
+`END LIVE REHEARSAL COPY-BACK`**. It has the original nine data groups, route
+and field labels, client-computed counts clearly identified, failures/absence,
+and the four judgments. Safety preview output precedes it and need not be
+pasted. The driver stops its owned process and proxy after the block; it
+writes no report, response log, credential or answer file. The orchestrator
+necessarily persists the authoring you authorized in its selected store.
+
+## Required one-cycle comparison for P1B-72
+
+Use a fresh store and reset as above, but invoke:
+
+```sh
+./scripts/run-live-rehearsal.sh --compare
+```
+
+Check destinations and type `live`. This mode owns startup and forwards the
+UI's requests; **it does not perform the automatic actions**. Use the fallback
+appendix's action sequence once through this port. Its store-reset prerequisite
+has already been done: do not delete the open store, run its second launcher,
+reset again after startup or follow its stop step until reading is finished.
+The appendix's routine, setup, capture, Plan, preview, approval, authoring and
+two producers are the actions under test. The same responses reach the UI and
+the recorder. An independent second capture or producer run would change the
+state rather than compare instruments.
+
+Read the appendix's figures privately and compare them with the resulting
+block after pressing Enter. The four questions follow those actions. Keep
+Vocabulary and Precondition selection readings separate. Report disagreement
+by item, route/field and count or absence; **private content remains withheld**.
+The appendix's older requests to paste names, words and risk prose do not
+supersede this policy. Do not repeat actions until numbers agree.
+
+P1B-72 operator acceptance and ledger retirements remain **pending** until you
+confirm agreement. Do not infer retirement from automated tests. The appendix
+remains the fallback if the instrument cannot run; report unavailable actions
+and continue, as it instructs. P1B-67's named-absence rule still applies to that
+manual transcription path and to any retained manual reading.
+
+The former normal procedure had **14 steps and 9 branching copy-back items**.
+The new ordinary flow has **one invocation, one approval decision, one visual
+pass, four questions and one paste**: nine data groups are generated, with no
+manual figure transcription. Startup consent, calendar reset, genuine private
+preparation and optional candidate decisions are additional responsibilities,
+not hidden automated steps. Item 1's seven named missing-figure phrases become
+zero named transcription branches in the normal path. All fallback branches
+remain in the appendix; this one comparison cycle intentionally costs more work.
+
+## Appendix — fallback manual procedure and comparison readings
+
+The original procedure follows, with its explanatory prose and step 11
+protection intact. Apply the comparison adaptations and public-content policy
+above before using its old clicking and copy-back instructions.
+
+### Original manual procedure
 
 This is the procedure. It is the single source for the live sequence: a
 ticket names this document and adds no steps of its own. Do the numbered
