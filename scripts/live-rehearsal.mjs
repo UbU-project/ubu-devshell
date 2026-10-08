@@ -86,7 +86,7 @@ export async function runActions({ endpoints:e, inputs={}, call, approve=async()
     if (!item || typeof item.name!=='string' || !/^(calendar\.color\.[a-z_]+|advisory\.(enabled|endpoint|model|timeout_ms))$/.test(item.name)) {observe({label:'colour_setting',skip:'unsupported_private_setting'});continue;}
     await action('colour_setting','PUT',setting(item.name),{schema_version:e.SETTING_SCHEMA_VERSION,value:item.value});
   }
-  await action('session','POST',e.GOOGLE_CALENDAR_SESSION_PATH,{schema_version:e.DESKTOP_SESSION_SCHEMA_VERSION,enabled:true});
+  await action('session','POST',e.GOOGLE_CALENDAR_SESSION_PATH,{schema_version:e.DESKTOP_SESSION_SCHEMA_VERSION});
   await action('capture','POST',e.CALENDAR_CAPTURE_PATH,{schema_version:e.CALENDAR_CAPTURE_SCHEMA_VERSION,export_mode:'live'});
   await action('plan','POST',e.PLANNING_GENERATE_PATH,{schema_version:e.PLANNING_SCHEMA_VERSION,request:null});
   const preview=await action('preview','GET',e.CALENDAR_PREVIEW_PATH);
