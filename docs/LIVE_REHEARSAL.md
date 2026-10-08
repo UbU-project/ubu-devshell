@@ -22,7 +22,11 @@ your responsibility. The driver never resets the calendar or retries a rehearsal
 ## Prepare and run
 
 Use Node 22 or newer, the sibling checkouts and the existing offline build setup.
-Activate your existing virtual environment. Back up your own store. Select a fresh rehearsal store and reset your rehearsal
+Activate your existing virtual environment. Set UBU_PLANNING_WORKER_PYTHON to
+its interpreter by absolute path; that is the reliable form because the bare
+python3 fallback depends on the PATH available to the launcher. Select
+UBU_PLANNER_STRATEGY=greedy for this worker rehearsal. Back up your own store.
+Select a fresh rehearsal store and reset your rehearsal
 calendar with your own copy tool before invocation. Set your private environment:
 
 | variable | purpose |
@@ -32,6 +36,8 @@ calendar with your own copy tool before invocation. Set your private environment
 | UBU_GOOGLE_CREDENTIALS_PATH | readable absolute OAuth application-file path |
 | UBU_GOOGLE_TOKEN_CACHE_PATH | absolute readable/writable token file, or writable parent |
 | UBU_REHEARSAL_INPUTS | genuine private routine/settings/observations/Task requirement, exactly one operator-chosen provisional root in subjects, and a mutation that writes under it; include planning.gpu_enabled=true, in the [driver reference](LIVE_REHEARSAL_DRIVER.md) shape |
+| UBU_PLANNING_WORKER_PYTHON | absolute interpreter path in your active virtual environment; its command/path and PyTorch version stay on the private screen |
+| UBU_PLANNING_WORKER_PROBE_TIMEOUT_MS | optional integer 1–30000 ms environment-probe budget; default 30000 ms |
 | UBU_REHEARSAL_BINARY | optional absolute executable; otherwise the launcher builds offline |
 | UBU_REHEARSAL_OUTPUT | optional public output file; default ./live-rehearsal-copy-back.txt |
 
@@ -77,7 +83,7 @@ second rehearsal; review applied actions and reset/select a fresh store first.
 
 ## Fault and remedy lookup
 
-The fault line names public variables, failed checks or the port. Credential
+The fault line names public variables, failed checks, input fields/rules or the port. Credential
 and token paths/contents remain private. Startup stderr is shown only privately,
 before health succeeds; it is discarded before capture. Correct the named fault
 using this lookup. The script stops rather than asking for a missing-figure phrase.
@@ -97,7 +103,7 @@ using this lookup. The script stops rather than asking for a missing-figure phra
 | `terminal_required` | Run from an interactive terminal so you can give consent and make the approval decision. |
 | `mock_configuration_refused` | Unset UBU_CALENDAR_MOCK_EVENTS for this real-calendar rehearsal. |
 | `invalid_port` | Set UBU_ORCHESTRATOR_PORT to an integer from 1 to 65535, or leave it unset for the UI default. |
-| `invalid_private_inputs` | Correct UBU_REHEARSAL_INPUTS privately to the documented JSON object/field shapes. |
+| `invalid_private_inputs` | Correct the named field in UBU_REHEARSAL_INPUTS privately to satisfy the named rule; see LIVE_REHEARSAL_DRIVER.md. |
 | `configuration_destination_or_transport_unavailable` | Check the selected environment and local checkout; paste this file when the cause remains unknown. |
 | `build_environment_unavailable` | Correct CARGO_BUILD_JOBS/UBU_TARGET_ROOT and the sourced env.sh build configuration; retain exclusion and memory limits. |
 | `offline_build_failed` | Make the locked offline orchestrator build pass under env.sh; stop a conflicting build/worker first. |

@@ -15,41 +15,62 @@ export function validSubject(root) {
   return typeof root==='string'&&root.length<=SETTING_VALUE_RULES.rootBytes&&/^[a-z][a-z0-9]*(_[a-z0-9]+)*$/.test(root)
     &&!RESERVED_SUBJECTS.includes(root)&&!GOVERNED_SUBJECTS.includes(root);
 }
-export function validSetting(name,value) {
-  if(typeof name!=='string')return false;
-  if(name.startsWith(SETTING_PREFIXES[1]))return validSubject(name.slice(SETTING_PREFIXES[1].length))&&value===true;
-  if(name.startsWith(SETTING_PREFIXES[0]))return !blank(name.slice(SETTING_PREFIXES[0].length))&&typeof value==='string'&&/^(?:[1-9]|10|11)$/.test(value);
-  if(!SETTING_NAMES.includes(name))return false;
-  if(name==='planning.gpu_enabled')return typeof value==='boolean';
-  if(name==='advisory.timeout_ms')return Number.isSafeInteger(value)&&value>=SETTING_VALUE_RULES.timeoutMin&&value<=SETTING_VALUE_RULES.timeoutMax;
-  if(['advisory.review_seed_days','advisory.review_ceiling_days'].includes(name))return Number.isSafeInteger(value)&&value>=SETTING_VALUE_RULES.reviewMin&&value<=SETTING_VALUE_RULES.reviewMax;
-  if(typeof value!=='string'||blank(value))return false;
+// Closed rule identities contain no supplied names or values.
+export const INPUT_RULES = Object.freeze([
+  'json_required','object_required','array_required','setting_object_required',
+  'setting_name_required','setting_name_supported','subject_root_valid','subject_true_required',
+  'colour_category_nonblank','colour_id_1_to_11','boolean_required',
+  'timeout_ms_5000_to_3600000','review_days_1_to_365','text_nonblank','loopback_origin',
+  'review_seed_le_ceiling','subject_unique','one_subject_required','subject_mutation_write_required'
+]);
+function settingFault(name,value) {
+  const fault=(field,rule)=>({field,rule});
+  if(typeof name!=='string')return fault('name','setting_name_required');
+  if(name.startsWith(SETTING_PREFIXES[1])) {
+    if(!validSubject(name.slice(SETTING_PREFIXES[1].length)))return fault('name','subject_root_valid');
+    return value===true?null:fault('value','subject_true_required');
+  }
+  if(name.startsWith(SETTING_PREFIXES[0])) {
+    if(blank(name.slice(SETTING_PREFIXES[0].length)))return fault('name','colour_category_nonblank');
+    return typeof value==='string'&&/^(?:[1-9]|10|11)$/.test(value)?null:fault('value','colour_id_1_to_11');
+  }
+  if(!SETTING_NAMES.includes(name))return fault('name','setting_name_supported');
+  if(name==='planning.gpu_enabled')return typeof value==='boolean'?null:fault('value','boolean_required');
+  if(name==='advisory.timeout_ms')return Number.isSafeInteger(value)&&value>=SETTING_VALUE_RULES.timeoutMin&&value<=SETTING_VALUE_RULES.timeoutMax?null:fault('value','timeout_ms_5000_to_3600000');
+  if(['advisory.review_seed_days','advisory.review_ceiling_days'].includes(name))return Number.isSafeInteger(value)&&value>=SETTING_VALUE_RULES.reviewMin&&value<=SETTING_VALUE_RULES.reviewMax?null:fault('value','review_days_1_to_365');
+  if(typeof value!=='string'||blank(value))return fault('value','text_nonblank');
   if(name==='advisory.endpoint') {
     const match=/^http:\/\/127\.0\.0\.1:([0-9]+)$/.exec(value);
-    return !!match&&Number(match[1])>0&&Number(match[1])<=65535;
+    if(!match||Number(match[1])===0||Number(match[1])>65535)return fault('value','loopback_origin');
   }
-  return true;
+  return null;
 }
+export function validSetting(name,value) {return settingFault(name,value)===null;}
+// null is success; a refusal is a safe structural field plus a closed rule.
 export function validAuthoringInputs(inputs) {
-  if(!inputs||typeof inputs!=='object'||Array.isArray(inputs))return false;
-  for(const key of ['settings','subjects','mutations'])if(inputs[key]!==undefined&&!Array.isArray(inputs[key]))return false;
+  if(!inputs||typeof inputs!=='object'||Array.isArray(inputs))return {field:'inputs',rule:'object_required'};
+  for(const key of ['settings','subjects','mutations'])if(inputs[key]!==undefined&&!Array.isArray(inputs[key]))return {field:key,rule:'array_required'};
   let {seed,ceiling}=REVIEW_DEFAULTS;
   const subjects=new Set();
-  for(const item of inputs.settings??[]) {
-    if(!item||!validSetting(item.name,item.value))return false;
+  for(const [index,item] of (inputs.settings??[]).entries()) {
+    const field=`settings[${index}]`;
+    if(!item||typeof item!=='object'||Array.isArray(item))return {field,rule:'setting_object_required'};
+    const fault=settingFault(item.name,item.value);
+    if(fault)return {field:`${field}.${fault.field}`,rule:fault.rule};
     if(item.name==='advisory.review_seed_days')seed=item.value;
     if(item.name==='advisory.review_ceiling_days')ceiling=item.value;
-    if(seed>ceiling)return false;
+    if(seed>ceiling)return {field:`${field}.value`,rule:'review_seed_le_ceiling'};
     if(item.name.startsWith(SETTING_PREFIXES[1])) {
-      if(subjects.has(item.name))return false;
+      if(subjects.has(item.name))return {field:`${field}.name`,rule:'subject_unique'};
       subjects.add(item.name);
     }
   }
-  for(const root of inputs.subjects??[]) {
-    if(!validSubject(root)||subjects.has(SETTING_PREFIXES[1]+root))return false;
+  for(const [index,root] of (inputs.subjects??[]).entries()) {
+    if(!validSubject(root))return {field:`subjects[${index}]`,rule:'subject_root_valid'};
+    if(subjects.has(SETTING_PREFIXES[1]+root))return {field:`subjects[${index}]`,rule:'subject_unique'};
     subjects.add(SETTING_PREFIXES[1]+root);
   }
-  return true;
+  return null;
 }
 export function routineBody(input,schema_version) {
   // Select the UI creation fields explicitly, never arbitrary root fields.

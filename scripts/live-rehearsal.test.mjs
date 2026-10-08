@@ -387,10 +387,10 @@ test('A all setting families enforce their Rust value, endpoint and root rules',
   assert(validSubject('a'.repeat(64)));
 });
 test('A review pairs follow supplied order and fresh-store defaults; duplicate subjects are refused',()=>{
-  assert(validAuthoringInputs({settings:[{name:'advisory.review_seed_days',value:1},{name:'advisory.review_ceiling_days',value:1}]}));
-  assert(!validAuthoringInputs({settings:[{name:'advisory.review_ceiling_days',value:1}]}));
-  assert(!validAuthoringInputs({settings:[{name:'advisory.review_ceiling_days',value:10},{name:'advisory.review_seed_days',value:11}]}));
-  assert(!validAuthoringInputs({settings:[{name:'universe.subject.invented',value:true}],subjects:['invented']}));
+  assert.equal(validAuthoringInputs({settings:[{name:'advisory.review_seed_days',value:1},{name:'advisory.review_ceiling_days',value:1}]}),null);
+  assert(validAuthoringInputs({settings:[{name:'advisory.review_ceiling_days',value:1}]}));
+  assert(validAuthoringInputs({settings:[{name:'advisory.review_ceiling_days',value:10},{name:'advisory.review_seed_days',value:11}]}));
+  assert(validAuthoringInputs({settings:[{name:'universe.subject.invented',value:true}],subjects:['invented']}));
 });
 test('A unsupported supplied setting stops before any action and never exposes private input',async()=>{
   let calls=0;const canary=secret();
@@ -493,4 +493,77 @@ test('P76 every Setting family has its own driver and public label',async()=>{
 test('P76 an empty effective registry is satisfied only for now and neither admits nor retires anything',()=>{
   const report=new PublicReport(e);report.observe({label:'registry',subjects:[],result:{status:200,data:{settings:[]}}});
   const output=report.render();assert(output.includes('provisional_subjects: 0'));assert(output.includes('ratification_condition: satisfied_for_now'));assert(output.includes('evaluated at the switch, not banked'));
+});
+
+test('P77 structural input faults identify fields before any action',async()=>{
+  for(const [inputs,field,rule] of [
+    [null,'inputs','object_required'],[[],'inputs','object_required'],
+    [{settings:{}},'settings','array_required'],[{subjects:{}},'subjects','array_required'],
+    [{mutations:{}},'mutations','array_required'],[{settings:[null]},'settings[0]','setting_object_required']
+  ]) {
+    assert.deepEqual(validAuthoringInputs(inputs),{field,rule});
+    let calls=0;
+    await assert.rejects(runActions({endpoints:e,inputs,call:async()=>{calls++;}}),error=>{
+      const line=failureLine(error);return line.includes('field: '+field)&&line.includes('rule: '+rule)&&line.includes('Remedy:');
+    });assert.equal(calls,0);
+  }
+});
+test('P77 Setting refusals distinguish name and value rules without disclosing either',()=>{
+  const canary=secret();
+  for(const [name,value,field,rule] of [
+    [null,canary,'name','setting_name_required'],[canary,canary,'name','setting_name_supported'],
+    ['universe.subject.'+canary,true,'name','subject_root_valid'],['universe.subject.synthetic_p77',canary,'value','subject_true_required'],
+    ['calendar.color.\u0085',canary,'name','colour_category_nonblank'],['calendar.color.'+canary,canary,'value','colour_id_1_to_11'],
+    ['planning.gpu_enabled',canary,'value','boolean_required'],['advisory.timeout_ms',canary,'value','timeout_ms_5000_to_3600000'],
+    ['advisory.review_seed_days',canary,'value','review_days_1_to_365'],['advisory.model','\u0085','value','text_nonblank'],
+    ['advisory.endpoint',canary,'value','loopback_origin']
+  ]) {
+    const fault=validAuthoringInputs({settings:[{name:'planning.gpu_enabled',value:true},{name,value}]});
+    assert.deepEqual(fault,{field:'settings[1].'+field,rule});
+    const line=failureLine(new RehearsalFault('invalid_private_inputs',fault));
+    assert(line.includes('field: settings[1].'+field));assert(line.includes('rule: '+rule));assert(!line.includes(canary));
+  }
+});
+test('P77 review ordering and duplicate roots name the specific failing array entry',()=>{
+  for(const [inputs,field,rule] of [
+    [{settings:[{name:'advisory.review_ceiling_days',value:1}]},'settings[0].value','review_seed_le_ceiling'],
+    [{settings:[{name:'universe.subject.synthetic_p77',value:true},{name:'universe.subject.synthetic_p77',value:true}]},'settings[1].name','subject_unique'],
+    [{subjects:['synthetic_p77','synthetic_p77']},'subjects[1]','subject_unique'],
+    [{subjects:['invalid-root']},'subjects[0]','subject_root_valid'],
+    [{settings:[{name:'universe.subject.synthetic_p77',value:true}],subjects:['synthetic_p77']},'subjects[0]','subject_unique']
+  ])assert.deepEqual(validAuthoringInputs(inputs),{field,rule});
+});
+test('P77 live JSON and required root/write faults retain precise safe context',()=>{
+  const env=fakeEnv();
+  for(const [raw,field,rule] of [
+    ['{','inputs','json_required'],['null','inputs','object_required'],
+    [JSON.stringify({}),'subjects','one_subject_required'],
+    [JSON.stringify({subjects:['synthetic_p77']}),'mutations','subject_mutation_write_required'],
+    [JSON.stringify({subjects:['synthetic_p77'],mutations:[{operation:'clear_fact',target:'facts.synthetic_p77.ready'}]}),'mutations','subject_mutation_write_required']
+  ])assert.throws(()=>liveConfig({...env,UBU_REHEARSAL_INPUTS:raw},e),error=>{
+    assert.deepEqual(error.context,{field,rule});const line=failureLine(error);
+    return error.code==='invalid_private_inputs'&&line.includes('field: '+field)&&line.includes('rule: '+rule);
+  });
+});
+test('P77 public refusal context refuses arbitrary fields and rule strings',()=>{
+  const canary=secret();
+  for(const field of [canary,'settings[2].'+canary,'subjects['+canary+']','mutations.'+canary]) {
+    const line=failureLine(new RehearsalFault('invalid_private_inputs',{field,rule:canary}));assert(!line.includes(canary));
+  }
+  const line=failureLine(new RehearsalFault('invalid_private_inputs',{field:'settings[2].value',rule:'boolean_required',value:canary,name:canary}));
+  assert(line.includes('settings[2].value'));assert(line.includes('boolean_required'));assert(!line.includes(canary));
+});
+test('P77 all environment facts and both interpreter sources remain closed while details stay private',()=>{
+  const facts=['python_unavailable','interpreter_start_failed','module_root_unavailable','module_package_unavailable','probe_budget_invalid','probe_timed_out','probe_failed','torch_unavailable','torch_version_mismatch'];
+  const sources=['planning_worker_python_environment_variable','planning_worker_python3_fallback'];
+  for(const source of sources) {
+    const interpreter=secret(),version=secret(),screen=[];
+    const diagnostics=[{code:source,message:`interpreter=${interpreter}; version=${version}`},...facts.map(fact=>({code:'planning_gpu_fallback_'+fact,message:interpreter}))];
+    const record={label:'plan',result:{status:200,data:{diagnostics}}};
+    const report=new PublicReport(e),privateView=new PrivateRenderer({print:line=>screen.push(line)});
+    report.observe(record);privateView.observe(record);const output=report.render();
+    for(const code of [source,...facts.map(fact=>'planning_gpu_fallback_'+fact)])assert(output.includes(`"${code}":1`));
+    assert(!output.includes('withheld_unknown'));assert(!output.includes(interpreter));assert(!output.includes(version));
+    assert(screen.join('\n').includes(interpreter));assert(screen.join('\n').includes(version));
+  }
 });

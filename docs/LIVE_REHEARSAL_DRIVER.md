@@ -20,6 +20,30 @@ UBU_REHEARSAL_OUTPUT selects the public output file; the default is
 tracked content. Node and a writable output destination are prerequisites.
 The writer refuses credential, token, binary and state destinations and symlinks.
 
+Worker configuration is private environment, read by the executable:
+
+| variable | purpose |
+|---|---|
+| UBU_PLANNING_WORKER_PYTHON | interpreter to probe and use for computation; supply your virtual environment's interpreter by absolute path |
+| UBU_PLANNING_WORKER_PROBE_TIMEOUT_MS | optional integer from 1 to 30000 milliseconds; default 30000, within the owned transport's 30-second ceiling |
+
+An absolute interpreter path is the reliable form because the bare python3
+fallback depends on the PATH available to the launcher. Activating a venv alone
+does not name the interpreter to the worker. The probe does not reserve compute;
+its default budget accommodates cold PyTorch imports on a loaded machine.
+Invalid budgets refuse with planning_gpu_fallback_probe_budget_invalid; timeouts
+report planning_gpu_fallback_probe_timed_out rather than claiming PyTorch absence.
+The public planning codes record whether UBU_PLANNING_WORKER_PYTHON was supplied
+or python3 defaulted. Interpreter spelling and observed version stay in diagnostic
+messages on the private screen, including when the probe succeeds.
+
+The advisory default remains 120000 milliseconds, intended for small local
+models. Larger models require an explicit advisory.timeout_ms Setting in private
+settings; 300000 milliseconds succeeded for the operator's 27-billion-parameter
+model. The allowed range remains 5000–3600000 milliseconds. This documents the
+required model-specific budget without lengthening every unconfigured request;
+the worker probe budget is a separate setting and does not change advisory timeouts.
+
 UBU_REHEARSAL_INPUTS is a private JSON object. Prepare it outside command history
 and repository content. No observation, requirement or routine hour is inferred:
 
@@ -45,6 +69,33 @@ action seam retains omitted-input outcomes for its tests; the live configuration
 refuses a missing/multiple root or unrelated/clear-only mutation authoring before
 any action. A supplied existing Task tree remains preserved, so its new-root
 precondition count may legitimately be zero rather than a manufactured requirement.
+
+Input refusals name the structural field and a closed rule. No supplied name or
+value is printed. settings and subjects indices are zero-based; for example,
+settings[2].value identifies the third Setting's value. Correct that field to
+meet the named rule before starting another fresh rehearsal:
+
+| rule | field | requirement |
+|---|---|---|
+| json_required | inputs | parseable JSON |
+| object_required | inputs | JSON object |
+| array_required | settings, subjects or mutations | array when supplied |
+| setting_object_required | settings[i] | Setting object with name/value |
+| setting_name_required | settings[i].name | string name |
+| setting_name_supported | settings[i].name | one of the documented names/prefixes |
+| subject_root_valid | settings[i].name or subjects[i] | valid provisional root, excluding reserved/governed roots |
+| subject_true_required | settings[i].value | literal true for a provisional root |
+| colour_category_nonblank | settings[i].name | nonblank category suffix |
+| colour_id_1_to_11 | settings[i].value | string colour id 1 through 11 |
+| boolean_required | settings[i].value | boolean for planning.gpu_enabled |
+| timeout_ms_5000_to_3600000 | settings[i].value | integer within the advisory budget range |
+| review_days_1_to_365 | settings[i].value | integer within the review-day range |
+| text_nonblank | settings[i].value | nonblank string for model/endpoint |
+| loopback_origin | settings[i].value | literal http loopback origin with nonzero port at most 65535 |
+| review_seed_le_ceiling | settings[i].value | supplied order keeps seed at or below the current ceiling |
+| subject_unique | settings[i].name or subjects[i] | root appears once across supplied Setting and subject entries |
+| one_subject_required | subjects | exactly one operator-chosen root for the live rehearsal |
+| subject_mutation_write_required | mutations | at least one supported state write under the supplied root |
 
 ## One execution and two sinks
 

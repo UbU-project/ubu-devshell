@@ -2,6 +2,7 @@ import * as realFs from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
+import { INPUT_RULES } from './live-rehearsal-contract.mjs';
 
 export const REMEDIES=Object.freeze({
   required_configuration_missing:'Set each named variable in your private environment, then run again.',
@@ -17,7 +18,7 @@ export const REMEDIES=Object.freeze({
   terminal_required:'Run from an interactive terminal so you can give consent and make the approval decision.',
   mock_configuration_refused:'Unset UBU_CALENDAR_MOCK_EVENTS for this real-calendar rehearsal.',
   invalid_port:'Set UBU_ORCHESTRATOR_PORT to an integer from 1 to 65535, or leave it unset for the UI default.',
-  invalid_private_inputs:'Correct UBU_REHEARSAL_INPUTS privately to the documented JSON object/field shapes.',
+  invalid_private_inputs:'Correct the named field in UBU_REHEARSAL_INPUTS privately to satisfy the named rule; see LIVE_REHEARSAL_DRIVER.md.',
   configuration_destination_or_transport_unavailable:'Check the selected environment and local checkout; paste this file when the cause remains unknown.',
   build_environment_unavailable:'Correct CARGO_BUILD_JOBS/UBU_TARGET_ROOT and the sourced env.sh build configuration; retain exclusion and memory limits.',
   offline_build_failed:'Make the locked offline orchestrator build pass under env.sh; stop a conflicting build/worker first.',
@@ -39,6 +40,9 @@ export const REMEDIES=Object.freeze({
 });
 const variables=new Set(['UBU_DB_PATH','UBU_GOOGLE_CALENDAR_ID','UBU_GOOGLE_CREDENTIALS_PATH','UBU_GOOGLE_TOKEN_CACHE_PATH','UBU_REHEARSAL_BINARY','UBU_REHEARSAL_INPUTS','UBU_ORCHESTRATOR_PORT','ORCHESTRATOR_DIR','UBU_REHEARSAL_OUTPUT','CARGO_BUILD_JOBS','UBU_TARGET_ROOT']);
 const checks=new Set(['missing','absolute path','stat','connection_or_timeout','invalid_json','response_too_large','unexpected_status','readable regular file','executable regular file','readable/writable regular file','writable parent','invalid JSON/field shape']);
+const inputRules=new Set(INPUT_RULES);
+// Structural field paths only, never supplied keys or values.
+const inputField=value=>typeof value==='string'&&/^(?:inputs|settings|subjects|mutations|settings\[(?:0|[1-9][0-9]*)\](?:\.(?:name|value))?|subjects\[(?:0|[1-9][0-9]*)\])$/.test(value);
 const actions=new Set(['routine','colour_setting','advisory_setting','planning_setting','subject_setting','session','capture','plan','preview','approval','universe_before','subject','authoring','task_lookup','task_read','requirement','requirement_readback','registry','vocabulary','precondition','queue']);
 export class RehearsalFault extends Error {
   constructor(code,context={}) {super(Object.hasOwn(REMEDIES,code)?code:'configuration_destination_or_transport_unavailable');this.code=this.message;this.context=context;}
@@ -49,6 +53,8 @@ export function failureLine(error) {
   const c=fault.context,parts=[];
   if(Array.isArray(c.variables))parts.push(c.variables.filter(v=>variables.has(v)).join(', '));
   if(variables.has(c.variable))parts.push(c.variable);
+  if(fault.code==='invalid_private_inputs'&&inputField(c.field))parts.push('field: '+c.field);
+  if(fault.code==='invalid_private_inputs'&&inputRules.has(c.rule))parts.push('rule: '+c.rule);
   if(checks.has(c.check))parts.push('failed check: '+c.check);
   if(actions.has(c.action))parts.push('action: '+c.action);
   if(Number.isSafeInteger(c.status))parts.push('HTTP '+c.status);

@@ -1288,3 +1288,51 @@ the one-job exclusion/memory wrapper remain unchanged.
 
 Operator acceptance is the one invocation in LIVE_REHEARSAL.md; the agent does
 not perform it. What is under test is whether the ratification agenda can be read.
+
+
+## P1B-77 — the worker probe names its interpreter source and failed fact
+
+Rules 10 and 11 remain operative: **“A manual step exists only for rendering.”**
+and **“A manual instrument has one line of execution.”** Environment diagnosis
+and input validation happen in code; neither introduces another invocation,
+figure transcription, absence phrase, judgment or visual pass. Source and reason
+codes survive the public projection; interpreter spelling and observed versions
+stay in private diagnostic messages. The existing interpreter selection from
+P1B-74 is retained, rather than claimed as a new implementation.
+
+The operator approved three grounding corrections. The driver already mentioned
+UBU_PLANNING_WORKER_PYTHON, but lacked prerequisite/configuration-table entries
+and reliable absolute-path guidance. liveConfig had five throw sites, a sixth
+in runActions, and validAuthoringInputs had six return-false sites with shared
+loops/conditions; the implementation names each actual field/rule instead of
+manufacturing fifteen faults. Only the three kernel Cargo consumer revisions
+advance; the kernel/orchestrator inventory entries also record their published
+heads, as the standing inventory policy requires.
+
+The probe's default rises from five to thirty seconds, within the existing
+transport ceiling, with UBU_PLANNING_WORKER_PROBE_TIMEOUT_MS bounded to integer
+1–30000 milliseconds. A timeout is its own fact. The compiled import root must
+contain the ubu_planning_worker package directory; the old package layout is
+reported separately from a missing root. Interpreter absence/start failure,
+layout, invalid budget, timeout, failed/malformed probe, unavailable/broken
+PyTorch and version mismatch have closed codes. None contains a path or version.
+The source code is emitted for successful probes too; unsupported strategy or
+missing factory still does not spawn or pretend an interpreter was probed.
+
+The exact StageOutput::assemble comparison and “Never widen a numeric tolerance
+here” comment stay byte-identical. CpuStrategy retains authority on fallback.
+The no-compute probe remains outside the compute lock; the compute session's
+shared exclusion, lifetime and reaping remain unchanged. The one-job Cargo
+wrapper and scoped memory ceiling, and P1B-70's five spawn conditions, remain
+unchanged. In-process orchestrator tests inject facts; pure driver tests inject
+responses. No new test path reaches HTTP, ollama, Google, editors or signals.
+
+The advisory default remains 120000 milliseconds. Larger local models require
+an explicit advisory.timeout_ms Setting; the operator's accepted 300000 ms
+budget is documented. This preserves the shorter unconfigured wait while
+making the larger-model requirement visible before a rehearsal.
+
+Operator acceptance remains the single invocation in LIVE_REHEARSAL.md. The
+agent does not perform it. What is under test is whether a failing environment
+names both which fact failed and which interpreter was asked. CPU-only owned
+worker checks do not claim CUDA parity or live acceptance.

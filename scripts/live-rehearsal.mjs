@@ -24,14 +24,14 @@ export function liveConfig(env, endpoints) {
   const port = Number(env.UBU_ORCHESTRATOR_PORT ?? endpoints.DEFAULT_ORCHESTRATOR_PORT);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new RehearsalFault('invalid_port');
   let inputs = {};
-  try { inputs = env.UBU_REHEARSAL_INPUTS ? JSON.parse(env.UBU_REHEARSAL_INPUTS) : {}; } catch { throw new RehearsalFault('invalid_private_inputs'); }
-  if (!inputs || typeof inputs !== 'object' || Array.isArray(inputs)) throw new RehearsalFault('invalid_private_inputs');
-  for (const key of ['settings','subjects','mutations']) if (inputs[key] !== undefined && !Array.isArray(inputs[key])) throw new RehearsalFault('invalid_private_inputs');
-  if(!validAuthoringInputs(inputs))throw new RehearsalFault('invalid_private_inputs');
-  if(inputs.subjects?.length!==1||!inputs.mutations?.some(mutation=>
+  try { inputs = env.UBU_REHEARSAL_INPUTS ? JSON.parse(env.UBU_REHEARSAL_INPUTS) : {}; } catch { throw new RehearsalFault('invalid_private_inputs',{field:'inputs',rule:'json_required'}); }
+  const inputFault=validAuthoringInputs(inputs);
+  if(inputFault)throw new RehearsalFault('invalid_private_inputs',inputFault);
+  if(inputs.subjects?.length!==1)throw new RehearsalFault('invalid_private_inputs',{field:'subjects',rule:'one_subject_required'});
+  if(!inputs.mutations?.some(mutation=>
     ['set_fact','set_numeric','increment_numeric','decrement_numeric','add_membership','append_event_marker'].includes(mutation?.operation)
     && typeof mutation?.target==='string'&&['facts','numeric_values','set_memberships','event_markers'].includes(mutation.target.split('.')[0])
-    && mutation.target.split('.')[1]===inputs.subjects[0]))throw new RehearsalFault('invalid_private_inputs',{variable:'UBU_REHEARSAL_INPUTS'});
+    && mutation.target.split('.')[1]===inputs.subjects[0]))throw new RehearsalFault('invalid_private_inputs',{field:'mutations',rule:'subject_mutation_write_required'});
   return { store:env.UBU_DB_PATH, calendar:env.UBU_GOOGLE_CALENDAR_ID, port, inputs };
 }
 export async function validateFiles(config,env,fs=fileSystem) {
@@ -70,7 +70,8 @@ export async function bindForwarder(server,port) {
   catch {throw new RehearsalFault('orchestrator_port_unavailable',{port});}
 }
 export async function runActions({ endpoints:e, inputs={}, call, approve=async()=>false, observe=()=>{} }) {
-  if(!validAuthoringInputs(inputs))throw new RehearsalFault('invalid_private_inputs');
+  const inputFault=validAuthoringInputs(inputs);
+  if(inputFault)throw new RehearsalFault('invalid_private_inputs',inputFault);
   const results=[];
   async function action(label,method,path,body,expected=200) {
     let result;
