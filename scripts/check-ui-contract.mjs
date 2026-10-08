@@ -2460,7 +2460,8 @@ scenarios.push({
     const enabled = await call(o.base, "POST", endpoints.PLANNING_GENERATE_PATH, body);
     cpuProvenance(enabled);
     const diagnostic = enabled.diagnostics.find((d) => d.code === "planning_gpu_unavailable");
-    ok(diagnostic?.message.includes("GPU compute stage not implemented"), "policy-on reports the missing device stage");
+    ok(diagnostic?.message.includes("unsupported_strategy"), "policy-on names the unchanged ChunkedSweep strategy's unsupported Stage 1 profile");
+    ok(enabled.diagnostics.some((d) => d.code === "planning_gpu_fallback_unsupported_strategy"), "the public diagnostic code carries the fallback reason without message disclosure");
     same(enabled.selected_candidate, result.selected_candidate, "policy-on preserves the CPU selected candidate");
     await call(o.base, "DELETE", endpoints.SETTING_DELETE_PATH.replace("{name}", "planning.gpu_enabled"), undefined, 204);
     const restored = await call(o.base, "POST", endpoints.PLANNING_GENERATE_PATH, body);

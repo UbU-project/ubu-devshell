@@ -1,6 +1,7 @@
 // Public projection: never serialize an API object, arbitrary string, or key.
 const count=v=>Number.isSafeInteger(v)&&v>=0?v:'unavailable';
 const length=v=>Array.isArray(v)?v.length:'unavailable';
+const collection=(body,key)=>!Object.hasOwn(body,key)?`missing_${key}`:Array.isArray(body[key])?body[key].length:`invalid_${key}`;
 const flag=v=>typeof v==='boolean'?v:'unavailable';
 const choice=(v,allowed)=>allowed.includes(v)?v:'withheld_or_unavailable';
 const kinds=['create','update','delete'];
@@ -8,7 +9,8 @@ const statuses=['ok','unconfigured','failed','malformed_result','queue_full','ap
 const levels=['low','medium','high'];
 const categories=['deadline_risk','dependency_fragility','worker_bottleneck','stale_affect','affect_margin','destructive_pressure','post_plan_depletion','low_coverage','skeleton_failure','routine_triage','unplaced_work'];
 // Closed vocabulary: an unexpected server code is counted but its text withheld.
-const codes=new Set(['capture_occupancy_only','capture_event_not_ownable','capture_colour_ambiguous','capture_owned_drift','capture_unrecorded_event','advisory_result_too_large','advisory_http_failed','advisory_transport_unavailable','capture_colour_absent','capture_stale_export','capture_event_invalid','capture_all_day_unsupported','capture_recurring_unsupported','capture_colour_unmapped','capture_colour_collision','routine_occurrence_overlaps_commitment','static_task_collision','calendar_event_retained','calendar_preview_stale','calendar_preview_missing','calendar_session_disabled','advisory_task_skipped','advisory_unconfigured','advisory_connection_failed','advisory_timeout','advisory_http_error','advisory_empty_response','advisory_malformed_result','precondition_queue_full','precondition_no_task','precondition_no_facts','precondition_missing_targets','precondition_proposal_refused','vocabulary_queue_full','vocabulary_no_task','vocabulary_proposal_refused','vocabulary_value_required','vocabulary_admission_refused','universe_mutation_invalid','universe_mutations_empty','version_conflict','unknown_schema_version','missing_schema_version']);
+import codeNames from './live-rehearsal-codes.json' with {type:'json'};
+const codes=new Set(codeNames);
 export function histogram(rows,key,allowed) {
   if(!Array.isArray(rows))return 'unavailable';
   const bins={};for(const row of rows){const code=allowed.has(row?.[key])?row[key]:'withheld_unknown';bins[code]=(bins[code]??0)+1;}return bins;
@@ -67,7 +69,7 @@ export class PublicReport {
         lines.push(`${method} ${route} status: ${choice(d.status,['candidate','admitted','rejected','superseded','planned','no_plan','ok','failed'])}`,
           `${method} ${route} diagnostics[].code: ${JSON.stringify(diagnostics(d.diagnostics))} (client-computed histogram; messages withheld)`,
           `${method} ${route} plan.steps: ${length(steps)} (client-computed cardinality); plan.steps[].static_anchor: ${JSON.stringify(histogram(steps,'static_anchor',new Set([true,false])))} (client-computed histogram)`);
-        for(const field of ['unplaced_tasks','blocked_tasks','invalid_tasks']) lines.push(`${method} ${route} ${field}: ${length(d[field])} (client-computed cardinality; titles/ids/reasons/explanations/alternatives withheld)`);
+        for(const field of ['unplaced_tasks','blocked_tasks','invalid_tasks']) lines.push(`${method} ${route} ${field}: ${collection(d,field)} (client-computed cardinality; titles/ids/reasons/explanations/alternatives withheld)`);
         const risk=[];
         risk.push(`${method} ${route} risk_report.level: ${choice(d.risk_report?.level,levels)}; risk_report.findings: ${length(d.risk_report?.findings)} (client-computed cardinality)`);
         if(Array.isArray(d.risk_report?.findings)) d.risk_report.findings.forEach((f,i)=>risk.push(`${method} ${route} risk_report.findings[${i}]: ${JSON.stringify({category:choice(f?.category,categories),severity:choice(f?.severity,levels),blocking:flag(f?.blocking)})}; detail/subject_ref withheld`));
@@ -82,7 +84,7 @@ export class PublicReport {
       if(label==='universe_before') for(const field of ['facts','numeric_values','set_memberships','event_markers'])lines.push(`${method} ${route} ${field}: ${d[field]&&typeof d[field]==='object'&&!Array.isArray(d[field])?Object.keys(d[field]).length:'unavailable'} (client-computed entry cardinality; no keys/values/rows)`);
       if(['authoring','requirement','subject'].includes(label))lines.push(`${method} ${route} write response observed; content withheld`);
       if(label==='requirement_readback')lines.push(`${method} ${route} payload.preconditions present: ${d.payload?flag(d.payload.preconditions!=null):'unavailable'}; AST/words withheld; terminal rendering stays private`);
-      if(['vocabulary','precondition'].includes(label))lines.push(`${method} ${route} producer=${label}: status: ${choice(d.status,statuses)}; candidates_enqueued: ${count(d.candidates_enqueued)}; selected: ${length(d.selected)} (client-computed cardinality; ids/titles withheld)`,
+      if(['vocabulary','precondition'].includes(label))lines.push(`${method} ${route} producer=${label}: status: ${choice(d.status,statuses)}; candidates_enqueued: ${count(d.candidates_enqueued)}; selected_tasks: ${length(d.selected)} (client-computed cardinality of selected[] Tasks; ids/titles withheld); request.limit: ${count(record.requestLimit)}`,
         `${method} ${route} producer=${label} diagnostics[].code: ${JSON.stringify(diagnostics(d.diagnostics))} (client-computed histogram; messages withheld)`,
         `${method} ${route} producer=${label} diagnostics[].code == advisory_task_skipped: ${Array.isArray(d.diagnostics)?d.diagnostics.filter(x=>x?.code==='advisory_task_skipped').length:'unavailable'} (client-computed diagnostic-entry count; aggregate notes are not Task counts)`);
       if(label==='queue')lines.push(`${method} ${route} candidates: ${length(d.candidates)} (client-computed cardinality; names/conditions/ids/titles withheld; proposal words stay on the private screen)`);

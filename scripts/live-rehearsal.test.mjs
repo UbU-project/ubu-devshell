@@ -8,7 +8,7 @@ const secret=()=>randomUUID();
 const owned='http://127.0.0.1:54321',ports=new Set([54321]);
 function flow({failure,tree=false,approve=false,mutate=()=>{}}={}) {
   const id=secret(),name=secret(),target=secret(),records=[],calls=[];
-  const inputs={routine:{title:name},subjects:[secret()],mutations:[{operation:'set_fact',target,payload:true}],task:{id},precondition:{target,predicate:'equals',expected:true}};
+  const inputs={routine:{title:name},subjects:['invented_'+secret().replaceAll('-','')],mutations:[{operation:'set_fact',target,payload:true}],task:{id},precondition:{target,predicate:'equals',expected:true}};
   const responses={
     capture:{captured:4,updated:3,unchanged:2,skipped:1,moved:5,resized:6,diagnostics:[{code:'capture_colour_absent',message:secret()},{code:'capture_colour_absent',message:secret()},{code:'capture_stale_export',message:secret()}]},
     plan:{status:'admitted',plan:{steps:[{summary:secret(),static_anchor:true},{summary:secret(),static_anchor:false},{summary:secret(),static_anchor:false}]},unplaced_tasks:[{summary:secret(),reason:secret()}],blocked_tasks:[],invalid_tasks:[],diagnostics:[{code:'static_task_collision',message:secret()}],risk_report:{level:'high',findings:[{category:'deadline_risk',severity:'high',blocking:true,detail:secret()},{category:'unplaced_work',severity:'medium',blocking:false,detail:secret()}]}},
@@ -223,7 +223,7 @@ test('B projection reports each injected count, cardinality, histogram and enum 
     const body=r[producer],marker=`POST ${e.ADVISORY_RUN_PATH} producer=${producer}`;
     check(`${marker}: status: `,body.status);
     const line=output.split('\n').find(line=>line.startsWith(`${marker}: status:`));
-    assert.equal(Number(line.match(/candidates_enqueued: (\d+)/)[1]),body.candidates_enqueued);assert.equal(Number(line.match(/selected: (\d+)/)[1]),body.selected.length);
+    assert.equal(Number(line.match(/candidates_enqueued: (\d+)/)[1]),body.candidates_enqueued);assert.equal(Number(line.match(/selected_tasks: (\d+)/)[1]),body.selected.length);
     check(`${marker} diagnostics[].code: `,{advisory_task_skipped:body.diagnostics.length});check(`${marker} diagnostics[].code == advisory_task_skipped: `,body.diagnostics.length);
   }
   check(`GET ${e.ADVISORY_QUEUE_PATH} candidates: `,r.queue.candidates.length);
@@ -352,4 +352,94 @@ test('public artifact filesystem smoke overwrites only its file, uses 0600 and l
     assert.equal((await fs.stat(first)).mode&0o777,0o600);
     assert.deepEqual(await fs.readdir(cwd),['live-rehearsal-copy-back.txt']);
   }finally{await fs.rm(cwd,{recursive:true,force:true});}
+});
+
+const {validSetting,validSubject,validAuthoringInputs,routineBody,ADVISORY_LIMIT}=await import('./live-rehearsal-contract.mjs');
+const {checkSourceAgreement,assertSettingsAgreement,emittedCodes,assertCodesAgreement}=await import('./check-live-rehearsal-contract.mjs');
+const {readFile}=await import('node:fs/promises');
+test('A and C current source agrees with the settings gate, validation fingerprints and closed code file',async()=>{
+  const result=await checkSourceAgreement();assert.equal(result.settings,6);assert.equal(result.prefixes,2);assert(result.codes>100);
+});
+test('A source additions, removals, aliases, prefixes and reserved roots fail agreement',async()=>{
+  const source=await readFile(new URL('../../ubu-orchestrator/src/services/setting_authoring.rs',import.meta.url),'utf8');
+  const subjects=await readFile(new URL('../../ubu-orchestrator/src/services/subject_vocabulary.rs',import.meta.url),'utf8');
+  for(const change of [s=>s.replace('"advisory.model" |','"advisory.invented" | "advisory.model" |'),
+    s=>s.replace('"advisory.model" |',''),s=>s.replace('"advisory.timeout_ms"','"advisory.invented_timeout"'),
+    s=>s.replace('"calendar.color."','"invented.colour."')])assert.throws(()=>assertSettingsAgreement(change(source),subjects));
+  assert.throws(()=>assertSettingsAgreement(source,subjects.replace('"universe.subject."','"invented.subject."')));
+  assert.throws(()=>assertSettingsAgreement(source,subjects.replace('"facts",','"invented_reserved",')));
+});
+test('A all setting families enforce their Rust value, endpoint and root rules',()=>{
+  for(const [name,value] of [['advisory.model','invented-model'],['advisory.endpoint','http://127.0.0.1:11434'],
+    ['advisory.timeout_ms',5000],['advisory.timeout_ms',3600000],['planning.gpu_enabled',true],['planning.gpu_enabled',false],
+    ['advisory.review_seed_days',1],['advisory.review_ceiling_days',365],['calendar.color.invented category-2','11'],
+    ['calendar.color.\ufeff','1'],['universe.subject.invented_subject_2',true]])assert(validSetting(name,value),name);
+  for(const [name,value] of [['advisory.enabled',true],['advisory.model','\u0085'],['advisory.endpoint','http://localhost:1'],
+    ['advisory.endpoint','http://127.0.0.1:0'],['advisory.endpoint','http://127.0.0.1:65536'],['advisory.endpoint','http://127.0.0.1:1/path'],
+    ['advisory.endpoint','https://127.0.0.1:1'],['advisory.timeout_ms',4999],['advisory.timeout_ms',3600001],
+    ['advisory.timeout_ms','5000'],['planning.gpu_enabled',1],['advisory.review_seed_days',1.5],['advisory.review_ceiling_days',366],
+    ['calendar.color.\u0085','1'],['calendar.color.invented',1],['calendar.color.invented','12'],
+    ['universe.subject.invented_subject',false]])assert(!validSetting(name,value),name);
+  for(const root of ['facts','numeric_values','set_memberships','event_markers','affect','operator','project','github','relationship','Invented','invented__root','invented_','2invented','é','a'.repeat(65)])assert(!validSubject(root),root);
+  assert(validSubject('a'.repeat(64)));
+});
+test('A review pairs follow supplied order and fresh-store defaults; duplicate subjects are refused',()=>{
+  assert(validAuthoringInputs({settings:[{name:'advisory.review_seed_days',value:1},{name:'advisory.review_ceiling_days',value:1}]}));
+  assert(!validAuthoringInputs({settings:[{name:'advisory.review_ceiling_days',value:1}]}));
+  assert(!validAuthoringInputs({settings:[{name:'advisory.review_ceiling_days',value:10},{name:'advisory.review_seed_days',value:11}]}));
+  assert(!validAuthoringInputs({settings:[{name:'universe.subject.invented',value:true}],subjects:['invented']}));
+});
+test('A unsupported supplied setting stops before any action and never exposes private input',async()=>{
+  let calls=0;const canary=secret();
+  await assert.rejects(runActions({endpoints:e,inputs:{settings:[{name:'advisory.enabled',value:canary}]},call:async()=>{calls++;}}),error=>error.code==='invalid_private_inputs'&&!failureLine(error).includes(canary));
+  assert.equal(calls,0);
+});
+test('B routine composition fixes mode/category, supplies the third title field and preserves genuine values',()=>{
+  const input={title:'Invented routine',mode:'one_time',schema_version:'invented',private_extra:secret(),
+    recurrence:{timezone:'UTC',rule:{kind:'daily'}},routine_instance_template:{nominal_start:'23:00:00',duration_estimate:{type:'fixed',seconds:3600},placement:'static',category_tag:'invented'}};
+  const body=routineBody(input,e.OBJECTIVE_SCHEMA_VERSION);
+  assert.equal(body.mode,'evergreen');assert.equal(body.schema_version,e.OBJECTIVE_SCHEMA_VERSION);assert(!Object.hasOwn(body,'private_extra'));
+  assert.equal(body.routine_instance_template.title,input.title);assert.deepEqual(body.routine_instance_template.tags,['invented']);assert.deepEqual(body.routine_instance_template.reminder_minutes,[]);
+  assert.equal(body.routine_instance_template.duration_estimate,input.routine_instance_template.duration_estimate);assert.equal(body.recurrence,input.recurrence);
+  assert(!Object.hasOwn(input.routine_instance_template,'tags'));
+  input.routine_instance_template.tags=['invented','other'];input.routine_instance_template.title='Invented occurrence';
+  assert.deepEqual(routineBody(input,'v').routine_instance_template.tags,['invented','other']);assert.equal(routineBody(input,'v').routine_instance_template.title,'Invented occurrence');
+});
+test('C code extraction covers constants, helpers, batches, branches and forwarded enums without messages',()=>{
+  const canary='invented_private_'+secret().replaceAll('-','');
+  const next='pub enum NextActionDiagnosticCode { NoReadyTask }';
+  const source=`const INVENTED_CODE: &str = "invented_constant";
+    fn refusal(code: &str, message: &str) {} fn go() {
+      refusal(INVENTED_CODE,"${canary}");
+      DiagnosticBody { code: "invented-dotted.code", message: "${canary}" };
+      DiagnosticBody { code: if flag { "invented_branch_one" } else { "invented_branch_two" }, message: "${canary}" };
+      let (code, message) = ("invented_tuple", "${canary}");
+      let items = vec![("invented_batch", format!("{:?}", [("${canary}", 17)]))];
+      AppError::bad_request_diagnostics("${canary}", items);
+      json!({"code":"invented_json", "message":"${canary}"});
+      DiagnosticBody { code: value["code"].into(), message: "${canary}" };
+    } #[cfg(test)] mod tests { fn unused() { DiagnosticBody { code:"invented_test_only",message:"x" }; } }`;
+  const actual=emittedCodes([next,source],'pub enum DiagnosticCode { SkeletonFailure }');
+  assert.deepEqual(actual,['SkeletonFailure','invented-dotted.code','invented_batch','invented_branch_one','invented_branch_two','invented_constant','invented_json','invented_tuple','no_ready_task']);
+  assert.throws(()=>assertCodesAgreement(actual,actual.filter(code=>code!=='invented_batch')));
+  assert.throws(()=>assertCodesAgreement(actual,[...actual,'invented_stale_code']));
+  assert.throws(()=>emittedCodes([next,'DiagnosticBody {code:format!("invented_{}", input),message:"x"}'],'pub enum DiagnosticCode { SkeletonFailure }'));
+});
+test('C newly known diagnostics stay named while genuinely unknown codes and all messages stay withheld',()=>{
+  const report=new PublicReport(e),canary=secret();
+  report.observe({label:'plan',result:{status:200,data:{diagnostics:[{code:'duration_model_observed',message:canary},{code:'SkeletonFailure',message:canary},{code:canary,message:canary}]}}});
+  const output=report.render();assert(output.includes('"duration_model_observed":1'));assert(output.includes('"SkeletonFailure":1'));assert(output.includes('"withheld_unknown":1'));assert(!output.includes(canary));
+});
+test('D empty, missing and malformed planning collections have distinct named results',()=>{
+  for(const field of ['blocked_tasks','invalid_tasks','unplaced_tasks'])for(const [value,expected] of [[[],0],[undefined,`missing_${field}`],[null,`invalid_${field}`]]) {
+    const report=new PublicReport(e),data={};if(value!==undefined)data[field]=value;
+    report.observe({label:'plan',result:{status:200,data}});assert(report.render().includes(`${field}: ${expected} (client-computed`));
+  }
+});
+test('D producer selection is labelled as Tasks and carries the actual request limit',async()=>{
+  const f=flow();await f.run();const report=new PublicReport(e);for(const record of f.records)report.observe(record);
+  for(const producer of ['vocabulary','precondition']) {
+    const record=f.records.find(r=>r.label===producer);assert.equal(record.requestLimit,ADVISORY_LIMIT);
+    const line=report.render().split('\n').find(line=>line.includes(`producer=${producer}:`));assert(line.includes('selected_tasks:'));assert(line.includes(`request.limit: ${ADVISORY_LIMIT}`));
+  }
 });

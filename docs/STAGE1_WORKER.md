@@ -45,8 +45,8 @@ No check installs torch or another compute dependency. Python and pytest are
 optional to the mandatory Rust CPU-only goldens. Existing pytest can run the
 kernel's gpu-advisory/tests with gpu-advisory/src on PYTHONPATH; an optional
 UBU_WORKER_TEST_PYTHON selects an interpreter, never a committed machine path.
-No real framework is installed in this execution. Tensor tests explicitly
-skip; those skips leave real tensor execution unverified.
+No real framework was installed in the P1B-73 execution. Its tensor tests
+explicitly skipped; those skips leave real tensor execution unverified.
 
 Detection owns a bounded child running only the kernel's committed worker
 module. It must perform a real import to distinguish a working CPU package
@@ -112,10 +112,18 @@ cpu, with certified CPU authority and stage1-atomic-v1 profile. Downstream stage
 still run on CPU. An in-memory stub claims CPU provenance; a permission flag
 or synthetic answer never manufactures worker provenance. No fifth enum exists.
 
-The orchestrator remains pinned to its P1B-70 kernel and CPU path. Only the
-devshell kernel inventory pin moves. No live planning.gpu_enabled activation,
-HTTP route or UI change is delivered here. The same torch-absent, policy-off
-operator rehearsal remains required.
+P1B-74 advances the three orchestrator kernel dependencies and enables this
+profile only for explicitly selected Greedy with planning.gpu_enabled=true.
+Default ChunkedSweep retains its existing Plan and reports unsupported_strategy.
+Ten Stage1FallbackReason values expose unchanged CPU fallbacks; caller-level
+transport_unavailable names a missing executable factory. No route/UI change
+or Stage 2/3/4 worker computation is added. The executable injects the owned
+transport; orchestrator tests exchange only in-memory frames. Each attempt's
+session drops/reaps before persistence and before any later build. Reason-specific
+closed diagnostic codes reach the public file while messages remain private.
+P1B-74's single opt-in operator invocation remains required; its private,
+explicitly authorized CPU torch/numpy installation verifies CPU tensor tests
+and quietness, never CUDA parity or a live operator run.
 
 ## Specified future duration stream (implementation decision)
 
@@ -123,7 +131,7 @@ D0171 makes deterministic seed conventions canonical; it does not itself name
 this generator or transform. The following is P1B-71's explicit implementation
 decision for a future stochastic Stage 1, not a claim it is implemented today.
 It neither changes the existing Stage 4 correlated sampler nor authorizes a
-change to today's deterministic placements. P1B-74 must implement and certify
+change to today's deterministic placements. A future duration-stream ticket must implement and certify
 both sides against the same specification before changing that behavior.
 
 Use **Philox4x32-10**, stateless and keyed on

@@ -31,7 +31,7 @@ calendar with your own copy tool before invocation. Set your private environment
 | UBU_GOOGLE_CALENDAR_ID | explicit rehearsal calendar id |
 | UBU_GOOGLE_CREDENTIALS_PATH | readable absolute OAuth application-file path |
 | UBU_GOOGLE_TOKEN_CACHE_PATH | absolute readable/writable token file, or writable parent |
-| UBU_REHEARSAL_INPUTS | genuine private routine/settings/observations/Task requirement, in the [driver reference](LIVE_REHEARSAL_DRIVER.md) shape |
+| UBU_REHEARSAL_INPUTS | genuine private routine/settings/observations/Task requirement; P1B-74 includes planning.gpu_enabled=true, in the [driver reference](LIVE_REHEARSAL_DRIVER.md) shape |
 | UBU_REHEARSAL_BINARY | optional absolute executable; otherwise the launcher builds offline |
 | UBU_REHEARSAL_OUTPUT | optional public output file; default ./live-rehearsal-copy-back.txt |
 

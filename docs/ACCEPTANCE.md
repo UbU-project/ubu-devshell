@@ -1172,3 +1172,68 @@ import warnings are counted in its existing framework-probe response and asserte
 zero by its existing owned-worker check. Finally, the kernel inventory pin must
 advance to its published correction commit; the other eight pins and consumer
 Cargo revisions stay unchanged. No test gains a new spawning/HTTP/signal path.
+
+## P1B-74 — source agreement and a named worker attempt
+
+P1B-74's opening records P1B-73 acceptance passed in one invocation. That
+operator evidence settles the earlier pending acceptance; it is not a new
+agent-run rehearsal. No numeric transcription or visual comparison returns.
+Rules 10/11 and the one invocation / three judgments / one pasted file remain.
+
+The gate must agree with the validator behind it. Settings names/constants and
+both prefixes derive from Rust source assertions; values, defaults, subject lists
+and validation-function fingerprints catch future drift. Routine composition
+supplies evergreen mode, category membership and the UI's title/list defaults.
+Diagnostic names derive from emitted source and forwarded closed enums.
+Messages, fact contents and names remain private. Missing planning collections
+are named, never inferred empty; intentional empty-field omission is recorded
+as an orchestrator finding without a serializer change. Selected Task counts
+name selected[] and show the actual advisory request limit.
+
+Five concrete grounding corrections were approved before implementation:
+
+1. Settings additionally require literal loopback endpoint syntax, provisional
+   true, governed-root exclusions and seed <= current ceiling. Copying the
+   abbreviated value rules would recreate the validator gap; changing Rust
+   would weaken an established admission contract. Fresh-store defaults and
+   supplied order are checked without silently reordering operator intent.
+2. Consumers pin the final published kernel reason API, rather than ea6b453
+   which cannot contain it. Kernel and orchestrator inventories advance to
+   their published heads; leaving them stale violates show-revs equality.
+   The three consumer revisions advance together; other pins stay unchanged.
+3. The prompt lists ten fallback paths, not nine. All ten receive closed names;
+   identity/profile/version checks remain one grouped mismatch, as specified.
+   Reclassification does not change fallback conditions or certification.
+4. Stage 1 certifies CpuStrategy (Greedy), while the orchestrator defaults to
+   ChunkedSweep. The default stays intact and reports unsupported_strategy;
+   only explicitly selected Greedy attempts the worker. Automatic switching
+   would change a Plan; extending the worker's algorithm exceeds this reason
+   and reachability ticket. No Stage 2/3/4 or stochastic-duration work is added.
+5. A reason only in a private message cannot be tested from the public file.
+   A second, closed reason-specific diagnostic code is emitted beside
+   planning_gpu_unavailable. Publishing messages would expose operator content;
+   adding a new API field would widen the contract unnecessarily. Counts still
+   explicitly mean diagnostic entries, not Tasks.
+
+The CPU kernel must validate any returned candidate before canonical Plan commit.
+StageOutput::assemble and its exact padded comparison are byte-identical.
+Operator enabled=true supplies the local compute-budget justification. The
+executable injects a kernel-owned, bounded transport; library state has none and
+orchestrator tests use only in-memory stubs. Real framework imports/owned worker
+parity remain within the existing five-condition kernel/devshell exemption.
+The shared nonblocking Cargo/compute lock and one-job memory scope are unchanged.
+Sessions drop/reap before persistence or any later build. Real certified worker
+provenance records its actual CPU device; a stub never claims GPU execution.
+
+After the five approvals, the operator explicitly authorized installing torch
+and numpy if useful, superseding this ticket's compute-install ban for this
+execution. Pinned CPU-only torch 2.6.0+cpu and numpy 2.2.6 were installed in a
+private environment with pytest; no machine path enters a repository. The
+actual owned probe must be quiet. Checks and runtime still install nothing.
+CPU tensor parity is useful evidence; it does not certify CUDA or live acceptance.
+The ordinary torch-absent environment remains a tested explicit-skip path.
+
+Operator acceptance remains the single invocation in LIVE_REHEARSAL.md, with
+planning.gpu_enabled=true in private inputs. It is not performed by the agent.
+What is under test is whether formerly hidden diagnostics name themselves and
+planning_gpu_unavailable carries its reason through a public closed code.

@@ -3,6 +3,7 @@ import { requestJson, loopbackUrl, TransportError } from './loopback-json.mjs';
 import { PublicReport } from './live-rehearsal-report.mjs';
 import { RehearsalFault, finishFailure, writePublicArtifact, startupBuffer } from './live-rehearsal-diagnostics.mjs';
 import { collectJudgments, privateStrings } from './live-rehearsal-questions.mjs';
+import { validAuthoringInputs, routineBody, ADVISORY_LIMIT } from './live-rehearsal-contract.mjs';
 import { PrivateRenderer } from './live-rehearsal-private.mjs';
 import { spawn } from 'node:child_process';
 import http from 'node:http';
@@ -26,6 +27,7 @@ export function liveConfig(env, endpoints) {
   try { inputs = env.UBU_REHEARSAL_INPUTS ? JSON.parse(env.UBU_REHEARSAL_INPUTS) : {}; } catch { throw new RehearsalFault('invalid_private_inputs'); }
   if (!inputs || typeof inputs !== 'object' || Array.isArray(inputs)) throw new RehearsalFault('invalid_private_inputs');
   for (const key of ['settings','subjects','mutations']) if (inputs[key] !== undefined && !Array.isArray(inputs[key])) throw new RehearsalFault('invalid_private_inputs');
+  if(!validAuthoringInputs(inputs))throw new RehearsalFault('invalid_private_inputs');
   return { store:env.UBU_DB_PATH, calendar:env.UBU_GOOGLE_CALENDAR_ID, port, inputs };
 }
 export async function validateFiles(config,env,fs=fileSystem) {
@@ -64,6 +66,7 @@ export async function bindForwarder(server,port) {
   catch {throw new RehearsalFault('orchestrator_port_unavailable',{port});}
 }
 export async function runActions({ endpoints:e, inputs={}, call, approve=async()=>false, observe=()=>{} }) {
+  if(!validAuthoringInputs(inputs))throw new RehearsalFault('invalid_private_inputs');
   const results=[];
   async function action(label,method,path,body,expected=200) {
     let result;
@@ -73,17 +76,16 @@ export async function runActions({ endpoints:e, inputs={}, call, approve=async()
       result={status:null,data:null,error:error instanceof TransportError?error.code:'connection_or_response_failure'};
     }
     if (result.status !== expected && !result.error) result.error='unexpected_status';
-    const record={ label,method,route:path,result }; results.push(record);observe(record);
+    const record={ label,method,route:path,result,...(['vocabulary','precondition'].includes(label)?{requestLimit:body.limit}:{}) }; results.push(record);observe(record);
     if(result.error)throw new RehearsalFault('action_request_failed',{action:label,status:result.status,check:result.error});
     if(label==='session'&&result.data?.enabled!==true)throw new RehearsalFault('calendar_session_unavailable',{action:label});
     if(['vocabulary','precondition'].includes(label)&&result.data?.status!=='ok')throw new RehearsalFault('advisory_run_failed',{action:label});
     return result.data;
   }
   const setting=(name)=>e.SETTING_PUT_PATH.replace('{name}',encodeURIComponent(name));
-  if (inputs.routine) await action('routine','POST',e.OBJECTIVE_CREATE_PATH,{...inputs.routine,schema_version:e.OBJECTIVE_SCHEMA_VERSION},201);
+  if (inputs.routine) await action('routine','POST',e.OBJECTIVE_CREATE_PATH,routineBody(inputs.routine,e.OBJECTIVE_SCHEMA_VERSION),201);
   else observe({label:'routine',skip:'private_input_missing'});
   for (const item of inputs.settings ?? []) {
-    if (!item || typeof item.name!=='string' || !/^(calendar\.color\.[a-z_]+|advisory\.(enabled|endpoint|model|timeout_ms))$/.test(item.name)) {observe({label:'colour_setting',skip:'unsupported_private_setting'});continue;}
     await action('colour_setting','PUT',setting(item.name),{schema_version:e.SETTING_SCHEMA_VERSION,value:item.value});
   }
   await action('session','POST',e.GOOGLE_CALENDAR_SESSION_PATH,{schema_version:e.DESKTOP_SESSION_SCHEMA_VERSION});
@@ -120,7 +122,7 @@ export async function runActions({ endpoints:e, inputs={}, call, approve=async()
     } else throw new RehearsalFault('task_selector_unavailable',{action:'requirement'});
   } else observe({label:'requirement',skip:'private_input_missing'});
   for (const producer of ['vocabulary','precondition']) {
-    await action(producer,'POST',e.ADVISORY_RUN_PATH,{schema_version:e.ADVISORY_RUN_SCHEMA_VERSION,producer,limit:25});
+    await action(producer,'POST',e.ADVISORY_RUN_PATH,{schema_version:e.ADVISORY_RUN_SCHEMA_VERSION,producer,limit:ADVISORY_LIMIT});
   }
   await action('queue','GET',e.ADVISORY_QUEUE_PATH);
   return results;

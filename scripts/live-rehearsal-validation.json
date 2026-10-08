@@ -1,0 +1,14 @@
+{
+  "validate_name": "1c46df4f1440d9cb707d969394c0f5898a190479c18952258186e6ff115c4ed4",
+  "valid_advisory_timeout": "9e2352653fee1ad656659b6d029f782ef7f03c818fff00b12f08f2a1f4e99c52",
+  "valid_advisory_endpoint": "96e1a817f444e8deb35c5788b3037166503eab53096116ed1a68148d53b8fbbe",
+  "put": "e6505fcb248946afb9ed342214b51a565fa910708787848ff29858282c628aa9",
+  "review_days": "785c1634a929ca30964897140a08e7c0f62757f614cd2ec22c6fb5f1fbdbc112",
+  "check_review_pair": "d2b79d24ddff221e133bfff177c7ba1d5fa3ca9c93b64993a3bb1530bb790c78",
+  "snake_case": "02c0d5c73adcad2a42cc186dd6a785622e1572957465125f7db97240f4bf98f8",
+  "validate_root": "c70d414f62167426b64bc8f5112d72befa04a17e8b043d01fe8d37949f9070ff",
+  "MIN_ADVISORY_TIMEOUT_MS": "5_000",
+  "MAX_ADVISORY_TIMEOUT_MS": "3_600_000",
+  "MAX_ROOT_BYTES": "64",
+  "colours": "[\"1\", \"2\", \"3\", \"4\", \"5\", \"6\", \"7\", \"8\", \"9\", \"10\", \"11\"]"
+}

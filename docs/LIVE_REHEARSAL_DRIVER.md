@@ -25,8 +25,8 @@ and repository content. No observation, requirement or routine hour is inferred:
 
 | field | existing API input |
 |---|---|
-| routine | your Objective creation body; the driver supplies its schema constant |
-| settings | array of name/value Settings for calendar.color.* or advisory.enabled/endpoint/model/timeout_ms |
+| routine | your routine creation fields; the driver supplies schema, evergreen mode, category-in-tags, occurrence-title fallback and empty reminder list |
+| settings | validated name/value Settings: calendar.color.*, universe.subject.*, advisory.model/endpoint/timeout_ms/review_seed_days/review_ceiling_days, planning.gpu_enabled |
 | subjects | explicitly chosen provisional subject strings, separately minted through Settings |
 | mutations | your genuine UniverseState PATCH mutation array |
 | task | unique ordinary active Task selector, id or privately supplied title |
@@ -78,7 +78,7 @@ the complete reason/remedy lookup.
 ## Verification and boundaries
 
 PublicReport accepts original action records, never private rendered text. Its
-closed vocabularies/counts are unchanged; unknown strings are withheld and counted.
+closed code vocabulary is generated from emitted source and asserted on every check; genuinely unknown strings are withheld and counted.
 Every generic cardinality/histogram is labelled client-computed with its route/field.
 UniverseState entries count collection keys, never values or set members. Failed,
 skipped and unreached actions retain explicit unavailable rows. Selection-note
@@ -92,3 +92,49 @@ screen and never in render(). Tests inject effects: no listener, real HTTP,
 Google/ollama/editor, child spawn or signal handler is introduced. check-all.sh
 and test-all.sh execute these pure tests, never the live CLI. The existing
 owned worker and runner exemptions are unchanged.
+
+## P1B-74 gate and reporting agreement
+
+The settings name allowlist is one named constant plus two prefixes, asserted
+against Rust validate_name match arms/constants/prefixes and subject validators.
+Value bounds, defaults, colours and subject lists are asserted from source;
+lexical fingerprints additionally detect changes to the endpoint/value/pair/root
+validation functions. Unsupported supplied settings stop before any action with
+invalid_private_inputs, instead of quietly skipping an intended GPU opt-in.
+The endpoint is a literal loopback HTTP origin with a nonzero port; subjects
+require true and forbid both reserved and governed roots. Review settings follow
+the operator's supplied order against fresh-store defaults 7/365; seed cannot
+exceed the currently effective ceiling. No script changes their order.
+
+Routine composition supplies evergreen mode and category membership, preserves
+genuine hours/durations/recurrence, and defaults an omitted occurrence title to
+the routine title, as the UI does. Empty tags and reminder lists are composed.
+The UI also converts its form's HH:MM to HH:MM:SS, whole minutes to fixed seconds,
+orders selected weekdays/days and trims form text; these are form-to-wire
+conversions. Private inputs already use API wire units and arrays. The driver
+does not invent an operator timezone, hours, duration, placement or capacity.
+
+check-live-rehearsal-contract.mjs lexically extracts production diagnostic
+constructors, code-parameter helpers/closures, constants, code variables/batches
+and code-returning functions. Forwarded kernel Debug and NextAction serde enum
+codes derive from their enum bodies. Test-only items and messages are excluded.
+The generated live-rehearsal-codes.json must equal this vocabulary in both
+directions. Unknown dynamic code formats fail extraction; unforeseen runtime
+codes remain withheld_unknown. Use --write only after reviewing source/rules
+and their witnesses; it cannot bypass names, roots or numeric assertions.
+Both standing check-all/test-all execute this assertion through driver tests.
+
+Empty JSON arrays project 0; absent collections project missing_<field>, and
+malformed collections invalid_<field>. The response intentionally omits empty
+blocked_tasks and invalid_tasks by skip_serializing_if, unlike unplaced_tasks.
+This remains an orchestrator finding: no zero is inferred from missing wire
+data and no serializer is repaired here. Producers print selected_tasks as the
+cardinality of selected[] Tasks, with the actual request.limit beside it.
+
+For P1B-74, include planning.gpu_enabled=true in private settings. Default
+ChunkedSweep reports planning_gpu_fallback_unsupported_strategy while retaining
+its Plan. An already-chosen UBU_PLANNER_STRATEGY=greedy can exercise the certified
+CPU tensor worker; the script never changes strategies. The executable may use
+UBU_PLANNING_WORKER_PYTHON to select an installed interpreter. The public file
+retains closed reason-specific codes, while messages stay on the private screen.
+This does not certify CUDA parity or add a human acceptance step.
