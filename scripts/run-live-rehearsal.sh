@@ -22,7 +22,8 @@ Usage: run-live-rehearsal.sh
 Required environment: UBU_DB_PATH (fresh absolute store path),
 UBU_GOOGLE_CALENDAR_ID, UBU_GOOGLE_CREDENTIALS_PATH,
 UBU_GOOGLE_TOKEN_CACHE_PATH (absolute paths, kept private).
-Optional UBU_REHEARSAL_INPUTS: private JSON authoring instructions; see
+Required UBU_REHEARSAL_INPUTS: private JSON with one chosen subject and a
+mutation write under it; see
  docs/LIVE_REHEARSAL_DRIVER.md. Optional UBU_REHEARSAL_BINARY: built binary.
 UBU_REHEARSAL_OUTPUT overrides ./live-rehearsal-copy-back.txt.
 Owns an orchestrator. Type live before startup; approval is a separate decision.
@@ -39,6 +40,7 @@ for ubu_required in UBU_DB_PATH UBU_GOOGLE_CALENDAR_ID UBU_GOOGLE_CREDENTIALS_PA
     refuse absolute_path_required "$ubu_required"
   fi
 done
+[[ -n "${UBU_REHEARSAL_INPUTS:-}" ]] || refuse required_configuration_missing UBU_REHEARSAL_INPUTS
 if ! source "$SCRIPT_DIR/env.sh" >/dev/null 2>&1; then refuse build_environment_unavailable; fi
 export ORCHESTRATOR_DIR="${ORCHESTRATOR_DIR:-$(cd "$SCRIPT_DIR/../.." && pwd)/ubu-orchestrator}"
 if [[ -z "${UBU_REHEARSAL_BINARY:-}" ]]; then

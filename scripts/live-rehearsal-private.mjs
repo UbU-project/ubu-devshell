@@ -1,6 +1,7 @@
 // Private presentation has no import, callback or output connection to PublicReport.
 import { scrubPrivatePaths } from './live-rehearsal-diagnostics.mjs';
 import { numericComparisonWords } from '../../ubu-ui/src/presentation/precondition.ts';
+import { GOVERNED_SUBJECTS, validSubject } from './live-rehearsal-contract.mjs';
 export const PRIVATE_BANNER='PRIVATE REHEARSAL DATA — your own content; never paste this screen.';
 const plain=value=>typeof value==='string'?value:JSON.stringify(value)??'unavailable';
 const safeText=value=>plain(value).replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g,c=>'\\u'+c.charCodeAt(0).toString(16).padStart(4,'0'));
@@ -65,6 +66,16 @@ export class PrivateRenderer {
           const words=conditionWords(proposal.proposed_precondition??proposal);this.rememberCondition(proposal.proposed_precondition??proposal);this.say('Proposed requirement: '+words);
         } else this.say('Proposal: '+plain(proposal));
       }
+    }
+    if(record.label==='registry'&&Array.isArray(data.settings)) {
+      this.say('Governed subjects — fixed: '+GOVERNED_SUBJECTS.join(', '));
+      const rows=data.settings.filter(row=>typeof row?.name==='string'&&row.value===true&&row.name.startsWith('universe.subject.')&&validSubject(row.name.slice('universe.subject.'.length)));
+      for(const row of rows) {
+        const root=row.name.slice('universe.subject.'.length),metadata=row.subject_metadata,refs=metadata?.references;
+        this.remember(root);this.remember(row.name);
+        this.say(`Provisional subject ${root}: minted ${plain(metadata?.minted_at)}; version ${plain(row.version)}; UniverseState keys ${plain(refs?.universe_state_keys)}; fact_provenance keys ${plain(refs?.fact_provenance_keys)}; Task precondition targets ${plain(refs?.task_precondition_targets)}.`);
+      }
+      this.say(rows.length?'UBU-D0291 ratification is outstanding. This screen is the agenda; the condition is evaluated at the switch, not banked.':'UBU-D0291 is satisfied for now; the condition is evaluated at the switch, not banked.');
     }
   }
 }

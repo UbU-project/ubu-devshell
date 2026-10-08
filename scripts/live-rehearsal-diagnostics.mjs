@@ -32,13 +32,14 @@ export const REMEDIES=Object.freeze({
   task_unavailable:'Correct the private Task selector/version; choose an ordinary active Task.',
   calendar_session_unavailable:'Complete Google consent with the configured credential/token files and enable the session.',
   advisory_run_failed:'Correct private advisory endpoint/model/budget settings using the diagnostic on screen; do not rerun for preferred candidates.',
+  subject_registry_unavailable:'Use the matching orchestrator checkout with subject metadata and complete non-negative reference counts, then start a fresh rehearsal.',
   judgment_unanswered:'Provide one non-empty judgment sentence for each of the three questions.',
   judgment_private_content:'Describe your judgment without copying known private data into the public answer.',
   help_requested:'Set your private environment and run run-live-rehearsal.sh without arguments.'
 });
 const variables=new Set(['UBU_DB_PATH','UBU_GOOGLE_CALENDAR_ID','UBU_GOOGLE_CREDENTIALS_PATH','UBU_GOOGLE_TOKEN_CACHE_PATH','UBU_REHEARSAL_BINARY','UBU_REHEARSAL_INPUTS','UBU_ORCHESTRATOR_PORT','ORCHESTRATOR_DIR','UBU_REHEARSAL_OUTPUT','CARGO_BUILD_JOBS','UBU_TARGET_ROOT']);
 const checks=new Set(['missing','absolute path','stat','connection_or_timeout','invalid_json','response_too_large','unexpected_status','readable regular file','executable regular file','readable/writable regular file','writable parent','invalid JSON/field shape']);
-const actions=new Set(['routine','colour_setting','session','capture','plan','preview','approval','universe_before','subject','authoring','task_lookup','task_read','requirement','requirement_readback','vocabulary','precondition','queue']);
+const actions=new Set(['routine','colour_setting','advisory_setting','planning_setting','subject_setting','session','capture','plan','preview','approval','universe_before','subject','authoring','task_lookup','task_read','requirement','requirement_readback','registry','vocabulary','precondition','queue']);
 export class RehearsalFault extends Error {
   constructor(code,context={}) {super(Object.hasOwn(REMEDIES,code)?code:'configuration_destination_or_transport_unavailable');this.code=this.message;this.context=context;}
 }

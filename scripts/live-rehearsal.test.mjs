@@ -18,7 +18,8 @@ function flow({failure,tree=false,approve=false,mutate=()=>{}}={}) {
     vocabulary:{status:'ok',candidates_enqueued:3,selected:[{id:secret(),title:secret()},{id:secret(),title:secret()}],diagnostics:[{code:'advisory_task_skipped',message:secret()},{code:'advisory_task_skipped',message:secret()}]},
     precondition:{status:'ok',candidates_enqueued:1,selected:[{id:secret(),title:secret()}],diagnostics:[{code:'advisory_task_skipped',message:secret()}]},
     queue:{candidates:[{candidate:{normalized_proposal:{target:secret()}}},{candidate:{normalized_proposal:{target:secret()}}}]},
-    session:{accepted:true,enabled:true}
+    session:{accepted:true,enabled:true},
+    registry:{settings:[{name:'universe.subject.'+inputs.subjects[0],value:true,version:1,subject_metadata:{minted_at:'2026-10-06T08:00:00Z',references:{universe_state_keys:2,fact_provenance_keys:3,task_precondition_targets:4}}}]}
   };
   mutate(responses);
   let saved=false;
@@ -29,6 +30,7 @@ function flow({failure,tree=false,approve=false,mutate=()=>{}}={}) {
     const label=Object.entries({capture:e.CALENDAR_CAPTURE_PATH,plan:e.PLANNING_GENERATE_PATH,preview:e.CALENDAR_PREVIEW_PATH,approval:e.CALENDAR_APPROVE_PATH,queue:e.ADVISORY_QUEUE_PATH,session:e.GOOGLE_CALENDAR_SESSION_PATH}).find(([,route])=>route===path)?.[0];
     if(label)data=responses[label];
     if(path===e.UNIVERSE_STATE_PATH&&method==='GET')data=responses.universe_before;
+    if(path===e.SETTINGS_LIST_PATH)data=responses.registry;
     if(path===e.ADVISORY_RUN_PATH)data=responses[body.producer];
     if(path.startsWith(e.TASK_LIST_PATH+'?'))data={tasks:[{task_id:id,title:name,is_routine_occurrence:false}]};
     if(path===e.TASK_PATH.replace('{task_id}',id)){
@@ -56,7 +58,7 @@ test('JSON transport preserves status; sanitizes malformed, connection and overs
 });
 test('actions follow document order with separate explicit approval and versioned leaf PATCH',async()=>{
   const f=flow({approve:true});await f.run();
-  assert.deepEqual(f.records.map(r=>r.label),['routine','session','capture','plan','preview','approval','universe_before','subject','authoring','task_lookup','task_read','requirement','requirement_readback','vocabulary','precondition','queue']);
+  assert.deepEqual(f.records.map(r=>r.label),['routine','session','capture','plan','preview','approval','universe_before','subject','authoring','task_lookup','task_read','requirement','requirement_readback','registry','vocabulary','precondition','queue']);
   const patch=f.calls.find(c=>c.method==='PATCH'&&c.path.startsWith('/task/'));
   assert.deepEqual(patch.body,{schema_version:e.TASK_CAPTURE_SCHEMA_VERSION,expected_version:7,preconditions:f.inputs.precondition});
   assert.equal(Object.keys(patch.body).length,3);
@@ -86,6 +88,7 @@ test('stale or absent preview never asks for approval; interrupted approval stop
 test('configuration has no path/calendar defaults and refuses mock or malformed private inputs',()=>{
   assert.throws(()=>liveConfig({},e));
   const env=Object.fromEntries(['UBU_DB_PATH','UBU_GOOGLE_CREDENTIALS_PATH','UBU_GOOGLE_TOKEN_CACHE_PATH','UBU_REHEARSAL_BINARY'].map(k=>[k,'/'+secret()]));env.UBU_GOOGLE_CALENDAR_ID=secret();
+  env.UBU_REHEARSAL_INPUTS=JSON.stringify({subjects:['synthetic_shelf'],mutations:[{operation:'set_fact',target:'facts.synthetic_shelf.ready',payload:true}]});
   assert.equal(liveConfig(env,e).port,Number(e.DEFAULT_ORCHESTRATOR_PORT));
   for(const extra of [{UBU_CALENDAR_MOCK_EVENTS:'x'},{UBU_REHEARSAL_INPUTS:'{'},{UBU_REHEARSAL_INPUTS:'{"subjects":{}}'},{UBU_ORCHESTRATOR_PORT:'0'}])assert.throws(()=>liveConfig({...env,...extra},e));
 });
@@ -252,7 +255,7 @@ test('B unknown enum/code entries are withheld and remain included in cardinalit
   const check=fields(output);check('risk_report.level: ','withheld_or_unavailable');check('operations: ',4);check('operations[].kind: ',{update:1,create:1,delete:1,withheld_unknown:1});check('operation_results: ',5);check('operation_results[].status: ',{applied:2,failed:1,skipped:1,withheld_unknown:1});check(`POST ${e.CALENDAR_CAPTURE_PATH} diagnostics[].code: `,{capture_colour_absent:2,capture_stale_export:1,withheld_unknown:1});assert(!output.includes(canary));
 });
 const {RehearsalFault,REMEDIES,failureLine,writePublicArtifact,finishFailure,startupBuffer,shellPath}=await import('./live-rehearsal-diagnostics.mjs');
-const fakeEnv=()=>Object.fromEntries(['UBU_DB_PATH','UBU_GOOGLE_CALENDAR_ID','UBU_GOOGLE_CREDENTIALS_PATH','UBU_GOOGLE_TOKEN_CACHE_PATH','UBU_REHEARSAL_BINARY'].map(key=>[key,'/'+secret()]));
+const fakeEnv=()=>({...Object.fromEntries(['UBU_DB_PATH','UBU_GOOGLE_CALENDAR_ID','UBU_GOOGLE_CREDENTIALS_PATH','UBU_GOOGLE_TOKEN_CACHE_PATH','UBU_REHEARSAL_BINARY'].map(key=>[key,'/'+secret()])),UBU_REHEARSAL_INPUTS:JSON.stringify({subjects:['synthetic_shelf'],mutations:[{operation:'set_fact',target:'facts.synthetic_shelf.ready',payload:true}]})});
 const absent=()=>Object.assign(new Error(secret()),{code:'ENOENT'});
 function fakeFiles({present=[],badStat,badAccess,writeFails=false}={}) {
   const writes=[],moves=[];
@@ -442,4 +445,52 @@ test('D producer selection is labelled as Tasks and carries the actual request l
     const record=f.records.find(r=>r.label===producer);assert.equal(record.requestLimit,ADVISORY_LIMIT);
     const line=report.render().split('\n').find(line=>line.includes(`producer=${producer}:`));assert(line.includes('selected_tasks:'));assert(line.includes(`request.limit: ${ADVISORY_LIMIT}`));
   }
+});
+
+test('P76 registry projection reports two tiers and the supplied roots counts without names or metadata content',async()=>{
+  const f=flow();const canary=secret();
+  f.responses.registry.settings[0].subject_metadata.references.extra=canary;
+  f.responses.registry.settings[0].subject_metadata.minted_at=canary;
+  f.responses.registry.settings.push({name:'universe.subject.workbench',value:true},{name:'universe.subject.invalid-root',value:true},{name:'universe.subject.operator',value:true},{name:'universe.subject.shelf',value:false});
+  await f.run();const report=new PublicReport(e),privateLines=[];
+  const privateView=new PrivateRenderer({print:line=>privateLines.push(line)});
+  for(const record of f.records){report.observe(record);privateView.observe(record);}
+  const output=report.render();
+  assert(output.includes('governed_subjects: 5'));assert(output.includes('provisional_subjects: 2'));
+  assert(output.includes('"universe_state_keys":2,"fact_provenance_keys":3,"task_precondition_targets":4'));
+  assert(output.includes('ratification_condition: outstanding'));
+  for(const privateText of [f.inputs.subjects[0],canary,'workbench','invalid-root','universe.subject.'])assert(!output.includes(privateText));
+  assert(privateLines.join('\n').includes('Provisional subject '+f.inputs.subjects[0]));
+  assert(privateView.knownContent.has(f.inputs.subjects[0]));
+});
+test('P76 changing one server reference count changes only its public count line',async()=>{
+  const before=(await projected()).output.split('\n');
+  for(const field of ['universe_state_keys','fact_provenance_keys','task_precondition_targets']) {
+    const after=(await projected({mutate:r=>r.registry.settings[0].subject_metadata.references[field]++})).output.split('\n');
+    const changed=after.filter((line,i)=>line!==before[i]);
+    assert.equal(changed.length,1);assert(changed[0].startsWith(`GET ${e.SETTINGS_LIST_PATH} supplied provisional root[1] references:`));
+  }
+});
+test('P76 missing or invalid registry metadata stops before advisory calls rather than inventing a count',async()=>{
+  for(const mutate of [r=>delete r.registry.settings,r=>r.registry.settings=[],r=>delete r.registry.settings[0].subject_metadata,r=>r.registry.settings[0].subject_metadata.references.task_precondition_targets=-1,r=>r.registry.settings[0].subject_metadata.references.task_precondition_targets='private_count_canary',r=>r.registry.settings.push(r.registry.settings[0])]) {
+    const f=flow({mutate});await assert.rejects(f.run(),error=>error.code==='subject_registry_unavailable');
+    assert(!f.calls.some(call=>call.path===e.ADVISORY_RUN_PATH));
+  }
+});
+test('P76 the live configuration requires one explicit root and subsequent authoring under it',()=>{
+  const env=fakeEnv();assert(liveConfig(env,e));
+  for(const inputs of [{},{subjects:[]},{subjects:['synthetic_shelf','synthetic_kettle']},{subjects:['synthetic_shelf'],mutations:[{operation:'set_fact',target:'facts.synthetic_kettle.ready',payload:true}]},{subjects:['synthetic_shelf'],mutations:[{operation:'clear_fact',target:'facts.synthetic_shelf.ready'}]}]) {
+    assert.throws(()=>liveConfig({...env,UBU_REHEARSAL_INPUTS:JSON.stringify(inputs)},e),error=>error.code==='invalid_private_inputs');
+  }
+});
+test('P76 every Setting family has its own driver and public label',async()=>{
+  const f=flow();f.inputs.settings=[{name:'calendar.color.synthetic',value:'1'},{name:'advisory.model',value:'synthetic-model'},{name:'planning.gpu_enabled',value:true},{name:'universe.subject.workbench',value:true}];
+  await f.run();assert.deepEqual(f.records.slice(1,5).map(record=>record.label),['colour_setting','advisory_setting','planning_setting','subject_setting']);
+  const report=new PublicReport(e);for(const record of f.records)report.observe(record);
+  const output=report.render();for(const family of ['calendar.color','advisory','planning','universe.subject'])assert(output.includes(`family=${family} HTTP: 200`));
+  assert(!output.includes('planning.gpu_enabled'));assert(!output.includes('synthetic-model'));assert(!output.includes('workbench'));
+});
+test('P76 an empty effective registry is satisfied only for now and neither admits nor retires anything',()=>{
+  const report=new PublicReport(e);report.observe({label:'registry',subjects:[],result:{status:200,data:{settings:[]}}});
+  const output=report.render();assert(output.includes('provisional_subjects: 0'));assert(output.includes('ratification_condition: satisfied_for_now'));assert(output.includes('evaluated at the switch, not banked'));
 });

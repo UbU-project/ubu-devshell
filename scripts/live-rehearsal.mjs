@@ -1,6 +1,6 @@
 // Real operator instrument, never executed by checks. Tests inject all effects.
 import { requestJson, loopbackUrl, TransportError } from './loopback-json.mjs';
-import { PublicReport } from './live-rehearsal-report.mjs';
+import { PublicReport, registryFigures } from './live-rehearsal-report.mjs';
 import { RehearsalFault, finishFailure, writePublicArtifact, startupBuffer } from './live-rehearsal-diagnostics.mjs';
 import { collectJudgments, privateStrings } from './live-rehearsal-questions.mjs';
 import { validAuthoringInputs, routineBody, ADVISORY_LIMIT } from './live-rehearsal-contract.mjs';
@@ -28,6 +28,10 @@ export function liveConfig(env, endpoints) {
   if (!inputs || typeof inputs !== 'object' || Array.isArray(inputs)) throw new RehearsalFault('invalid_private_inputs');
   for (const key of ['settings','subjects','mutations']) if (inputs[key] !== undefined && !Array.isArray(inputs[key])) throw new RehearsalFault('invalid_private_inputs');
   if(!validAuthoringInputs(inputs))throw new RehearsalFault('invalid_private_inputs');
+  if(inputs.subjects?.length!==1||!inputs.mutations?.some(mutation=>
+    ['set_fact','set_numeric','increment_numeric','decrement_numeric','add_membership','append_event_marker'].includes(mutation?.operation)
+    && typeof mutation?.target==='string'&&['facts','numeric_values','set_memberships','event_markers'].includes(mutation.target.split('.')[0])
+    && mutation.target.split('.')[1]===inputs.subjects[0]))throw new RehearsalFault('invalid_private_inputs',{variable:'UBU_REHEARSAL_INPUTS'});
   return { store:env.UBU_DB_PATH, calendar:env.UBU_GOOGLE_CALENDAR_ID, port, inputs };
 }
 export async function validateFiles(config,env,fs=fileSystem) {
@@ -76,7 +80,7 @@ export async function runActions({ endpoints:e, inputs={}, call, approve=async()
       result={status:null,data:null,error:error instanceof TransportError?error.code:'connection_or_response_failure'};
     }
     if (result.status !== expected && !result.error) result.error='unexpected_status';
-    const record={ label,method,route:path,result,...(['vocabulary','precondition'].includes(label)?{requestLimit:body.limit}:{}) }; results.push(record);observe(record);
+    const record={ label,method,route:path,result,...(['vocabulary','precondition'].includes(label)?{requestLimit:body.limit}:{}),...(label==='registry'?{subjects:inputs.subjects}:{}) }; results.push(record);observe(record);
     if(result.error)throw new RehearsalFault('action_request_failed',{action:label,status:result.status,check:result.error});
     if(label==='session'&&result.data?.enabled!==true)throw new RehearsalFault('calendar_session_unavailable',{action:label});
     if(['vocabulary','precondition'].includes(label)&&result.data?.status!=='ok')throw new RehearsalFault('advisory_run_failed',{action:label});
@@ -86,7 +90,8 @@ export async function runActions({ endpoints:e, inputs={}, call, approve=async()
   if (inputs.routine) await action('routine','POST',e.OBJECTIVE_CREATE_PATH,routineBody(inputs.routine,e.OBJECTIVE_SCHEMA_VERSION),201);
   else observe({label:'routine',skip:'private_input_missing'});
   for (const item of inputs.settings ?? []) {
-    await action('colour_setting','PUT',setting(item.name),{schema_version:e.SETTING_SCHEMA_VERSION,value:item.value});
+    const label=item.name.startsWith('calendar.color.')?'colour_setting':item.name.startsWith('advisory.')?'advisory_setting':item.name.startsWith('planning.')?'planning_setting':'subject_setting';
+    await action(label,'PUT',setting(item.name),{schema_version:e.SETTING_SCHEMA_VERSION,value:item.value});
   }
   await action('session','POST',e.GOOGLE_CALENDAR_SESSION_PATH,{schema_version:e.DESKTOP_SESSION_SCHEMA_VERSION});
   await action('capture','POST',e.CALENDAR_CAPTURE_PATH,{schema_version:e.CALENDAR_CAPTURE_SCHEMA_VERSION,export_mode:'live'});
@@ -121,6 +126,10 @@ export async function runActions({ endpoints:e, inputs={}, call, approve=async()
       } else throw new RehearsalFault('task_unavailable',{action:'requirement'});
     } else throw new RehearsalFault('task_selector_unavailable',{action:'requirement'});
   } else observe({label:'requirement',skip:'private_input_missing'});
+  if(inputs.subjects?.length) {
+    const registry=await action('registry','GET',e.SETTINGS_LIST_PATH);
+    if(!registryFigures(registry,inputs.subjects))throw new RehearsalFault('subject_registry_unavailable',{action:'registry'});
+  } else observe({label:'registry',skip:'private_input_missing'});
   for (const producer of ['vocabulary','precondition']) {
     await action(producer,'POST',e.ADVISORY_RUN_PATH,{schema_version:e.ADVISORY_RUN_SCHEMA_VERSION,producer,limit:ADVISORY_LIMIT});
   }

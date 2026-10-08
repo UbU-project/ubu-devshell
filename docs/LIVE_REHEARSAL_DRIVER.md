@@ -27,7 +27,7 @@ and repository content. No observation, requirement or routine hour is inferred:
 |---|---|
 | routine | your routine creation fields; the driver supplies schema, evergreen mode, category-in-tags, occurrence-title fallback and empty reminder list |
 | settings | validated name/value Settings: calendar.color.*, universe.subject.*, advisory.model/endpoint/timeout_ms/review_seed_days/review_ceiling_days, planning.gpu_enabled |
-| subjects | explicitly chosen provisional subject strings, separately minted through Settings |
+| subjects | exactly one explicitly chosen provisional root, separately minted through Settings; the live configuration requires subsequent mutation authoring under it |
 | mutations | your genuine UniverseState PATCH mutation array |
 | task | unique ordinary active Task selector, id or privately supplied title |
 | precondition | explicit condition AST; a useful existing tree is preserved |
@@ -39,12 +39,19 @@ run separately after deterministic authoring. Zero candidates is a legitimate
 result; no producer is rerun to force agreement. No automatic candidate admission
 or rejection occurs. The optional app remains available for deliberate decisions.
 
+For this rehearsal, `subjects` and a following mutation write under its chosen
+root are required private inputs. No root is inferred. The generic injected
+action seam retains omitted-input outcomes for its tests; the live configuration
+refuses a missing/multiple root or unrelated/clear-only mutation authoring before
+any action. A supplied existing Task tree remains preserved, so its new-root
+precondition count may legitimately be zero rather than a manufactured requirement.
+
 ## One execution and two sinks
 
 Type live after checking the displayed store/calendar. The action order is routine,
 settings, session, capture, Plan, preview, approval decision, pre-authoring
 UniverseState counts, explicit subject/mutation authoring, Task requirement,
-Vocabulary, Precondition and queue. The script does not reset the calendar.
+registry readback, Vocabulary, Precondition and queue. The script does not reset the calendar.
 Stamped leftovers/collisions are observations; unstamped reset completeness
 cannot be certified. A repeated invocation is another rehearsal.
 
@@ -56,6 +63,21 @@ no connection to PublicReport. Credential/token paths are scrubbed, including
 from bounded startup stderr, which stops being captured at successful health.
 No private response, terminal transcript or answer log is written by the driver.
 The orchestrator persists authorized authoring in the selected store as usual.
+
+The registry readback uses existing `SETTINGS_LIST_PATH`, after deterministic
+authoring and before advisory runs. The screen privately names governed and
+provisional roots and their minting metadata/version/counts. The file contains
+two client-computed tier cardinalities, the supplied root's three server-computed
+reference counts and computed `satisfied_for_now`/`outstanding` status. Root,
+Setting name/value, key and target strings are withheld. Missing, duplicate or
+invalid reference metadata stops with `subject_registry_unavailable` and its
+remedy; it never becomes invented zeros. The condition is evaluated at the
+switch, not banked; no switch lock or ratification operation is introduced.
+
+Each Setting family has its own action/public label: `colour_setting` for
+calendar colours, `advisory_setting`, `planning_setting`, and `subject_setting`
+for subject Settings supplied through `settings`. Explicit `subjects` minting
+retains the separate `subject` action. Dynamic names/values are never published.
 
 Human words are not an HTTP field. The approved terminal formatter consumes the
 existing AST, reuses the existing numeric-word helper and preserves nested logic.

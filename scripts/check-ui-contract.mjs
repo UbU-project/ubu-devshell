@@ -2369,8 +2369,13 @@ scenarios.push({
     await putSetting(o,"advisory.model","synthetic-legacy-model");await putSetting(o,"advisory.endpoint",stub.endpoint);
     await call(o.base,"POST",endpoints.ADVISORY_RUN_PATH,{schema_version:endpoints.ADVISORY_RUN_SCHEMA_VERSION,producer:"precondition",limit:25});
     ok(JSON.parse(stub.requests[0].body.prompt).targets.includes("facts.legacy_leaf"),"recorded target enumeration retains the legacy name");
+    const agenda=await call(o.base,"GET",endpoints.SETTINGS_LIST_PATH);
+    const subject=agenda.settings.find(row=>row.name==="universe.subject.teapot");
+    same(subject.subject_metadata.references,{universe_state_keys:1,fact_provenance_keys:1,task_precondition_targets:0},"registry metadata counts references without emitting their keys or values");
+    const refusal=await call(o.base,"DELETE",fill(endpoints.SETTING_DELETE_PATH,{name:"universe.subject.teapot"}),undefined,409);
+    same(refusal.diagnostics[0].code,"subject_referenced","referenced retirement is refused");
+    const before=await edit([{operation:"clear_fact",target:"facts.teapot.ready"}]);
     await call(o.base,"DELETE",fill(endpoints.SETTING_DELETE_PATH,{name:"universe.subject.teapot"}),undefined,204);
-    const before=await read();
     same((await edit([{operation:"set_fact",target:"facts.teapot.ready",payload:false}],400)).diagnostics[0].code,"universe_target_subject_unknown","retirement refuses new writes");
     same(await read(),before,"retirement never rewrites existing target data");
     await edit([

@@ -1237,3 +1237,54 @@ Operator acceptance remains the single invocation in LIVE_REHEARSAL.md, with
 planning.gpu_enabled=true in private inputs. It is not performed by the agent.
 What is under test is whether formerly hidden diagnostics name themselves and
 planning_gpu_unavailable carries its reason through a public closed code.
+
+## P1B-76 — the existing Subjects panel becomes a ratification agenda
+
+Rules 10 and 11 govern the extension: **“A manual step exists only for
+rendering.”** and **“A manual instrument has one line of execution.”** Registry
+cardinalities and reference counts move through driver response projections,
+not a new tally, comparison, absence phrase or transcription step. Rendering
+remains the pre-release visual pass. LIVE_REHEARSAL.md remains the sole live
+procedure; no additional judgment or alternative invocation is introduced.
+
+The operator approved three grounding corrections. Subject ratification is a
+remaining switch gate, not proof that desktop GPU planning/CPU certification is
+discharged. The UniverseState Subjects list, mint/retire controls and client
+validation already existed; this ticket extends that panel rather than claiming
+to introduce it. The dangling-diagnostic claim is withdrawn outright, and its
+existing message is preserved. Changing that text as if it named no screen would
+replace a correct reference with a fictional repair.
+
+The third correction preserves no-cascade retirement while explaining that
+append-only event markers have no clearing operation. The old panel sentence
+allowing retirement despite retained references is replaced alongside the UI
+refusal controls, coupled with the server's guarded DELETE in this change set.
+**UBU-D0291 append-only-marker retirement gap** names the missing retirement
+leg of the promoted-or-retired binary for such roots. They remain registered
+pending operator ratification or separate cleanup work. No new decision,
+cascading erasure, automatic promotion, marker-clearing operation or switch lock
+is filed or implemented here.
+
+The live input now supplies exactly one operator-chosen root in `subjects` and
+a genuine mutation write under it. The driver mints that supplied root through
+the existing Setting route, authors the supplied state/requirement, then reads
+SETTINGS_LIST_PATH before either advisory run. The private screen names the
+provisional root, minting metadata/version and counts; the public file contains
+only the two tier counts, that root's three server-computed reference counts and
+computed satisfaction/outstanding status. Missing or invalid count metadata
+stops once with subject_registry_unavailable and one remedy. Zero references
+are legitimate when the server actually returns them; no omitted count is
+manufactured. A preserved Task tree is not overwritten to force a reference.
+
+calendar colours, advisory, planning and subject Settings supplied through the
+settings array now have separate driver labels; explicit subjects minting has
+its own subject label. Thus planning.gpu_enabled is no longer labelled a colour
+setting. The public diagnostic vocabulary gains the source-derived
+subject_referenced code, with messages still private. Pure driver tests exercise
+metadata projections, one-field changes, privacy canaries, Setting-family
+labels and early-stop conditions without HTTP, child processes, handlers,
+Google, real ollama, editors or signals. Existing runner/worker exemptions and
+the one-job exclusion/memory wrapper remain unchanged.
+
+Operator acceptance is the one invocation in LIVE_REHEARSAL.md; the agent does
+not perform it. What is under test is whether the ratification agenda can be read.

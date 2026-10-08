@@ -22,7 +22,7 @@ your responsibility. The driver never resets the calendar or retries a rehearsal
 ## Prepare and run
 
 Use Node 22 or newer, the sibling checkouts and the existing offline build setup.
-Back up your own store. Select a fresh rehearsal store and reset your rehearsal
+Activate your existing virtual environment. Back up your own store. Select a fresh rehearsal store and reset your rehearsal
 calendar with your own copy tool before invocation. Set your private environment:
 
 | variable | purpose |
@@ -31,13 +31,22 @@ calendar with your own copy tool before invocation. Set your private environment
 | UBU_GOOGLE_CALENDAR_ID | explicit rehearsal calendar id |
 | UBU_GOOGLE_CREDENTIALS_PATH | readable absolute OAuth application-file path |
 | UBU_GOOGLE_TOKEN_CACHE_PATH | absolute readable/writable token file, or writable parent |
-| UBU_REHEARSAL_INPUTS | genuine private routine/settings/observations/Task requirement; P1B-74 includes planning.gpu_enabled=true, in the [driver reference](LIVE_REHEARSAL_DRIVER.md) shape |
+| UBU_REHEARSAL_INPUTS | genuine private routine/settings/observations/Task requirement, exactly one operator-chosen provisional root in subjects, and a mutation that writes under it; include planning.gpu_enabled=true, in the [driver reference](LIVE_REHEARSAL_DRIVER.md) shape |
 | UBU_REHEARSAL_BINARY | optional absolute executable; otherwise the launcher builds offline |
 | UBU_REHEARSAL_OUTPUT | optional public output file; default ./live-rehearsal-copy-back.txt |
 
 Every Cargo build uses sourced env.sh, one job, shared exclusion and the available
 memory scope. The lock is released before any human prompt. Credentials and
 observations are never committed. Optional input omissions are recorded by code.
+
+Supply exactly one provisional root in `inputs.subjects`, and make the following
+genuine mutation authoring reference that root. Choose it yourself; the driver
+neither invents a root nor ratifies it. This makes the existing Subjects panel
+an outstanding ratification agenda. The driver reads it after authoring: the
+private screen names its provisional roots, minting metadata and reference
+counts; the public block reports only the governed/provisional tier counts and
+the supplied root's UniverseState-key, fact_provenance-key and Task-precondition
+target counts. No root, key, value or target string is pasted.
 
 From ubu-devshell, one invocation:
 
@@ -103,6 +112,7 @@ using this lookup. The script stops rather than asking for a missing-figure phra
 | `task_unavailable` | Correct the private Task selector/version; choose an ordinary active Task. |
 | `calendar_session_unavailable` | Complete Google consent with the configured credential/token files and enable the session. |
 | `advisory_run_failed` | Correct private advisory endpoint/model/budget settings using the diagnostic on screen; do not rerun for preferred candidates. |
+| `subject_registry_unavailable` | Use the matching orchestrator checkout with subject metadata and complete non-negative reference counts, then start a fresh rehearsal. |
 | `judgment_unanswered` | Provide one non-empty judgment sentence for each of the three questions. |
 | `judgment_private_content` | Describe your judgment without copying known private data into the public answer. |
 | `help_requested` | Set your private environment and run run-live-rehearsal.sh without arguments. |

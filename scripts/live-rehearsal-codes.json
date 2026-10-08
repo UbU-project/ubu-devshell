@@ -223,6 +223,7 @@
   "subject_governed",
   "subject_invalid",
   "subject_invalid_value",
+  "subject_referenced",
   "subject_reserved",
   "suggest_tags_occurrence_skipped",
   "task_effect_application_failed",
