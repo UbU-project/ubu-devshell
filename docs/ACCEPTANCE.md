@@ -1381,3 +1381,35 @@ scope remain unchanged. No ChunkedSweep work or model-committee rank occurs.
 Operator acceptance is the single invocation in LIVE_REHEARSAL.md, performed
 by the operator. What is under test is whether a refused certification names
 the field it refused.
+
+### P1B-79 enumerated hard feasibility and bounded occupancy
+
+PLANNING_KERNEL_CONTRACT.md §5 and amended UBU-D0171 now enumerate Stage 1's
+dependency_feasibility and hard_constraint_feasibility. The latter combines
+plan validity, dependency timing, plan/Task-window and exact-anchor containment,
+and pairwise disjointness with endpoint touching allowed. The definition was
+published before either implementation changed. UBU-D0301 records that exact
+parity requires an enumerated field; UBU-Q0184 remains unanswered and records
+Rust's false versus Python's direct-index error for an absent prerequisite.
+
+Greedy suffix perturbations now use the minimum forward non-suffix occupancy
+gap for each placement, alongside existing window bounds. Skeleton placement
+behavior and chunked generation are unchanged. Python mirrors the bound in
+proposal generation; its predicate, within and dependency terms are unchanged.
+Rust adds disjointness as a tested invariant. The thirteen-field comparator,
+exact assembly guard and public/private diagnostic split remain byte-identical.
+
+The existing week generator adds one synthetic occupancy-ahead case. Before
+the bound, the actual CPU tensor-worker comparison reports one diverging field,
+hard_constraint_feasibility, first at candidate 4. Afterward it reports zero.
+The fourteen existing worker cases retain their expected values; the new case
+retains sixteen candidates with bounded shifts. One older C-1 golden shrinks
+from sixteen to nine candidates because its occupancy gap permits eight delays;
+the existing freezer generates its exact new expectations. No assertion is
+relaxed. Counts, governing quotations, the approved corrections and both kinds
+of published pin are in [P1B-79_PINS.md](P1B-79_PINS.md).
+
+This is CPU tensor certification, not CUDA parity or certification of the
+operator's week. Operator acceptance remains the one invocation in
+[LIVE_REHEARSAL.md](LIVE_REHEARSAL.md), performed by the operator. What is under
+test is whether Stage 1 certifies on that week; no manual steps are added.

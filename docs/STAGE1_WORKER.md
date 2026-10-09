@@ -72,7 +72,7 @@ candidate bound is 16. Arrays pad to those fixed shapes, never ragged lists.
 | piece_index, piece_count | 16 × 256 | int64 | atomic 1/1, padding 0/0 |
 | dependency_slack | 16 | int64 | minimum dependency slack in seconds, 0 if none |
 | dependency_feasibility | 16 | bool | all prerequisites finish before starts |
-| hard_constraint_feasibility | 16 | bool | schedule validity, windows and anchors |
+| hard_constraint_feasibility | 16 | bool | non-empty valid declared order, unique Tasks, positive intervals, dependencies present and feasible by time, plan/Task windows, exact anchors, pairwise disjointness (touching allowed) |
 
 Int64 preserves integer placement arithmetic and avoids float rounding at window
 boundaries. Bool represents masks directly. Rejection codes and omission/failure
