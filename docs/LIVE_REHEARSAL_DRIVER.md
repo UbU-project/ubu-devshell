@@ -211,3 +211,23 @@ CPU tensor worker; the script never changes strategies. The executable may use
 UBU_PLANNING_WORKER_PYTHON to select an installed interpreter. The public file
 retains closed reason-specific codes, while messages stay on the private screen.
 This does not certify CUDA parity or add a human acceptance step.
+
+
+## P1B-78 certification location
+
+A refused Stage 1 certificate retains planning_gpu_fallback_certification_failed
+and adds one closed field-specific code. The block reports that field, zero-based
+candidate/slot indices where applicable, and the number of differing fields.
+It validates those four metadata values from the corresponding diagnostic
+message and constructs a fresh public object. Actual/expected values and
+arbitrary message text remain on the private screen. Global omissions/failure
+use null indices; a missing candidate row has no slot index. Invalid metadata
+is labelled unavailable rather than replaced with zeros.
+
+The existing engine_provenance.backend_kind is also projected as a closed value.
+A successful worker result reads gpu_worker, the serialized form of GpuWorker;
+CPU reference reads cpu_reference. This CPU tensor profile does not certify
+CUDA. Framework/device/version strings remain withheld from the public block.
+The three synthetic week cases agree with the CPU, so they have not reproduced
+the operator's live divergence and no Python repair is claimed. The live
+procedure remains solely LIVE_REHEARSAL.md with one invocation.

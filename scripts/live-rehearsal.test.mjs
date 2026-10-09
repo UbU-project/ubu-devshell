@@ -567,3 +567,52 @@ test('P77 all environment facts and both interpreter sources remain closed while
     assert(screen.join('\n').includes(interpreter));assert(screen.join('\n').includes(version));
   }
 });
+
+const {certificationLocations,CERTIFICATION_FIELDS}=await import('./live-rehearsal-report.mjs');
+test('P78 closed certification fields and bounds agree with the kernel declaration',async()=>{
+  const source=await readFile(new URL('../../ubu-planning-kernel/crates/ubu-planning-worker/src/stage1.rs',import.meta.url),'utf8');
+  const body=/pub struct StageOutput\s*\{([^}]+)\}/.exec(source)[1];
+  assert.deepEqual([...body.matchAll(/pub\s+([a-z_]+)\s*:/g)].map(m=>m[1]),CERTIFICATION_FIELDS);
+  assert.equal(Number(/pub const MAX_CANDIDATES: usize = (\d+)/.exec(source)[1]),16);
+  assert.equal(Number(/pub const MAX_PLANNING_TASKS: usize = (\d+)/.exec(source)[1]),256);
+});
+test('P78 every certification field retains code, indices and count while values remain private',()=>{
+  for(const [index,field] of CERTIFICATION_FIELDS.entries()) {
+    const expected=secret(),actual=secret(),candidate_index=index<11?3:null,slot_index=index<6?120:null;
+    const code='planning_gpu_fallback_certification_failed_'+field;
+    const metadata={field,candidate_index,slot_index,diverging_fields:4,expected,actual,extra:secret()};
+    const record={label:'plan',result:{status:200,data:{diagnostics:[{code,message:JSON.stringify(metadata)}]}}};
+    const report=new PublicReport(e),screen=[],view=new PrivateRenderer({print:line=>screen.push(line)});
+    report.observe(record);view.observe(record);const output=report.render();
+    assert(output.includes(`"${code}":1`));assert(!output.includes('withheld_unknown'));
+    assert.deepEqual(certificationLocations(record.result.data.diagnostics),[{field,candidate_index,slot_index,diverging_fields:4}]);
+    assert(output.includes('"diverging_fields":4'));assert(!output.includes(expected));assert(!output.includes(actual));assert(!output.includes(metadata.extra));
+    assert(screen.join('\n').includes(expected));assert(screen.join('\n').includes(actual));
+  }
+});
+test('P78 malformed or inconsistent certification metadata never manufactures a location',()=>{
+  const field='task_index',code='planning_gpu_fallback_certification_failed_'+field,valid={field,candidate_index:0,slot_index:0,diverging_fields:1};
+  for(const message of ['private-message',JSON.stringify({}),...[
+    {field:secret()},{candidate_index:secret()},{candidate_index:-1},{candidate_index:17},{slot_index:257},{slot_index:secret()},{diverging_fields:0},{diverging_fields:14},{diverging_fields:secret()}
+  ].map(change=>JSON.stringify({...valid,...change}))])assert.deepEqual(certificationLocations([{code,message}]),[{field,location:'unavailable'}]);
+  assert.deepEqual(certificationLocations([{code:secret(),message:JSON.stringify(valid)}]),[]);
+  assert.deepEqual(certificationLocations([{code,message:JSON.stringify({...valid,candidate_index:16,slot_index:null})}]),[{field,candidate_index:16,slot_index:null,diverging_fields:1}]);
+});
+test('P78 one-field metadata changes alter only their dependent public location line',()=>{
+  function project(metadata){const report=new PublicReport(e);report.observe({label:'plan',result:{status:200,data:{diagnostics:[{code:'planning_gpu_fallback_certification_failed_duration_samples',message:JSON.stringify(metadata)}]}}});return report.render().split('\n');}
+  const base={field:'duration_samples',candidate_index:1,slot_index:2,diverging_fields:3,expected:secret(),actual:secret()};
+  const original=project(base);
+  for(const field of ['candidate_index','slot_index','diverging_fields']) {
+    const changed=project({...base,[field]:base[field]+1});const indices=original.flatMap((line,i)=>line===changed[i]?[]:[i]);
+    assert.equal(indices.length,1);assert(original[indices[0]].includes('certification metadata:'));
+  }
+  assert.deepEqual(project({...base,expected:secret(),actual:secret()}),original);
+});
+test('P78 existing backend provenance is a closed public projection with private version/device withheld',()=>{
+  for(const kind of ['cpu_reference','gpu_worker','mobile_cpu','mobile_gpu',secret()]) {
+    const version=secret(),device=secret(),report=new PublicReport(e);
+    report.observe({label:'plan',result:{status:200,data:{engine_provenance:{backend_kind:kind,framework_version:version,device_summary:device}}}});
+    const output=report.render();assert(output.includes('engine_provenance.backend_kind: '+(['cpu_reference','gpu_worker','mobile_cpu','mobile_gpu'].includes(kind)?kind:'withheld_or_unavailable')));
+    assert(!output.includes(version));assert(!output.includes(device));
+  }
+});

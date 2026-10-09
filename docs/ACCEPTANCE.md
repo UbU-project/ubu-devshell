@@ -1336,3 +1336,48 @@ Operator acceptance remains the single invocation in LIVE_REHEARSAL.md. The
 agent does not perform it. What is under test is whether a failing environment
 names both which fact failed and which interpreter was asked. CPU-only owned
 worker checks do not claim CUDA parity or live acceptance.
+
+
+## P1B-78 — exact certification names its first difference
+
+Rules 10 and 11 remain: **“A manual step exists only for rendering.”** and
+**“A manual instrument has one line of execution.”** The driver projects the
+failed field and bounded indices/count from existing diagnostics; no numeric
+transcription, new judgment or additional invocation is introduced.
+
+“Exact comparison covers every padded value, code, mask and omission, not only
+the final schedule. Never widen a numeric tolerance here.” The thirteen typed
+field comparisons remain exact; every inequality still refuses and retains
+CpuStrategy. First-difference reporting follows declaration order, candidate
+order and slot order, counting differing fields rather than cells. Error
+Display/Debug contain metadata alone. Differing values belong only to the
+private diagnostic message/screen, and the public projector constructs a new
+object containing only validated structural metadata. Global omissions/failure
+have no candidate/slot index; absent rows have no slot index.
+
+Four grounding corrections were approved. The original shared goldens have
+one to three Tasks, and scale is a hypothesis until reproduced. Overlapping
+static anchors are a CPU refusal, so the successful 120-placement week and
+three-overlap refusal are separate cases. A one-candidate constrained week
+exercises unused candidate rows beside the main 16-candidate case. Backend
+provenance was absent from the public block; its existing closed wire value
+is gpu_worker, now projected without framework/device/version details.
+
+The committed generator uses only synthetic shape parameters, a fixed seed,
+93 anchors including seven mandatory daily routine labels, and 27 dynamic
+Tasks. Dependency depth, many-anchor occupancy scanning, bounded perturbations,
+unused slots and unused candidates are exercised. Both the independent Python
+algorithm and actual CPU tensor worker match the unchanged CPU goldens for all
+three new cases. The live divergence is not reproduced; Python and the CPU
+reference therefore remain unchanged. Matching synthetic shape does not certify
+the operator's week, and no CUDA parity or agent-run acceptance is claimed.
+
+The thirteen field-specific codes augment the retained generic certification
+fallback. Public indices/counts are zero-based and validated; missing/malformed
+metadata is unavailable, never invented. Existing canonical frames, API/schema,
+worker spawning conditions, lock ownership/reaping, one-job Cargo and memory
+scope remain unchanged. No ChunkedSweep work or model-committee rank occurs.
+
+Operator acceptance is the single invocation in LIVE_REHEARSAL.md, performed
+by the operator. What is under test is whether a refused certification names
+the field it refused.

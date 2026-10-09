@@ -17,6 +17,23 @@ export function histogram(rows,key,allowed) {
   const bins={};for(const row of rows){const code=allowed.has(row?.[key])?row[key]:'withheld_unknown';bins[code]=(bins[code]??0)+1;}return bins;
 }
 const diagnostics=v=>histogram(v,'code',codes);
+export const CERTIFICATION_FIELDS=Object.freeze(['task_index','slot_mask','start_time_offsets','duration_samples','piece_index','piece_count','validity_mask','dependency_slack','dependency_feasibility','hard_constraint_feasibility','rejection_codes','omissions','failure']);
+const certificationPrefix='planning_gpu_fallback_certification_failed_';
+// Parse only messages attached to a known field code. Construct a fresh public
+// object; the private expected/actual values and arbitrary keys never pass through.
+export function certificationLocations(rows) {
+  if(!Array.isArray(rows))return [];
+  return rows.filter(row=>codes.has(row?.code)&&row.code.startsWith(certificationPrefix)&&CERTIFICATION_FIELDS.includes(row.code.slice(certificationPrefix.length))).map(row=>{
+    const field=row.code.slice(certificationPrefix.length);let data;
+    try {data=JSON.parse(row.message);} catch {return {field,location:'unavailable'};}
+    const bounded=(v,max)=>Number.isSafeInteger(v)&&v>=0&&v<=max;
+    const candidate= data?.candidate_index,slot=data?.slot_index;
+    const position=CERTIFICATION_FIELDS.indexOf(field);
+    const validPosition=position<6?bounded(candidate,16)&&(slot===null||bounded(slot,256)):position<11?bounded(candidate,16)&&slot===null:candidate===null&&slot===null;
+    if(data?.field!==field||!validPosition||!bounded(data?.diverging_fields,13)||data.diverging_fields<1)return {field,location:'unavailable'};
+    return {field,candidate_index:candidate,slot_index:slot,diverging_fields:data.diverging_fields};
+  });
+}
 const stamp=v=>typeof v==='string'&&/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?(?:Z|[+-]\d\d:\d\d)$/.test(v)?v:'withheld_or_unavailable';
 export function safeOperation(op) {
   const row={kind:choice(op?.kind,kinds),static_anchor:flag(op?.static_anchor)};
@@ -84,6 +101,8 @@ export class PublicReport {
           `${method} ${route} diagnostics[].code: ${JSON.stringify(diagnostics(d.diagnostics))} (client-computed histogram; messages withheld)`,
           `${method} ${route} plan.steps: ${length(steps)} (client-computed cardinality); plan.steps[].static_anchor: ${JSON.stringify(histogram(steps,'static_anchor',new Set([true,false])))} (client-computed histogram)`);
         for(const field of ['unplaced_tasks','blocked_tasks','invalid_tasks']) lines.push(`${method} ${route} ${field}: ${collection(d,field)} (client-computed cardinality; titles/ids/reasons/explanations/alternatives withheld)`);
+        lines.push(`${method} ${route} engine_provenance.backend_kind: ${choice(d.engine_provenance?.backend_kind,['cpu_reference','gpu_worker','mobile_cpu','mobile_gpu'])}`);
+        for(const location of certificationLocations(d.diagnostics))lines.push(`${method} ${route} diagnostics[].message certification metadata: ${JSON.stringify(location)} (closed field; zero-based indices; values withheld)`);
         const risk=[];
         risk.push(`${method} ${route} risk_report.level: ${choice(d.risk_report?.level,levels)}; risk_report.findings: ${length(d.risk_report?.findings)} (client-computed cardinality)`);
         if(Array.isArray(d.risk_report?.findings)) d.risk_report.findings.forEach((f,i)=>risk.push(`${method} ${route} risk_report.findings[${i}]: ${JSON.stringify({category:choice(f?.category,categories),severity:choice(f?.severity,levels),blocking:flag(f?.blocking)})}; detail/subject_ref withheld`));

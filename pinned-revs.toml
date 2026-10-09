@@ -18,9 +18,9 @@
 ubu_schemas         = "070d0a6f9a6ad7833dd523042925008316ce923b"  # P1B-70 published branch
 ubu_core            = "fa26bf678977f5e077229eb97a39cc1b8b960c9b"  # P1B-70 published branch
 ubu_store           = "83a099f55220b1286ffb2dee3c9d19006e2090b5"  # P1B-70 published branch
-ubu_planning_kernel = "1c0d1b2ba776deae004ab93177983d733d8e020d"  # P1B-77 published interpreter/probe facts
+ubu_planning_kernel = "3e9d947cbf846b152a101f27559c6e3d98955ace"  # P1B-78 published certification locations / synthetic weeks
 ubu_github_adapter  = "e14a43b47aeb0a928f4dfdc83cd78ea9a2e044f6"  # P1B-70 published branch
-ubu_orchestrator = "755fc131e62759831d209e0f6e0b742e3eb48965"  # P1B-77 published interpreter/probe diagnostics
+ubu_orchestrator = "d0d67631dce2dc564724fc771800a4b4b1557dac"  # P1B-78 published certification field/location diagnostics
 ubu_ui = "649f8e117a3eec08b5f8581885b06999d187f8a3"  # P1B-76 published agenda / accepted design input
 ubu_design = "9e57b4959fecc39e852b84d2391deb95a93da446"  # P1B-76 published agenda / accepted design input
 ubu_brand           = "faf2005a8bd9e64742dd76ee6d1f91f45223946b"  # P1B-41 H: unchanged brand baseline; inventory previously unset
