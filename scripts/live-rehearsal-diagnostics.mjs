@@ -3,18 +3,20 @@ import { resolve, dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { INPUT_RULES } from './live-rehearsal-contract.mjs';
+import { RESPONSE_STATUSES } from './live-rehearsal-report.mjs';
+import codeNames from './live-rehearsal-codes.json' with {type:'json'};
 
 export const REMEDIES=Object.freeze({
   required_configuration_missing:'Set each named variable in your private environment, then run again.',
   absolute_path_required:'Set each named path variable to an absolute path, then run again.',
-  configuration_file_required:'Correct the named variable so its file/check meets the stated requirement.',
+  configuration_file_required:'Correct the named variable so its file/check meets the stated requirement. Set optional values or unset them.',
   token_unavailable:'Correct UBU_GOOGLE_TOKEN_CACHE_PATH; its file must be readable/writable or its parent writable.',
   fresh_store_required:'Stop the owned orchestrator, run the displayed cleanup command, reset the rehearsal calendar, then run again.',
   orchestrator_port_unavailable:'Stop acceptance.sh, run-live.sh or the stale orchestrator using this port, then run again.',
   owned_startup_failed:'Check the binary and checkout configuration and the private startup stderr shown on screen.',
   owned_orchestrator_unavailable:'Correct the private startup error shown on screen before starting a fresh rehearsal.',
   startup_timeout:'Correct the private startup error and make the owned health endpoint available before running again.',
-  unsupported_argument:'Use run-live-rehearsal.sh without arguments; --help shows configuration. No comparison or approval flag exists.',
+  unsupported_argument:'Use --check-inputs for pre-flight, or no arguments for the rehearsal; --help shows configuration. No comparison or approval flag exists.',
   terminal_required:'Run from an interactive terminal so you can give consent and make the approval decision.',
   mock_configuration_refused:'Unset UBU_CALENDAR_MOCK_EVENTS for this real-calendar rehearsal.',
   invalid_port:'Set UBU_ORCHESTRATOR_PORT to an integer from 1 to 65535, or leave it unset for the UI default.',
@@ -38,12 +40,12 @@ export const REMEDIES=Object.freeze({
   judgment_private_content:'Describe your judgment without copying known private data into the public answer.',
   help_requested:'Set your private environment and run run-live-rehearsal.sh without arguments.'
 });
-const variables=new Set(['UBU_DB_PATH','UBU_GOOGLE_CALENDAR_ID','UBU_GOOGLE_CREDENTIALS_PATH','UBU_GOOGLE_TOKEN_CACHE_PATH','UBU_REHEARSAL_BINARY','UBU_REHEARSAL_INPUTS','UBU_ORCHESTRATOR_PORT','ORCHESTRATOR_DIR','UBU_REHEARSAL_OUTPUT','CARGO_BUILD_JOBS','UBU_TARGET_ROOT']);
-const checks=new Set(['missing','absolute path','stat','connection_or_timeout','invalid_json','response_too_large','unexpected_status','readable regular file','executable regular file','readable/writable regular file','writable parent','invalid JSON/field shape']);
+const variables=new Set(['UBU_DB_PATH','UBU_GOOGLE_CALENDAR_ID','UBU_GOOGLE_CREDENTIALS_PATH','UBU_GOOGLE_TOKEN_CACHE_PATH','UBU_REHEARSAL_BINARY','UBU_REHEARSAL_INPUTS','UBU_ORCHESTRATOR_PORT','ORCHESTRATOR_DIR','UBU_REHEARSAL_OUTPUT','CARGO_BUILD_JOBS','UBU_TARGET_ROOT','UBU_PLANNING_WORKER_PYTHON','UBU_PLANNING_WORKER_PROBE_TIMEOUT_MS','UBU_PLANNER_STRATEGY']);
+const checks=new Set(['missing','absolute path','stat','connection_or_timeout','invalid_json','response_too_large','unexpected_status','readable regular file','executable regular file','readable/writable regular file','writable parent','invalid JSON/field shape','greedy or chunked','probe budget 1 to 30000','endpoint configured','model configured','endpoint answers','model present','worker module and pinned torch']);
 const inputRules=new Set(INPUT_RULES);
 // Structural field paths only, never supplied keys or values.
 const inputField=value=>typeof value==='string'&&/^(?:inputs|settings|subjects|mutations|settings\[(?:0|[1-9][0-9]*)\](?:\.(?:name|value))?|subjects\[(?:0|[1-9][0-9]*)\])$/.test(value);
-const actions=new Set(['routine','colour_setting','advisory_setting','planning_setting','subject_setting','session','capture','plan','preview','approval','universe_before','subject','authoring','task_lookup','task_read','requirement','requirement_readback','registry','vocabulary','precondition','queue']);
+const actions=new Set(['routine','colour_setting','advisory_setting','planning_setting','subject_setting','session','capture','plan','preview','approval','universe_before','subject','authoring','task_lookup','task_read','requirement','requirement_readback','registry','vocabulary','precondition','queue','advisory_readiness','risk_read','human_complete','time_by_category']);
 export class RehearsalFault extends Error {
   constructor(code,context={}) {super(Object.hasOwn(REMEDIES,code)?code:'configuration_destination_or_transport_unavailable');this.code=this.message;this.context=context;}
 }
@@ -58,6 +60,12 @@ export function failureLine(error) {
   if(checks.has(c.check))parts.push('failed check: '+c.check);
   if(actions.has(c.action))parts.push('action: '+c.action);
   if(Number.isSafeInteger(c.status))parts.push('HTTP '+c.status);
+  if(RESPONSE_STATUSES.includes(c.response_status))parts.push('response status: '+c.response_status);
+  if(c.diagnostic_codes&&typeof c.diagnostic_codes==='object') {
+    const allowed=new Set([...codeNames,'withheld_unknown']);
+    const counts=Object.fromEntries(Object.entries(c.diagnostic_codes).filter(([code,n])=>allowed.has(code)&&Number.isSafeInteger(n)&&n>=0));
+    parts.push('diagnostics[].code: '+JSON.stringify(counts));
+  }
   if(Number.isSafeInteger(c.port)&&c.port>0&&c.port<65536)parts.push('port '+c.port);
   if(fault.code==='fresh_store_required'&&typeof c.store==='string') {
     parts.push('store '+JSON.stringify(c.store));
@@ -82,9 +90,9 @@ export async function writePublicArtifact(text,{env=process.env,cwd=process.cwd(
   } catch {await fs.rm(temporary,{force:true}).catch(()=>{});throw new RehearsalFault('copy_back_unwritable',{variable:'UBU_REHEARSAL_OUTPUT'});}
   return path;
 }
-export async function finishFailure(error,{print=console.error,...options}={}) {
+export async function finishFailure(error,{report,print=console.error,...options}={}) {
   const line=failureLine(error);print(line.trimEnd());
-  try {const path=await writePublicArtifact(line,options);print('Copy-back file: '+JSON.stringify(path));return path;}
+  try {const path=await writePublicArtifact((report?report.render()+'\n':'')+line,options);print('Copy-back file: '+JSON.stringify(path));return path;}
   catch(writeError){print(failureLine(writeError).trimEnd());return null;}
 }
 export function scrubPrivatePaths(text,withheld=[]) {

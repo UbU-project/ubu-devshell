@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Every launcher refusal writes the same public artifact as the Node owner.
+# Rehearsal refusals write the owned public artifact; pre-flight/help are read-only.
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ubu_reason_recorded=0
@@ -18,7 +18,7 @@ launcher_exit() {
 trap launcher_exit EXIT
 if [[ "${1:-}" == --help && $# -eq 1 ]]; then
   cat <<'HELP'
-Usage: run-live-rehearsal.sh
+Usage: run-live-rehearsal.sh [--check-inputs]
 Required environment: UBU_DB_PATH (fresh absolute store path),
 UBU_GOOGLE_CALENDAR_ID, UBU_GOOGLE_CREDENTIALS_PATH,
 UBU_GOOGLE_TOKEN_CACHE_PATH (absolute paths, kept private).
@@ -28,9 +28,13 @@ mutation write under it; see
 UBU_REHEARSAL_OUTPUT overrides ./live-rehearsal-copy-back.txt.
 Owns an orchestrator. Type live before startup; approval is a separate decision.
 Reset your calendar yourself. No default store or calendar is selected.
+--check-inputs checks private inputs/files, advisory model availability and the
+owned worker environment without building, starting a server or writing files.
 HELP
-  node "$SCRIPT_DIR/live-rehearsal-diagnostics.mjs" help_requested
   exit 0
+fi
+if [[ $# -eq 1 && "$1" == --check-inputs ]]; then
+  exec node --experimental-strip-types --no-warnings "$SCRIPT_DIR/live-rehearsal.mjs" --check-inputs
 fi
 [[ $# -eq 0 ]] || refuse unsupported_argument
 [[ -t 0 ]] || refuse terminal_required

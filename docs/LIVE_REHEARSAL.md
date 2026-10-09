@@ -25,9 +25,9 @@ Use Node 22 or newer, the sibling checkouts and the existing offline build setup
 Activate your existing virtual environment. Set UBU_PLANNING_WORKER_PYTHON to
 its interpreter by absolute path; that is the reliable form because the bare
 python3 fallback depends on the PATH available to the launcher. Select
-UBU_PLANNER_STRATEGY=greedy for this worker rehearsal. Back up your own store.
-Select a fresh rehearsal store and reset your rehearsal
-calendar with your own copy tool before invocation. Set your private environment:
+UBU_PLANNER_STRATEGY=greedy for this worker rehearsal. Choose an absent fresh
+store path, then check readiness before resetting the calendar or starting a
+rehearsal. Set your private environment:
 
 | variable | purpose |
 |---|---|
@@ -37,9 +37,18 @@ calendar with your own copy tool before invocation. Set your private environment
 | UBU_GOOGLE_TOKEN_CACHE_PATH | absolute readable/writable token file, or writable parent |
 | UBU_REHEARSAL_INPUTS | genuine private routine/settings/observations/Task requirement, exactly one operator-chosen provisional root in subjects, and a mutation that writes under it; include planning.gpu_enabled=true, in the [driver reference](LIVE_REHEARSAL_DRIVER.md) shape |
 | UBU_PLANNING_WORKER_PYTHON | absolute interpreter path in your active virtual environment; its command/path and PyTorch version stay on the private screen |
+| UBU_PLANNER_STRATEGY | required non-empty strategy; select greedy for this worker rehearsal |
 | UBU_PLANNING_WORKER_PROBE_TIMEOUT_MS | optional integer 1–30000 ms environment-probe budget; default 30000 ms |
 | UBU_REHEARSAL_BINARY | optional absolute executable; otherwise the launcher builds offline |
 | UBU_REHEARSAL_OUTPUT | optional public output file; default ./live-rehearsal-copy-back.txt |
+
+Include advisory.model and advisory.endpoint in the private inputs.settings so
+pre-flight checks exactly the configuration the fresh store will receive. Every
+required variable must be non-empty. Pre-flight checks file metadata, absent
+store/WAL/SHM and writable parents, the advisory endpoint's model list, and the
+owned worker module with quiet pinned CPU Torch 2.6.0+cpu. An omitted model tag
+uses the runtime's :latest name. Model presence is readiness, not a prediction
+test or a promise that generation will succeed.
 
 Every Cargo build uses sourced env.sh, one job, shared exclusion and the available
 memory scope. The lock is released before any human prompt. Credentials and
@@ -54,7 +63,18 @@ counts; the public block reports only the governed/provisional tier counts and
 the supplied root's UniverseState-key, fact_provenance-key and Task-precondition
 target counts. No root, key, value or target string is pasted.
 
-From ubu-devshell, one invocation:
+From ubu-devshell, first run the pre-flight:
+
+```sh
+./scripts/run-live-rehearsal.sh --check-inputs
+```
+
+It passes or names one thing to fix. It does not build, start a server, write
+state/calendar data or replace the copy-back file. An explicitly supplied
+binary is checked; an omitted binary is built only by the rehearsal launcher.
+The check needs no reset and never offers a skip. Once it passes, back up your
+own store and reset your rehearsal calendar with your own copy tool. Then run
+the single rehearsal, which rechecks readiness before starting:
 
 ```sh
 ./scripts/run-live-rehearsal.sh
@@ -77,9 +97,11 @@ Answer the three questions with your own public judgment sentences:
 
 The app's visual pass belongs to pre-release testing. There is no comparison
 cycle, manual fallback, tally, figure transcription or copy-back item list.
-Paste the **entire printed output file**, once. It contains the public block on
-completion or one named fault and remedy on refusal. A second invocation is a
-second rehearsal; review applied actions and reset/select a fresh store first.
+Paste the **entire printed output file**, once. On a rehearsal failure it contains
+all observed steps, explicit unavailable judgments, then the named fault and
+remedy with closed response status and diagnostic-code counts. Unobserved actions
+stay unavailable. Another rehearsal invocation is another rehearsal; review
+applied actions and reset/select a fresh store first. Pre-flight is not a rehearsal.
 
 ## Fault and remedy lookup
 
@@ -92,14 +114,14 @@ using this lookup. The script stops rather than asking for a missing-figure phra
 |---|---|
 | `required_configuration_missing` | Set each named variable in your private environment, then run again. |
 | `absolute_path_required` | Set each named path variable to an absolute path, then run again. |
-| `configuration_file_required` | Correct the named variable so its file/check meets the stated requirement. |
+| `configuration_file_required` | Correct the named variable so its file/check meets the stated requirement. Set optional values or unset them. |
 | `token_unavailable` | Correct UBU_GOOGLE_TOKEN_CACHE_PATH; its file must be readable/writable or its parent writable. |
 | `fresh_store_required` | Stop the owned orchestrator, run the displayed cleanup command, reset the rehearsal calendar, then run again. |
 | `orchestrator_port_unavailable` | Stop acceptance.sh, run-live.sh or the stale orchestrator using this port, then run again. |
 | `owned_startup_failed` | Check the binary and checkout configuration and the private startup stderr shown on screen. |
 | `owned_orchestrator_unavailable` | Correct the private startup error shown on screen before starting a fresh rehearsal. |
 | `startup_timeout` | Correct the private startup error and make the owned health endpoint available before running again. |
-| `unsupported_argument` | Use run-live-rehearsal.sh without arguments; --help shows configuration. No comparison or approval flag exists. |
+| `unsupported_argument` | Use --check-inputs for pre-flight, or no arguments for the rehearsal; --help shows configuration. No comparison or approval flag exists. |
 | `terminal_required` | Run from an interactive terminal so you can give consent and make the approval decision. |
 | `mock_configuration_refused` | Unset UBU_CALENDAR_MOCK_EVENTS for this real-calendar rehearsal. |
 | `invalid_port` | Set UBU_ORCHESTRATOR_PORT to an integer from 1 to 65535, or leave it unset for the UI default. |

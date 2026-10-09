@@ -1413,3 +1413,37 @@ This is CPU tensor certification, not CUDA parity or certification of the
 operator's week. Operator acceptance remains the one invocation in
 [LIVE_REHEARSAL.md](LIVE_REHEARSAL.md), performed by the operator. What is under
 test is whether Stage 1 certifies on that week; no manual steps are added.
+
+### P1B-80 retained partial evidence and read-only readiness
+
+A manual instrument still has one line of execution. A failed rehearsal now
+writes its rendered partial block before the named fault and remedy, retaining
+all completed actions and explicit unavailable judgments. Response-backed faults
+retain only closed status values and diagnostic-code counts; an interrupted
+approval has no response cause and invents none. The private screen retains
+messages and other content.
+
+The separate --check-inputs pre-flight validates required non-empty configuration,
+private inputs/file metadata, fresh-store siblings/parents, configured advisory
+model availability and the owned worker's quiet pinned CPU Torch environment.
+It builds nothing, starts no server, makes no prediction or state/calendar write,
+and does not replace a previous copy-back file. The rehearsal rechecks readiness
+before actions. [LIVE_REHEARSAL.md](LIVE_REHEARSAL.md) now prescribes one pre-flight
+plus one rehearsal, with no skip, comparison loop or agent-performed acceptance.
+
+SuggestTags receives selected-Task and category bounds; Vocabulary was already
+bounded. The observed Vocabulary abort triggered the audit and is not attributed
+to that distinct SuggestTags defect. UBU-D0302 records the bounded-structure
+lesson; UBU-Q0185 remains Open and unanswered. No decode parameter is added.
+Relayed upstream errors retain their bounded private text without misleading
+model-pull advice. Empty planning collections now serialize consistently, and
+empty optional environment values regain absence/default semantics.
+
+The opt-in private kernel-input dump includes complete affect profile and
+observed dimensions for exact offline strategy/legitimization replay. It is
+plaintext 0600 with a default outside repository working trees, never a public
+block or fixture. Existing report routes expose only closed enums/counts; a
+source-checked fixed marker classifies stand-in affect figures without printing
+prose. The occupancy minimum changes no golden, candidate count or expectation.
+The governing quotes, approved corrections, exact dump fields, tests, unchanged
+public contracts and both kinds of pin are in [P1B-80_PINS.md](P1B-80_PINS.md).

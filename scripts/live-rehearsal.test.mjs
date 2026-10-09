@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import * as e from '../../ubu-ui/src/api/endpoints.ts';
-import { liveConfig, runActions, createForwarder, routeTemplate, validateFiles, bindForwarder } from './live-rehearsal.mjs';
+import { liveConfig, runActions, createForwarder, routeTemplate, validateFiles, bindForwarder, checkInputs } from './live-rehearsal.mjs';
 import { requestJson, loopbackUrl } from './loopback-json.mjs';
 const secret=()=>randomUUID();
 const owned='http://127.0.0.1:54321',ports=new Set([54321]);
@@ -58,7 +58,7 @@ test('JSON transport preserves status; sanitizes malformed, connection and overs
 });
 test('actions follow document order with separate explicit approval and versioned leaf PATCH',async()=>{
   const f=flow({approve:true});await f.run();
-  assert.deepEqual(f.records.map(r=>r.label),['routine','session','capture','plan','preview','approval','universe_before','subject','authoring','task_lookup','task_read','requirement','requirement_readback','registry','vocabulary','precondition','queue']);
+  assert.deepEqual(f.records.map(r=>r.label),['routine','session','capture','plan','risk_read','human_complete','time_by_category','preview','approval','universe_before','subject','authoring','task_lookup','task_read','requirement','requirement_readback','registry','vocabulary','precondition','queue']);
   const patch=f.calls.find(c=>c.method==='PATCH'&&c.path.startsWith('/task/'));
   assert.deepEqual(patch.body,{schema_version:e.TASK_CAPTURE_SCHEMA_VERSION,expected_version:7,preconditions:f.inputs.precondition});
   assert.equal(Object.keys(patch.body).length,3);
@@ -88,6 +88,7 @@ test('stale or absent preview never asks for approval; interrupted approval stop
 test('configuration has no path/calendar defaults and refuses mock or malformed private inputs',()=>{
   assert.throws(()=>liveConfig({},e));
   const env=Object.fromEntries(['UBU_DB_PATH','UBU_GOOGLE_CREDENTIALS_PATH','UBU_GOOGLE_TOKEN_CACHE_PATH','UBU_REHEARSAL_BINARY'].map(k=>[k,'/'+secret()]));env.UBU_GOOGLE_CALENDAR_ID=secret();
+  env.UBU_PLANNING_WORKER_PYTHON='/synthetic-worker';env.UBU_PLANNER_STRATEGY='greedy';
   env.UBU_REHEARSAL_INPUTS=JSON.stringify({subjects:['synthetic_shelf'],mutations:[{operation:'set_fact',target:'facts.synthetic_shelf.ready',payload:true}]});
   assert.equal(liveConfig(env,e).port,Number(e.DEFAULT_ORCHESTRATOR_PORT));
   for(const extra of [{UBU_CALENDAR_MOCK_EVENTS:'x'},{UBU_REHEARSAL_INPUTS:'{'},{UBU_REHEARSAL_INPUTS:'{"subjects":{}}'},{UBU_ORCHESTRATOR_PORT:'0'}])assert.throws(()=>liveConfig({...env,...extra},e));
@@ -255,7 +256,7 @@ test('B unknown enum/code entries are withheld and remain included in cardinalit
   const check=fields(output);check('risk_report.level: ','withheld_or_unavailable');check('operations: ',4);check('operations[].kind: ',{update:1,create:1,delete:1,withheld_unknown:1});check('operation_results: ',5);check('operation_results[].status: ',{applied:2,failed:1,skipped:1,withheld_unknown:1});check(`POST ${e.CALENDAR_CAPTURE_PATH} diagnostics[].code: `,{capture_colour_absent:2,capture_stale_export:1,withheld_unknown:1});assert(!output.includes(canary));
 });
 const {RehearsalFault,REMEDIES,failureLine,writePublicArtifact,finishFailure,startupBuffer,shellPath}=await import('./live-rehearsal-diagnostics.mjs');
-const fakeEnv=()=>({...Object.fromEntries(['UBU_DB_PATH','UBU_GOOGLE_CALENDAR_ID','UBU_GOOGLE_CREDENTIALS_PATH','UBU_GOOGLE_TOKEN_CACHE_PATH','UBU_REHEARSAL_BINARY'].map(key=>[key,'/'+secret()])),UBU_REHEARSAL_INPUTS:JSON.stringify({subjects:['synthetic_shelf'],mutations:[{operation:'set_fact',target:'facts.synthetic_shelf.ready',payload:true}]})});
+const fakeEnv=()=>({...Object.fromEntries(['UBU_DB_PATH','UBU_GOOGLE_CALENDAR_ID','UBU_GOOGLE_CREDENTIALS_PATH','UBU_GOOGLE_TOKEN_CACHE_PATH','UBU_REHEARSAL_BINARY','UBU_PLANNING_WORKER_PYTHON'].map(key=>[key,'/'+secret()])),UBU_PLANNER_STRATEGY:'greedy',UBU_REHEARSAL_INPUTS:JSON.stringify({subjects:['synthetic_shelf'],mutations:[{operation:'set_fact',target:'facts.synthetic_shelf.ready',payload:true}]})});
 const absent=()=>Object.assign(new Error(secret()),{code:'ENOENT'});
 function fakeFiles({present=[],badStat,badAccess,writeFails=false}={}) {
   const writes=[],moves=[];
@@ -615,4 +616,116 @@ test('P78 existing backend provenance is a closed public projection with private
     const output=report.render();assert(output.includes('engine_provenance.backend_kind: '+(['cpu_reference','gpu_worker','mobile_cpu','mobile_gpu'].includes(kind)?kind:'withheld_or_unavailable')));
     assert(!output.includes(version));assert(!output.includes(device));
   }
+});
+
+test('P80 a late failure preserves completed capture, planning and approval before the fault',async()=>{
+  const canary=secret(),f=flow({approve:true,mutate:r=>{r.vocabulary.status='failed';r.vocabulary.diagnostics=[{code:'advisory_http_failed',message:canary}];}});
+  let fault;try{await f.run();}catch(error){fault=error;}
+  assert.equal(fault.code,'advisory_run_failed');
+  const report=new PublicReport(e);for(const record of f.records)report.observe(record);
+  const fs=fakeFiles();await finishFailure(fault,{report,fs,env:{UBU_REHEARSAL_OUTPUT:'/synthetic-copy-back'},print:()=>{}});
+  const text=fs.writes[0].text;
+  assert(text.startsWith('BEGIN LIVE REHEARSAL COPY-BACK'));
+  assert(text.includes(`${e.CALENDAR_CAPTURE_PATH} captured: 4`));
+  assert(text.includes('plan.steps: 3'));assert(text.includes('operation_results: 4'));
+  assert(text.includes('producer=vocabulary: status: failed'));
+  assert(text.includes(`${e.ADVISORY_RUN_PATH}: unavailable; action not observed`));
+  for(let i=1;i<=3;i++)assert(text.includes(`answer ${i}: unavailable`));
+  assert(text.indexOf('END LIVE REHEARSAL COPY-BACK')<text.lastIndexOf('advisory_run_failed:'));
+  assert(text.includes('response status: failed'));assert(text.includes('"advisory_http_failed":1'));
+  assert(!text.includes(canary));assert(!JSON.stringify(fault.context).includes(canary));
+});
+test('P80 response causes and failure context withhold arbitrary status, codes and messages',async()=>{
+  const {responseCause}=await import('./live-rehearsal-report.mjs');const canary=secret();
+  const cause=responseCause({status:200,data:{status:canary,diagnostics:[{code:canary,message:canary},{code:'advisory_http_failed',message:canary}]}});
+  assert.deepEqual(cause,{status:200,diagnostic_codes:{withheld_unknown:1,advisory_http_failed:1}});
+  const line=failureLine(new RehearsalFault('advisory_run_failed',{...cause,response_status:canary,diagnostic_codes:{[canary]:2,advisory_http_failed:1},message:canary}));
+  assert(!line.includes(canary));assert(line.includes('"advisory_http_failed":1'));
+});
+
+function readyEnv() {
+  const env=fakeEnv(),inputs=JSON.parse(env.UBU_REHEARSAL_INPUTS);
+  inputs.settings=[{name:'advisory.endpoint',value:'http://127.0.0.1:11434'},{name:'advisory.model',value:'synthetic-model:latest'}];
+  env.UBU_REHEARSAL_INPUTS=JSON.stringify(inputs);return env;
+}
+const readyWorker=async()=>({importable:true,version:'2.6.0+cpu',import_warning_count:0});
+test('P80 pre-flight checks the final private model setting and worker without writes or a binary build',async()=>{
+  const env=readyEnv();delete env.UBU_REHEARSAL_BINARY;const fs=fakeFiles(),calls=[];
+  const inputs=JSON.parse(env.UBU_REHEARSAL_INPUTS);inputs.settings.push({name:'advisory.model',value:'synthetic-final'});env.UBU_REHEARSAL_INPUTS=JSON.stringify(inputs);
+  const facts=await checkInputs({env,endpoints:e,fs,queryModels:async endpoint=>{calls.push(endpoint);return {status:200,data:{models:[{name:'synthetic-final:latest'}]}};},probeWorker:async()=>{calls.push('worker');return readyWorker();}});
+  assert.deepEqual(calls,['http://127.0.0.1:11434','worker']);assert.equal(facts.torchVersion,'2.6.0+cpu');assert.equal(fs.writes.length,0);assert.equal(fs.moves.length,0);
+});
+test('P80 pre-flight refuses each absent or exported-empty required variable before live effects',async()=>{
+  const required=['UBU_DB_PATH','UBU_GOOGLE_CALENDAR_ID','UBU_GOOGLE_CREDENTIALS_PATH','UBU_GOOGLE_TOKEN_CACHE_PATH','UBU_REHEARSAL_INPUTS','UBU_PLANNING_WORKER_PYTHON','UBU_PLANNER_STRATEGY'];
+  for(const variable of required)for(const value of [undefined,'']) {
+    const env={...readyEnv(),[variable]:value};let effects=0;
+    await assert.rejects(checkInputs({env,endpoints:e,fs:fakeFiles(),queryModels:async()=>{effects++;},probeWorker:async()=>{effects++;}}),error=>error.code==='required_configuration_missing'&&failureLine(error).includes(variable));
+    assert.equal(effects,0);
+  }
+});
+test('P80 pre-flight stops at one model readiness cause and withholds model/error strings',async()=>{
+  const canary=secret();
+  for(const [queryModels,check] of [[async()=>{throw Error(canary);},'endpoint answers'],[async()=>({status:503,data:{error:canary}}),'endpoint answers'],[async()=>({status:200,data:{models:[{name:canary}]}}),'model present']]) {
+    let probes=0;await assert.rejects(checkInputs({env:readyEnv(),endpoints:e,fs:fakeFiles(),queryModels,probeWorker:async()=>{probes++;}}),error=>{const line=failureLine(error);return line.includes(check)&&!line.includes(canary);});assert.equal(probes,0);
+  }
+  const env=readyEnv(),inputs=JSON.parse(env.UBU_REHEARSAL_INPUTS);inputs.settings=[];env.UBU_REHEARSAL_INPUTS=JSON.stringify(inputs);
+  await assert.rejects(checkInputs({env,endpoints:e,fs:fakeFiles(),queryModels:async()=>{throw Error('must not query');},probeWorker:readyWorker}),error=>failureLine(error).includes('endpoint configured'));
+});
+test('P80 pre-flight requires a quiet compatible worker and a fresh writable store',async()=>{
+  for(const facts of [{importable:false,version:null,import_warning_count:0},{importable:true,version:secret(),import_warning_count:0},{importable:true,version:'2.6.0+cpu',import_warning_count:1}]) {
+    await assert.rejects(checkInputs({env:readyEnv(),endpoints:e,fs:fakeFiles(),queryModels:async()=>({status:200,data:{models:[{model:'synthetic-model:latest'}]}}),probeWorker:async()=>facts}),error=>failureLine(error).includes('worker module and pinned torch'));
+  }
+  const env=readyEnv();let calls=0;
+  await assert.rejects(checkInputs({env,endpoints:e,fs:fakeFiles({present:[env.UBU_DB_PATH+'-wal']}),queryModels:async()=>{calls++;},probeWorker:async()=>{calls++;}}),error=>error.code==='fresh_store_required');assert.equal(calls,0);
+  for(const value of ['', '0', '30001', 'synthetic-invalid'])await assert.rejects(checkInputs({env:{...readyEnv(),UBU_PLANNING_WORKER_PROBE_TIMEOUT_MS:value},endpoints:e,fs:fakeFiles(),queryModels:async()=>{throw Error('must not query');},probeWorker:readyWorker}),error=>failureLine(error).includes('probe budget 1 to 30000'));
+});
+
+test('P80 all response-backed sibling refusals retain HTTP and diagnostic counts; approval exceptions invent none',async()=>{
+  const branches=[
+    ['session','calendar_session_unavailable',{enabled:false}],
+    ['vocabulary','advisory_run_failed',{status:'worker_error'}],
+    ['precondition','advisory_run_failed',{status:'malformed_result'}],
+    ['preview','preview_unavailable',{stale:true}],
+    ['task_read','task_unavailable',{version:null,is_routine_occurrence:true}],
+    ['task_lookup','task_selector_unavailable',{tasks:[]}],
+    ['registry','subject_registry_unavailable',{settings:[]}]
+  ];
+  const canary=secret();
+  for(const [failing,code,override] of branches) {
+    let last;
+    const data={enabled:true,preview_id:'synthetic-preview',stale:false,status:'ok',version:1,payload:{},tasks:[{task_id:'synthetic-task',is_routine_occurrence:false}],settings:[{name:'universe.subject.synthetic_p80',value:true,subject_metadata:{references:{universe_state_keys:0,fact_provenance_keys:0,task_precondition_targets:0}}}]};
+    const call=async(method,path,body)=>{
+      last=path===e.GOOGLE_CALENDAR_SESSION_PATH?'session':path===e.CALENDAR_PREVIEW_PATH?'preview':path===e.SETTINGS_LIST_PATH?'registry':path===e.ADVISORY_RUN_PATH?body.producer:path.startsWith(e.TASK_LIST_PATH+'?')?'task_lookup':path===e.TASK_PATH.replace('{task_id}','synthetic-task')?'task_read':null;
+      return {status:200,data:last===failing?{...data,...override,diagnostics:[{code:'advisory_http_failed',message:canary},{code:canary,message:canary}]}:data};
+    };
+    await assert.rejects(runActions({endpoints:e,inputs:{subjects:['synthetic_p80'],task:{id:'synthetic-task'},precondition:{target:'facts.synthetic_p80.ready',predicate:'absent'}},call,approve:async()=>false}),error=>{
+      assert.equal(error.code,code);assert.equal(error.context.status,200);assert.deepEqual(error.context.diagnostic_codes,{advisory_http_failed:1,withheld_unknown:1});
+      assert(!JSON.stringify(error.context).includes(canary));return true;
+    });
+  }
+  await assert.rejects(runActions({endpoints:e,call:async()=>({status:200,data:{enabled:true,stale:false,preview_id:'synthetic-preview'}}),approve:async()=>{throw Error(canary);}}),error=>{
+    assert.equal(error.code,'approval_interrupted');assert.deepEqual(error.context,{action:'approval'});return true;
+  });
+});
+test('P80 report routes remain existing paths and the stand-in marker agrees exactly with its producer',async()=>{
+  const {REPORT_ROUTES,BOOTSTRAP_AFFECT_MARKER}=await import('./live-rehearsal-report.mjs');
+  const spec=JSON.parse(await readFile(new URL('../../ubu-orchestrator/openapi/openapi.generated.json',import.meta.url),'utf8'));
+  for(const route of [...Object.values(REPORT_ROUTES),e.TIME_BY_CATEGORY_PATH])assert(spec.paths[route]?.get);
+  assert.equal(Object.keys(spec.paths).length,56);
+  const source=await readFile(new URL('../../ubu-orchestrator/src/reports/planning_analysis.rs',import.meta.url),'utf8');
+  const block=/const RECORD_AFFECT_SUGGESTION: &str = concat!\(([\s\S]*?)\);/.exec(source)[1];
+  assert.equal([...block.matchAll(/"(?:\\.|[^"\\])*"/g)].map(m=>JSON.parse(m[0])).join(''),BOOTSTRAP_AFFECT_MARKER);
+  assert(source.includes('suggestions.insert(0, RECORD_AFFECT_SUGGESTION.to_owned())'));
+});
+test('P80 closed report projection retains enums and counts while withholding all prose, names and affect values',async()=>{
+  const {BOOTSTRAP_AFFECT_MARKER,affectFigureKind}=await import('./live-rehearsal-report.mjs');
+  const canary=secret(),report=new PublicReport(e),q={checkpoint_coverage:'adequate',failure_pattern:'wrong_estimates',violated_dimensions:[canary],affect_margin:12.3456789,revision_suggestions:[BOOTSTRAP_AFFECT_MARKER,canary]};
+  report.observe({label:'plan',result:{status:200,data:{human_complete_plan_quality:q}}});
+  report.observe({label:'risk_read',result:{status:200,data:{level:'high',findings:[{category:'deadline_risk',severity:'high',blocking:true,detail:canary,subject_ref:canary}]}}});
+  report.observe({label:'human_complete',result:{status:200,data:{completed_tasks:3,task_statuses:[{status:'completed',count:3}],notes:[canary]}}});
+  report.observe({label:'time_by_category',result:{status:200,data:{total_seconds:120,categories:[{category:canary,seconds:120,static_seconds:90,completed_seconds:30,task_count:2}],unmeasured:[{task_id:canary,title:canary,reason:canary}]}}});
+  const output=report.render();assert(output.includes('checkpoint_coverage: adequate'));assert(output.includes('failure_pattern: wrong_estimates'));assert(output.includes('violated_dimensions.count: 1'));assert(output.includes('affect_figures: stand_in'));
+  assert(output.includes('/reports/risk level: high'));assert(output.includes('/reports/human-complete completed_tasks: 3'));assert(output.includes('total_seconds: 120'));assert(output.includes('unmeasured.count: 1'));
+  assert(!output.includes(canary));assert(!output.includes(BOOTSTRAP_AFFECT_MARKER));assert(!output.includes('12.3456789'));
+  assert.equal(affectFigureKind({revision_suggestions:[canary]}),'not_marked_as_stand_in');assert.equal(affectFigureKind({}),'unavailable');
 });

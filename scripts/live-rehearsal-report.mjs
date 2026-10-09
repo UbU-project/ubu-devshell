@@ -6,7 +6,8 @@ const collection=(body,key)=>!Object.hasOwn(body,key)?`missing_${key}`:Array.isA
 const flag=v=>typeof v==='boolean'?v:'unavailable';
 const choice=(v,allowed)=>allowed.includes(v)?v:'withheld_or_unavailable';
 const kinds=['create','update','delete'];
-const statuses=['ok','unconfigured','failed','malformed_result','queue_full','applied','partial','refused','skipped','observed','drifted','rejected','admitted','timeout','worker_error','cancelled'];
+export const RESPONSE_STATUSES=Object.freeze(['ok','unconfigured','failed','malformed_result','queue_full','applied','partial','refused','skipped','observed','drifted','rejected','admitted','timeout','worker_error','cancelled','active','completed','moot']);
+const statuses=RESPONSE_STATUSES;
 const levels=['low','medium','high'];
 const categories=['deadline_risk','dependency_fragility','worker_bottleneck','stale_affect','affect_margin','destructive_pressure','post_plan_depletion','low_coverage','skeleton_failure','routine_triage','unplaced_work'];
 // Closed vocabulary: an unexpected server code is counted but its text withheld.
@@ -17,6 +18,21 @@ export function histogram(rows,key,allowed) {
   const bins={};for(const row of rows){const code=allowed.has(row?.[key])?row[key]:'withheld_unknown';bins[code]=(bins[code]??0)+1;}return bins;
 }
 const diagnostics=v=>histogram(v,'code',codes);
+export const REPORT_ROUTES=Object.freeze({risk:'/reports/risk',humanComplete:'/reports/human-complete'});
+// Exact producer marker, verified against Rust; never emit suggestion text.
+export const BOOTSTRAP_AFFECT_MARKER='Record how you are feeling: no affect Snapshot covers this Plan, so its affect margin, stretch pressure and post-plan state are a stand-in and not a measurement.';
+export function affectFigureKind(quality) {
+  if(!Array.isArray(quality?.revision_suggestions))return 'unavailable';
+  return quality.revision_suggestions[0]===BOOTSTRAP_AFFECT_MARKER?'stand_in':'not_marked_as_stand_in';
+}
+// A fault retains only the same closed response metadata as the public block.
+export function responseCause(result) {
+  return {
+    ...(Number.isSafeInteger(result?.status)&&result.status>=100&&result.status<=599?{status:result.status}:{}),
+    ...(statuses.includes(result?.data?.status)?{response_status:result.data.status}:{}),
+    ...(Array.isArray(result?.data?.diagnostics)?{diagnostic_codes:diagnostics(result.data.diagnostics)}:{})
+  };
+}
 export const CERTIFICATION_FIELDS=Object.freeze(['task_index','slot_mask','start_time_offsets','duration_samples','piece_index','piece_count','validity_mask','dependency_slack','dependency_feasibility','hard_constraint_feasibility','rejection_codes','omissions','failure']);
 const certificationPrefix='planning_gpu_fallback_certification_failed_';
 // Parse only messages attached to a known field code. Construct a fresh public
@@ -64,7 +80,7 @@ export function registryFigures(data, subjects=[]) {
   }
   return {governed:GOVERNED_SUBJECTS.length,provisional:new Set(rows.map(row=>row.name)).size,selected};
 }
-const sources={capture:['POST','CALENDAR_CAPTURE_PATH'],plan:['POST','PLANNING_GENERATE_PATH'],preview:['GET','CALENDAR_PREVIEW_PATH'],approval:['POST','CALENDAR_APPROVE_PATH'],universe_before:['GET','UNIVERSE_STATE_PATH'],authoring:['PATCH','UNIVERSE_STATE_PATH'],requirement:['PATCH','TASK_PATH'],requirement_readback:['GET','TASK_PATH'],vocabulary:['POST','ADVISORY_RUN_PATH'],precondition:['POST','ADVISORY_RUN_PATH'],risk:['POST','PLANNING_GENERATE_PATH'],queue:['GET','ADVISORY_QUEUE_PATH'],routine:['POST','OBJECTIVE_CREATE_PATH'],session:['POST','GOOGLE_CALENDAR_SESSION_PATH'],subject:['PUT','SETTING_PUT_PATH'],registry:['GET','SETTINGS_LIST_PATH'],colour_setting:['PUT','SETTING_PUT_PATH'],advisory_setting:['PUT','SETTING_PUT_PATH'],planning_setting:['PUT','SETTING_PUT_PATH'],subject_setting:['PUT','SETTING_PUT_PATH']};
+const sources={capture:['POST','CALENDAR_CAPTURE_PATH'],plan:['POST','PLANNING_GENERATE_PATH'],preview:['GET','CALENDAR_PREVIEW_PATH'],approval:['POST','CALENDAR_APPROVE_PATH'],universe_before:['GET','UNIVERSE_STATE_PATH'],authoring:['PATCH','UNIVERSE_STATE_PATH'],requirement:['PATCH','TASK_PATH'],requirement_readback:['GET','TASK_PATH'],vocabulary:['POST','ADVISORY_RUN_PATH'],precondition:['POST','ADVISORY_RUN_PATH'],risk:['POST','PLANNING_GENERATE_PATH'],risk_read:['GET',REPORT_ROUTES.risk],human_complete:['GET',REPORT_ROUTES.humanComplete],time_by_category:['GET','TIME_BY_CATEGORY_PATH'],queue:['GET','ADVISORY_QUEUE_PATH'],routine:['POST','OBJECTIVE_CREATE_PATH'],session:['POST','GOOGLE_CALENDAR_SESSION_PATH'],subject:['PUT','SETTING_PUT_PATH'],registry:['GET','SETTINGS_LIST_PATH'],colour_setting:['PUT','SETTING_PUT_PATH'],advisory_setting:['PUT','SETTING_PUT_PATH'],planning_setting:['PUT','SETTING_PUT_PATH'],subject_setting:['PUT','SETTING_PUT_PATH']};
 const settingFamilies={colour_setting:'calendar.color',advisory_setting:'advisory',planning_setting:'planning',subject_setting:'universe.subject'};
 const safeSkips=new Set(['private_input_missing','unsupported_private_setting','invalid_private_input','existing_tree_preserved','task_unavailable','task_selector_missing_or_ambiguous','operator_did_not_approve_or_preview_stale','preview_unavailable']);
 export class PublicReport {
@@ -79,7 +95,7 @@ export class PublicReport {
       return;
     }
     if(!Object.hasOwn(sources,label))return;
-    const [method,key]=sources[label],route=e[key],r=record.result,d=r?.data;
+    const [method,key]=sources[label],route=key.startsWith('/')?key:e[key],r=record.result,d=r?.data;
     const family=settingFamilies[label]?` family=${settingFamilies[label]}`:'';
     const lines=[`${method} ${route}${family} HTTP: ${count(r?.status)}; outcome: ${record.skip?(safeSkips.has(record.skip)?record.skip:'unavailable'):r?.error?'transport_or_status_failure':'response_observed'}`];
     if(label==='plan')this.rows.set('risk',[`${method} ${route}: unavailable; action not observed`]);
@@ -107,6 +123,8 @@ export class PublicReport {
         risk.push(`${method} ${route} risk_report.level: ${choice(d.risk_report?.level,levels)}; risk_report.findings: ${length(d.risk_report?.findings)} (client-computed cardinality)`);
         if(Array.isArray(d.risk_report?.findings)) d.risk_report.findings.forEach((f,i)=>risk.push(`${method} ${route} risk_report.findings[${i}]: ${JSON.stringify({category:choice(f?.category,categories),severity:choice(f?.severity,levels),blocking:flag(f?.blocking)})}; detail/subject_ref withheld`));
         this.rows.set('risk',risk);
+        const q=d.human_complete_plan_quality;
+        lines.push(`${method} ${route} human_complete_plan_quality checkpoint_coverage: ${choice(q?.checkpoint_coverage,['adequate','sparse','absent'])}; failure_pattern: ${choice(q?.failure_pattern,['none','wrong_estimates','missing_dependencies','stale_affect','interruption','overload','changed_objective'])}; violated_dimensions.count: ${q&&typeof q==='object'?(Object.hasOwn(q,'violated_dimensions')?length(q.violated_dimensions):0):'unavailable'} (client-computed cardinality; omitted empty list uses the server default); affect_figures: ${affectFigureKind(q)}; numeric affect values and revision_suggestions withheld`);
       }
       if(label==='preview') {
         lines.push(...previewLines(d,route));
@@ -129,17 +147,29 @@ export class PublicReport {
         `${method} ${route} producer=${label} diagnostics[].code: ${JSON.stringify(diagnostics(d.diagnostics))} (client-computed histogram; messages withheld)`,
         `${method} ${route} producer=${label} diagnostics[].code == advisory_task_skipped: ${Array.isArray(d.diagnostics)?d.diagnostics.filter(x=>x?.code==='advisory_task_skipped').length:'unavailable'} (client-computed diagnostic-entry count; aggregate notes are not Task counts)`);
       if(label==='queue')lines.push(`${method} ${route} candidates: ${length(d.candidates)} (client-computed cardinality; names/conditions/ids/titles withheld; proposal words stay on the private screen)`);
+      if(label==='risk_read') {
+        lines.push(`${method} ${route} level: ${choice(d.level,levels)}; findings.count: ${length(d.findings)} (client-computed cardinality)`);
+        if(Array.isArray(d.findings))d.findings.forEach((finding,i)=>lines.push(`${method} ${route} findings[${i}]: ${JSON.stringify({category:choice(finding?.category,categories),severity:choice(finding?.severity,levels),blocking:flag(finding?.blocking)})}; detail/subject_ref withheld`));
+      }
+      if(label==='human_complete') {
+        lines.push(`${method} ${route} completed_tasks: ${count(d.completed_tasks)}; task_statuses.count: ${length(d.task_statuses)} (client-computed cardinality); notes withheld`);
+        if(Array.isArray(d.task_statuses))d.task_statuses.forEach((row,i)=>lines.push(`${method} ${route} task_statuses[${i}]: ${JSON.stringify({status:choice(row?.status,['active','completed','failed','moot']),count:count(row?.count)})}`));
+      }
+      if(label==='time_by_category') {
+        lines.push(`${method} ${route} total_seconds: ${count(d.total_seconds)}; categories.count: ${length(d.categories)}; unmeasured.count: ${length(d.unmeasured)} (client-computed cardinalities; names/titles/ids/reasons withheld)`);
+        if(Array.isArray(d.categories))d.categories.forEach((row,i)=>lines.push(`${method} ${route} categories[${i}]: ${JSON.stringify(Object.fromEntries(['seconds','static_seconds','completed_seconds','task_count'].map(key=>[key,count(row?.[key])])))}; category name withheld`));
+      }
       if(label==='session')for(const field of ['accepted','enabled'])lines.push(`${method} ${route} ${field}: ${flag(d[field])}`);
     }
     this.attempts.push(`${method} ${route} HTTP: ${count(r?.status)}; ${label}`);
     this.rows.set(label,lines);
   }
   render(answers=[]) {
-    const section=(n,labels)=>[`${n}.`,...labels.flatMap(label=>this.rows.get(label)??[`${sources[label][0]} ${this.e[sources[label][1]]}: unavailable; action not observed`])];
+    const section=(n,labels)=>[`${n}.`,...labels.flatMap(label=>this.rows.get(label)??[`${sources[label][0]} ${sources[label][1].startsWith('/')?sources[label][1]:this.e[sources[label][1]]}: unavailable; action not observed`])];
     return ['BEGIN LIVE REHEARSAL COPY-BACK',
       ...section(1,['capture']),...section(2,['plan']),
-      ...section(3,['risk']),...section(4,['preview']),...section(5,['approval']),...section(6,['universe_before']),...section(7,['subject','authoring','requirement','requirement_readback','registry']),...section(8,['vocabulary','precondition','queue']),...this.decisions,
-      '9. Operator judgments (deliberate public sentences; never API data):',...answers.map((a,i)=>`answer ${i+1}: ${typeof a==='string'?JSON.stringify(a):'unavailable'}`),
+      ...section(3,['risk','risk_read','human_complete','time_by_category']),...section(4,['preview']),...section(5,['approval']),...section(6,['universe_before']),...section(7,['subject','authoring','requirement','requirement_readback','registry']),...section(8,['vocabulary','precondition','queue']),...this.decisions,
+      '9. Operator judgments (deliberate public sentences; never API data):',...Array.from({length:3},(_,i)=>`answer ${i+1}: ${typeof answers[i]==='string'?JSON.stringify(answers[i]):'unavailable'}`),
       'Additional action outcomes:',...['routine','session',...Object.keys(settingFamilies)].flatMap(label=>this.rows.get(label)??[]),
       'Observed action attempts (no replay):',...this.attempts,
       'Reset completeness: unverifiable. capture_stale_export diagnoses stamped leftovers; plan collision codes are observations, not proof of reset.',

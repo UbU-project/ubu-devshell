@@ -5,7 +5,9 @@ existing route attests an attached process's store/calendar identity. A loopback
 forwarder keeps optional app access possible; forwarded reads never replace
 automatic report snapshots. Only explicit app admission/rejection route/status
 outcomes are recorded. The app is optional, and visual checking is pre-release.
-The comparison mode and manual fallback have been removed.
+The comparison mode and manual fallback have been removed. The separate
+--check-inputs pre-flight is read-only readiness, not another rehearsal mode.
+The rehearsal still has one line of execution and offers no readiness skip.
 
 ## Configuration and genuine authoring
 
@@ -25,6 +27,7 @@ Worker configuration is private environment, read by the executable:
 | variable | purpose |
 |---|---|
 | UBU_PLANNING_WORKER_PYTHON | interpreter to probe and use for computation; supply your virtual environment's interpreter by absolute path |
+| UBU_PLANNER_STRATEGY | required and non-empty; greedy for the atomic worker rehearsal |
 | UBU_PLANNING_WORKER_PROBE_TIMEOUT_MS | optional integer from 1 to 30000 milliseconds; default 30000, within the owned transport's 30-second ceiling |
 
 An absolute interpreter path is the reliable form because the bare python3
@@ -62,6 +65,44 @@ PATCH changes only preconditions and reads it back. Vocabulary and Precondition
 run separately after deterministic authoring. Zero candidates is a legitimate
 result; no producer is rerun to force agreement. No automatic candidate admission
 or rejection occurs. The optional app remains available for deliberate decisions.
+
+Pre-flight requires advisory.model and advisory.endpoint in inputs.settings,
+using the last value when an advisory Setting is supplied more than once, just
+as sequential admission does. It reads the model list without a prediction and
+imports the owned worker module with the existing 1–30000 ms probe budget.
+All effects in tests are injected; no unit test or runner gains live access.
+No pre-flight output replaces evidence from an earlier rehearsal. A failed
+rehearsal writes its partial public block before the fault and remedy, with
+three unavailable judgment answers when no completed answers exist.
+
+The public block reads the existing risk, human-complete and time-by-category
+routes. It projects enum names and counts, withholding prose, category names,
+titles, identifiers and numeric affect values. Quality enums come from
+planning/generate's human_complete_plan_quality. An exact source-checked fixed
+marker classifies stand-in affect figures; revision_suggestions text is never
+printed, and absence of that marker does not claim a measurement.
+
+## Private offline strategy replay (outside operator acceptance)
+
+UBU_PLANNING_REQUEST_DUMP is unset by default. Set it to 1 to enable the private
+system-temporary file ubu-planning-request-<orchestrator-pid>.json, or provide an
+explicit absolute output path with an existing parent. The default is refused
+if its temporary parent is inside any Git working tree. The file is plaintext
+JSON, created atomically with exact owner-only mode 0600; credential and state
+destinations are refused. It is private data, never a fixture or copy-back item.
+Only store-built generation requests are captured. Supplied requests are not
+copied, and nothing is written while the option is unset or exported empty.
+
+The dump is the exact converted kernel request after its effective request ID
+and seed are set. It retains all affect_profile and affect_observation dimensions
+and values, budgets, graph identities, windows, duration models and scoring
+policy. It contains no Task title, calendar summary/event ID, description, fact
+key, precondition target or display-warning prose. Necessary Task/request IDs
+remain private for faithful dependency and seed replay. Replay the same file
+through the existing planning CLI plan command with --strategy greedy and
+--strategy chunked. These are offline developer comparisons, not extra live
+rehearsal invocations. POSIX 0600 support is required; unsupported platforms
+refuse the opt-in write rather than create an unprotected file.
 
 For this rehearsal, `subjects` and a following mutation write under its chosen
 root are required private inputs. No root is inferred. The generic injected
