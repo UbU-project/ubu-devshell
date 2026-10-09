@@ -21,7 +21,8 @@ export const INPUT_RULES = Object.freeze([
   'setting_name_required','setting_name_supported','subject_root_valid','subject_true_required',
   'colour_category_nonblank','colour_id_1_to_11','boolean_required',
   'timeout_ms_5000_to_3600000','review_days_1_to_365','text_nonblank','loopback_origin',
-  'review_seed_le_ceiling','subject_unique','one_subject_required','subject_mutation_write_required'
+  'review_seed_le_ceiling','subject_unique','one_subject_required','subject_mutation_write_required',
+  'ranking_object_required','ranking_seed_u32','ranking_layers_1_to_64'
 ]);
 function settingFault(name,value) {
   const fault=(field,rule)=>({field,rule});
@@ -49,6 +50,12 @@ export function validSetting(name,value) {return settingFault(name,value)===null
 // null is success; a refusal is a safe structural field plus a closed rule.
 export function validAuthoringInputs(inputs) {
   if(!inputs||typeof inputs!=='object'||Array.isArray(inputs))return {field:'inputs',rule:'object_required'};
+  if(Object.hasOwn(inputs,'ranking')) {
+    const ranking=inputs.ranking;
+    if(!ranking||typeof ranking!=='object'||Array.isArray(ranking)||Object.keys(ranking).some(key=>!['seed','layers'].includes(key)))return {field:'ranking',rule:'ranking_object_required'};
+    if(!Number.isInteger(ranking.seed)||ranking.seed<0||ranking.seed>4294967295)return {field:'ranking.seed',rule:'ranking_seed_u32'};
+    if(!Number.isInteger(ranking.layers)||ranking.layers<1||ranking.layers>64)return {field:'ranking.layers',rule:'ranking_layers_1_to_64'};
+  }
   for(const key of ['settings','subjects','mutations'])if(inputs[key]!==undefined&&!Array.isArray(inputs[key]))return {field:key,rule:'array_required'};
   let {seed,ceiling}=REVIEW_DEFAULTS;
   const subjects=new Set();

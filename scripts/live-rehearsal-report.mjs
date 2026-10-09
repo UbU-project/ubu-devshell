@@ -80,11 +80,26 @@ export function registryFigures(data, subjects=[]) {
   }
   return {governed:GOVERNED_SUBJECTS.length,provisional:new Set(rows.map(row=>row.name)).size,selected};
 }
+// Deliberate rehearsal selection; Static Tasks can be ranked by the server.
+export function rankingTasks(data) {
+  const rows=data?.tasks;
+  if(!Array.isArray(rows)||!rows.every(row=>row&&typeof row.task_id==='string'&&row.task_id.length>0&&typeof row.title==='string'&&['static','planned'].includes(row.placement)&&typeof row.is_routine_occurrence==='boolean')||new Set(rows.map(row=>row.task_id)).size!==rows.length)return null;
+  return rows.filter(row=>row.placement==='planned'&&row.is_routine_occurrence===false);
+}
+function priorityFigures(data) {
+  const rows=data.task_priorities,unavailable={bucket_count:'unavailable',ranked:'unavailable',unranked:'unavailable'};
+  if(!Array.isArray(rows))return unavailable;
+  const bounded=v=>Number.isInteger(v)&&v>=0&&v<=4294967295;
+  if(!rows.every(row=>row&&typeof row==='object'&&!Array.isArray(row)&&bounded(row.bucket_count)&&(!Object.hasOwn(row,'bucket')||row.bucket===null||bounded(row.bucket)&&row.bucket<row.bucket_count)))return unavailable;
+  const counts=new Set(rows.map(row=>row.bucket_count)),ranked=rows.filter(row=>Object.hasOwn(row,'bucket')&&row.bucket!==null).length;
+  return {bucket_count:counts.size===1?rows[0].bucket_count:'unavailable',ranked,unranked:rows.length-ranked};
+}
 const sources={capture:['POST','CALENDAR_CAPTURE_PATH'],plan:['POST','PLANNING_GENERATE_PATH'],preview:['GET','CALENDAR_PREVIEW_PATH'],approval:['POST','CALENDAR_APPROVE_PATH'],universe_before:['GET','UNIVERSE_STATE_PATH'],authoring:['PATCH','UNIVERSE_STATE_PATH'],requirement:['PATCH','TASK_PATH'],requirement_readback:['GET','TASK_PATH'],vocabulary:['POST','ADVISORY_RUN_PATH'],precondition:['POST','ADVISORY_RUN_PATH'],risk:['POST','PLANNING_GENERATE_PATH'],risk_read:['GET',REPORT_ROUTES.risk],human_complete:['GET',REPORT_ROUTES.humanComplete],time_by_category:['GET','TIME_BY_CATEGORY_PATH'],queue:['GET','ADVISORY_QUEUE_PATH'],routine:['POST','OBJECTIVE_CREATE_PATH'],session:['POST','GOOGLE_CALENDAR_SESSION_PATH'],subject:['PUT','SETTING_PUT_PATH'],registry:['GET','SETTINGS_LIST_PATH'],colour_setting:['PUT','SETTING_PUT_PATH'],advisory_setting:['PUT','SETTING_PUT_PATH'],planning_setting:['PUT','SETTING_PUT_PATH'],subject_setting:['PUT','SETTING_PUT_PATH']};
+Object.assign(sources,{ranking_lookup:['GET','TASK_LIST_PATH'],ranking_statement:['POST','PREFERENCE_CREATE_PATH'],ranking:['POST','PREFERENCE_CREATE_PATH']});
 const settingFamilies={colour_setting:'calendar.color',advisory_setting:'advisory',planning_setting:'planning',subject_setting:'universe.subject'};
-const safeSkips=new Set(['private_input_missing','unsupported_private_setting','invalid_private_input','existing_tree_preserved','task_unavailable','task_selector_missing_or_ambiguous','operator_did_not_approve_or_preview_stale','preview_unavailable']);
+const safeSkips=new Set(['private_input_missing','no_eligible_tasks','unsupported_private_setting','invalid_private_input','existing_tree_preserved','task_unavailable','task_selector_missing_or_ambiguous','operator_did_not_approve_or_preview_stale','preview_unavailable']);
 export class PublicReport {
-  constructor(endpoints) {this.e=endpoints;this.rows=new Map();this.decisions=[];this.attempts=[];}
+  constructor(endpoints) {this.e=endpoints;this.rows=new Map();this.decisions=[];this.attempts=[];this.ranking=null;this.rankingAttempts=[];this.rankedTaskIds=new Set();}
   observe(record,forwarded=false) {
     const e=this.e;let label=record.label;
     if(forwarded){
@@ -96,7 +111,16 @@ export class PublicReport {
     }
     if(!Object.hasOwn(sources,label))return;
     const [method,key]=sources[label],route=key.startsWith('/')?key:e[key],r=record.result,d=r?.data;
-    const family=settingFamilies[label]?` family=${settingFamilies[label]}`:'';
+    if(label==='ranking') {
+      if(record.skip)this.rows.set(label,[`${method} ${route} ranking outcome: ${safeSkips.has(record.skip)?record.skip:'unavailable'}`,`${method} ${route}: unavailable; action not observed`]);
+      else this.ranking={seed:Number.isInteger(record.seed)&&record.seed>=0&&record.seed<=4294967295?record.seed:'unavailable',layers:Number.isInteger(record.layers)&&record.layers>=1&&record.layers<=64?record.layers:'unavailable',buckets:length(record.buckets)};
+      return;
+    }
+    if(label==='ranking_statement') {
+      this.rankingAttempts.push(count(r?.status));
+      if(r?.status===201&&!r.error)for(const id of [record.statement?.task_a,record.statement?.task_b])if(typeof id==='string')this.rankedTaskIds.add(id);
+    }
+    const family=label==='ranking_lookup'?' ranking_lookup':settingFamilies[label]?` family=${settingFamilies[label]}`:'';
     const lines=[`${method} ${route}${family} HTTP: ${count(r?.status)}; outcome: ${record.skip?(safeSkips.has(record.skip)?record.skip:'unavailable'):r?.error?'transport_or_status_failure':'response_observed'}`];
     if(label==='plan')this.rows.set('risk',[`${method} ${route}: unavailable; action not observed`]);
     if(record.skip || r?.error || !Number.isInteger(r?.status) || r.status<200 || r.status>=300) {
@@ -105,6 +129,7 @@ export class PublicReport {
       this.rows.set(label,lines);return;
     }
     if(d&&typeof d==='object') {
+      if(label==='ranking_lookup')lines.push(`${method} ${route} ranking_lookup tasks: ${length(d.tasks)}; eligible (placement=planned, not occurrence): ${length(rankingTasks(d))} (client-computed cardinalities; ids/titles withheld)`);
       if(!['capture','plan','vocabulary','precondition'].includes(label)&&Array.isArray(d.diagnostics))lines.push(`${method} ${route} diagnostics[].code: ${JSON.stringify(diagnostics(d.diagnostics))} (client-computed histogram; messages withheld)`);
       if(label==='capture') {
         for(const key of ['captured','updated','unchanged','skipped','moved','resized'])lines.push(`${method} ${route} ${key}: ${count(d[key])}`);
@@ -117,6 +142,8 @@ export class PublicReport {
           `${method} ${route} diagnostics[].code: ${JSON.stringify(diagnostics(d.diagnostics))} (client-computed histogram; messages withheld)`,
           `${method} ${route} plan.steps: ${length(steps)} (client-computed cardinality); plan.steps[].static_anchor: ${JSON.stringify(histogram(steps,'static_anchor',new Set([true,false])))} (client-computed histogram)`);
         for(const field of ['unplaced_tasks','blocked_tasks','invalid_tasks']) lines.push(`${method} ${route} ${field}: ${collection(d,field)} (client-computed cardinality; titles/ids/reasons/explanations/alternatives withheld)`);
+        const priorities=priorityFigures(d);
+        lines.push(`${method} ${route} task_priorities: ${collection(d,'task_priorities')} (client-computed cardinality); bucket_count: ${priorities.bucket_count}; ranked: ${priorities.ranked}; unranked: ${priorities.unranked} (client-computed from the rows' shared bucket_count and bucket presence; values withheld); ranking_input: ${record.rankingSupplied===true?'synthetic_stand_in':record.rankingSupplied===false?'not_supplied':'unavailable'}`);
         lines.push(`${method} ${route} engine_provenance.backend_kind: ${choice(d.engine_provenance?.backend_kind,['cpu_reference','gpu_worker','mobile_cpu','mobile_gpu'])}`);
         for(const location of certificationLocations(d.diagnostics))lines.push(`${method} ${route} diagnostics[].message certification metadata: ${JSON.stringify(location)} (closed field; zero-based indices; values withheld)`);
         const risk=[];
@@ -165,9 +192,13 @@ export class PublicReport {
     this.rows.set(label,lines);
   }
   render(answers=[]) {
+    if(this.ranking) {
+      const {seed,layers,buckets}=this.ranking;
+      this.rows.set('ranking',[`POST ${this.e.PREFERENCE_CREATE_PATH} ranking: seed ${seed}; layers requested ${layers}; buckets ${buckets}; ranked Tasks ${this.rankedTaskIds.size}; statements attempted ${this.rankingAttempts.length}; HTTP 201: ${this.rankingAttempts.filter(status=>status===201).length} (operator-chosen integers and client-computed counts; Preference ids withheld); source: synthetic_stand_in`]);
+    }
     const section=(n,labels)=>[`${n}.`,...labels.flatMap(label=>this.rows.get(label)??[`${sources[label][0]} ${sources[label][1].startsWith('/')?sources[label][1]:this.e[sources[label][1]]}: unavailable; action not observed`])];
     return ['BEGIN LIVE REHEARSAL COPY-BACK',
-      ...section(1,['capture']),...section(2,['plan']),
+      ...section(1,['capture']),...section(2,['ranking_lookup','ranking','plan']),
       ...section(3,['risk','risk_read','human_complete','time_by_category']),...section(4,['preview']),...section(5,['approval']),...section(6,['universe_before']),...section(7,['subject','authoring','requirement','requirement_readback','registry']),...section(8,['vocabulary','precondition','queue']),...this.decisions,
       '9. Operator judgments (deliberate public sentences; never API data):',...Array.from({length:3},(_,i)=>`answer ${i+1}: ${typeof answers[i]==='string'?JSON.stringify(answers[i]):'unavailable'}`),
       'Additional action outcomes:',...['routine','session',...Object.keys(settingFamilies)].flatMap(label=>this.rows.get(label)??[]),

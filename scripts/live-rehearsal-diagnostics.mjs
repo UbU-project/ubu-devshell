@@ -44,8 +44,8 @@ const variables=new Set(['UBU_DB_PATH','UBU_GOOGLE_CALENDAR_ID','UBU_GOOGLE_CRED
 const checks=new Set(['missing','absolute path','stat','connection_or_timeout','invalid_json','response_too_large','unexpected_status','readable regular file','executable regular file','readable/writable regular file','writable parent','invalid JSON/field shape','greedy or chunked','probe budget 1 to 30000','endpoint configured','model configured','endpoint answers','model present','worker module and pinned torch']);
 const inputRules=new Set(INPUT_RULES);
 // Structural field paths only, never supplied keys or values.
-const inputField=value=>typeof value==='string'&&/^(?:inputs|settings|subjects|mutations|settings\[(?:0|[1-9][0-9]*)\](?:\.(?:name|value))?|subjects\[(?:0|[1-9][0-9]*)\])$/.test(value);
-const actions=new Set(['routine','colour_setting','advisory_setting','planning_setting','subject_setting','session','capture','plan','preview','approval','universe_before','subject','authoring','task_lookup','task_read','requirement','requirement_readback','registry','vocabulary','precondition','queue','advisory_readiness','risk_read','human_complete','time_by_category']);
+const inputField=value=>typeof value==='string'&&/^(?:inputs|settings|subjects|mutations|ranking(?:\.(?:seed|layers))?|settings\[(?:0|[1-9][0-9]*)\](?:\.(?:name|value))?|subjects\[(?:0|[1-9][0-9]*)\])$/.test(value);
+const actions=new Set(['routine','colour_setting','advisory_setting','planning_setting','subject_setting','session','capture','ranking_lookup','ranking_statement','plan','preview','approval','universe_before','subject','authoring','task_lookup','task_read','requirement','requirement_readback','registry','vocabulary','precondition','queue','advisory_readiness','risk_read','human_complete','time_by_category']);
 export class RehearsalFault extends Error {
   constructor(code,context={}) {super(Object.hasOwn(REMEDIES,code)?code:'configuration_destination_or_transport_unavailable');this.code=this.message;this.context=context;}
 }

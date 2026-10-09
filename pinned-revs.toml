@@ -22,5 +22,5 @@ ubu_planning_kernel = "464b4924cd114c64dd1e2fc8ae98bae3e5bba04d"  # P1B-80 publi
 ubu_github_adapter  = "e14a43b47aeb0a928f4dfdc83cd78ea9a2e044f6"  # P1B-70 published branch
 ubu_orchestrator = "164f6c4db27462e10c399d4406d0f2bd2c4e71c0"  # P1B-80 published bounded grammar / private exact replay
 ubu_ui = "649f8e117a3eec08b5f8581885b06999d187f8a3"  # P1B-76 published agenda / accepted design input
-ubu_design = "63cd428eaf896755ccb9b7ab6de0a9b894b24d76"  # P1B-80 published bounded producer rule / open decode question
+ubu_design = "51345d377cd363233773f667832dd0944a886e34"  # P1B-81 published planner gate discharge / mirror deferral
 ubu_brand           = "faf2005a8bd9e64742dd76ee6d1f91f45223946b"  # P1B-41 H: unchanged brand baseline; inventory previously unset

@@ -4,12 +4,14 @@ import { randomUUID } from 'node:crypto';
 import * as e from '../../ubu-ui/src/api/endpoints.ts';
 import { liveConfig, runActions, createForwarder, routeTemplate, validateFiles, bindForwarder, checkInputs } from './live-rehearsal.mjs';
 import { requestJson, loopbackUrl } from './loopback-json.mjs';
+import { mulberry32, shuffle, rankingStatements } from './synthetic-ranking.mjs';
 const secret=()=>randomUUID();
 const owned='http://127.0.0.1:54321',ports=new Set([54321]);
-function flow({failure,tree=false,approve=false,mutate=()=>{}}={}) {
+function flow({failure,tree=false,approve=false,ranking,failPreferenceAt,mutate=()=>{}}={}) {
   const id=secret(),name=secret(),target=secret(),records=[],calls=[];
   const inputs={routine:{title:name},subjects:['invented_'+secret().replaceAll('-','')],mutations:[{operation:'set_fact',target,payload:true}],task:{id},precondition:{target,predicate:'equals',expected:true}};
   const responses={
+    task_list:{tasks:[{task_id:id,title:name,placement:'planned',is_routine_occurrence:false},{task_id:secret(),title:secret(),placement:'planned',is_routine_occurrence:false},{task_id:secret(),title:secret(),placement:'static',is_routine_occurrence:false}]},
     capture:{captured:4,updated:3,unchanged:2,skipped:1,moved:5,resized:6,diagnostics:[{code:'capture_colour_absent',message:secret()},{code:'capture_colour_absent',message:secret()},{code:'capture_stale_export',message:secret()}]},
     plan:{status:'admitted',plan:{steps:[{summary:secret(),static_anchor:true},{summary:secret(),static_anchor:false},{summary:secret(),static_anchor:false}]},unplaced_tasks:[{summary:secret(),reason:secret()}],blocked_tasks:[],invalid_tasks:[],diagnostics:[{code:'static_task_collision',message:secret()}],risk_report:{level:'high',findings:[{category:'deadline_risk',severity:'high',blocking:true,detail:secret()},{category:'unplaced_work',severity:'medium',blocking:false,detail:secret()}]}},
     preview:{preview_id:secret(),stale:false,matching_placements:8,diagnostics:[],operations:[{kind:'update',static_anchor:false,event:{summary:secret(),start_at:'2026-10-07T10:00:00Z',end_at:'2026-10-07T11:00:00Z',color_id:null,transparent:false,reminders_minutes:[5,10]}},{kind:'create',static_anchor:true,event:{summary:secret(),start_at:'2026-10-07T12:00:00Z',end_at:'2026-10-07T13:00:00Z',color_id:'8',transparent:true,reminders_minutes:[]}},{kind:'delete',summary:secret()}]},
@@ -21,8 +23,11 @@ function flow({failure,tree=false,approve=false,mutate=()=>{}}={}) {
     session:{accepted:true,enabled:true},
     registry:{settings:[{name:'universe.subject.'+inputs.subjects[0],value:true,version:1,subject_metadata:{minted_at:'2026-10-06T08:00:00Z',references:{universe_state_keys:2,fact_provenance_keys:3,task_precondition_targets:4}}}]}
   };
+  if(ranking!==undefined)inputs.ranking=ranking;
+  responses.plan.task_priorities=responses.task_list.tasks.map(task=>({task_id:task.task_id,bucket_count:0,value:0.1}));
+  responses.preference_fault={diagnostics:[{code:'preference_unknown_task',message:name+' '+id}]};
   mutate(responses);
-  let saved=false;
+  let saved=false,preferences=0;
   const call=async(method,path,body)=>{
     calls.push({method,path,body});
     if(path===failure)throw new Error(secret());
@@ -32,12 +37,13 @@ function flow({failure,tree=false,approve=false,mutate=()=>{}}={}) {
     if(path===e.UNIVERSE_STATE_PATH&&method==='GET')data=responses.universe_before;
     if(path===e.SETTINGS_LIST_PATH)data=responses.registry;
     if(path===e.ADVISORY_RUN_PATH)data=responses[body.producer];
-    if(path.startsWith(e.TASK_LIST_PATH+'?'))data={tasks:[{task_id:id,title:name,is_routine_occurrence:false}]};
+    if(path.startsWith(e.TASK_LIST_PATH+'?'))data=responses.task_list;
+    if(path===e.PREFERENCE_CREATE_PATH){if(++preferences===failPreferenceAt)return {status:400,data:responses.preference_fault};data={preference_id:secret(),version:1};}
     if(path===e.TASK_PATH.replace('{task_id}',id)){
       if(method==='PATCH')saved=true;
       data={version:7,payload:{preconditions:tree?{all_of:[inputs.precondition]}:saved?inputs.precondition:undefined}};
     }
-    return {status:path===e.OBJECTIVE_CREATE_PATH?201:200,data};
+    return {status:[e.OBJECTIVE_CREATE_PATH,e.PREFERENCE_CREATE_PATH].includes(path)?201:200,data};
   };
   return {inputs,calls,records,responses,run:()=>runActions({endpoints:e,inputs,call,approve:async()=>approve,observe:r=>records.push(r)})};
 }
@@ -57,8 +63,8 @@ test('JSON transport preserves status; sanitizes malformed, connection and overs
   }
 });
 test('actions follow document order with separate explicit approval and versioned leaf PATCH',async()=>{
-  const f=flow({approve:true});await f.run();
-  assert.deepEqual(f.records.map(r=>r.label),['routine','session','capture','plan','risk_read','human_complete','time_by_category','preview','approval','universe_before','subject','authoring','task_lookup','task_read','requirement','requirement_readback','registry','vocabulary','precondition','queue']);
+  const f=flow({approve:true,ranking:{seed:7,layers:2}});await f.run();
+  assert.deepEqual(f.records.filter(r=>r.label!=='ranking').map(r=>r.label),['routine','session','capture','ranking_lookup','ranking_statement','plan','risk_read','human_complete','time_by_category','preview','approval','universe_before','subject','authoring','task_lookup','task_read','requirement','requirement_readback','registry','vocabulary','precondition','queue']);
   const patch=f.calls.find(c=>c.method==='PATCH'&&c.path.startsWith('/task/'));
   assert.deepEqual(patch.body,{schema_version:e.TASK_CAPTURE_SCHEMA_VERSION,expected_version:7,preconditions:f.inputs.precondition});
   assert.equal(Object.keys(patch.body).length,3);
@@ -728,4 +734,122 @@ test('P80 closed report projection retains enums and counts while withholding al
   assert(output.includes('/reports/risk level: high'));assert(output.includes('/reports/human-complete completed_tasks: 3'));assert(output.includes('total_seconds: 120'));assert(output.includes('unmeasured.count: 1'));
   assert(!output.includes(canary));assert(!output.includes(BOOTSTRAP_AFFECT_MARKER));assert(!output.includes('12.3456789'));
   assert.equal(affectFigureKind({revision_suggestions:[canary]}),'not_marked_as_stand_in');assert.equal(affectFigureKind({}),'unavailable');
+});
+
+test('P81 seeded ranking is deterministic, listing-order independent and does not mutate inputs',()=>{
+  const ids=Array.from({length:12},(_,i)=>`invented-rank-${i}`),before=[...ids];
+  const first=rankingStatements(ids,{seed:7,layers:4});
+  assert.deepEqual(rankingStatements(ids,{seed:7,layers:4}),first);
+  assert.deepEqual(rankingStatements([...ids].reverse(),{seed:7,layers:4}),first);
+  assert.notDeepEqual(rankingStatements(ids,{seed:8,layers:4}).statements,first.statements);
+  assert.deepEqual(ids,before);
+  assert.deepEqual(shuffle(ids,mulberry32(7)),shuffle([...ids].reverse(),mulberry32(7)));
+  for(const seed of [0,7,4294967295]){const random=mulberry32(seed);for(let i=0;i<100;i++){const value=random();assert(value>=0&&value<1);}}
+});
+test('P81 balanced buckets produce exactly the within-bucket chains and adjacent first-member edges',()=>{
+  for(const [n,layers] of [[0,1],[1,64],[2,1],[2,64],[7,3],[12,4],[10,64],[65,64]]) {
+    const ids=Array.from({length:n},(_,i)=>`invented-rank-${String(i).padStart(2,'0')}`),{buckets,statements}=rankingStatements(ids,{seed:7,layers});
+    assert.equal(buckets.length,Math.min(n,layers));assert.equal(statements.length,Math.max(0,n-1));
+    assert.deepEqual(buckets.flat().sort(),ids);
+    if(buckets.length)assert(Math.max(...buckets.map(b=>b.length))-Math.min(...buckets.map(b=>b.length))<=1);
+    const expected=[];
+    for(const bucket of buckets)for(let i=1;i<bucket.length;i++)expected.push({task_a:bucket[i-1],task_b:bucket[i],order:'a_indifferent_to_b'});
+    for(let p=1;p<buckets.length;p++)expected.push({task_a:buckets[p-1][0],task_b:buckets[p][0],order:'a_preferred_to_b'});
+    assert.deepEqual(statements,expected);
+    for(const statement of statements){assert(ids.includes(statement.task_a));assert(ids.includes(statement.task_b));assert.notEqual(statement.task_a,statement.task_b);}
+  }
+});
+test('P81 ranking has exactly three safe input rules and pre-flight rejects it before effects',async()=>{
+  const cases=[
+    ...[null,[],true,'private', {seed:7,layers:4,private:secret()}].map(ranking=>[ranking,'ranking','ranking_object_required']),
+    ...[undefined,-1,4294967296,1.5,'7',NaN,Infinity].map(seed=>[{seed,layers:4},'ranking.seed','ranking_seed_u32']),
+    ...[undefined,0,65,1.5,'4',NaN,Infinity].map(layers=>[{seed:7,layers},'ranking.layers','ranking_layers_1_to_64'])
+  ];
+  for(const [ranking,field,rule] of cases) {
+    assert.deepEqual(validAuthoringInputs({ranking}),{field,rule});
+    const env=readyEnv(),inputs=JSON.parse(env.UBU_REHEARSAL_INPUTS);inputs.ranking=ranking;env.UBU_REHEARSAL_INPUTS=JSON.stringify(inputs);
+    let effects=0;
+    await assert.rejects(checkInputs({env,endpoints:e,fs:fakeFiles(),queryModels:async()=>{effects++;},probeWorker:async()=>{effects++;}}),error=>error.code==='invalid_private_inputs'&&failureLine(error).includes('field: '+field)&&failureLine(error).includes('rule: '+rule));
+    assert.equal(effects,0);
+  }
+  for(const seed of [0,4294967295])for(const layers of [1,64])assert.equal(validAuthoringInputs({ranking:{seed,layers}}),null);
+});
+test('P81 ranking admits only planned non-occurrences, prints titles privately and counts each attempt',async()=>{
+  const f=flow({ranking:{seed:7,layers:2},mutate:r=>r.task_list.tasks.push({task_id:secret(),title:secret(),placement:'planned',is_routine_occurrence:true})});
+  await f.run();
+  const eligible=f.responses.task_list.tasks.filter(task=>task.placement==='planned'&&!task.is_routine_occurrence),expected=rankingStatements(eligible.map(task=>task.task_id),f.inputs.ranking);
+  const sent=f.calls.filter(call=>call.path===e.PREFERENCE_CREATE_PATH);
+  assert.deepEqual(sent.map(call=>call.body),expected.statements.map(statement=>({schema_version:e.PREFERENCE_SCHEMA_VERSION,...statement})));
+  const lookup=f.records.find(r=>r.label==='ranking_lookup');assert.equal(lookup.route,`${e.TASK_LIST_PATH}?schema_version=${encodeURIComponent(e.TASK_READ_SCHEMA_VERSION)}&status=active`);
+  const screen=[],view=new PrivateRenderer({print:line=>screen.push(line)}),report=new PublicReport(e);
+  for(const record of f.records){report.observe(record);view.observe(record);}
+  const output=report.render(),summary=output.split('\n').find(line=>line.startsWith('POST /preference ranking:'));
+  assert.equal(output.split('\n').find(line=>line.startsWith('GET /tasks ranking_lookup HTTP:')),'GET /tasks ranking_lookup HTTP: 200; outcome: response_observed');
+  assert(output.includes('ranking_lookup tasks: 4; eligible (placement=planned, not occurrence): 2'));
+  assert(summary.includes('seed 7; layers requested 2; buckets 2; ranked Tasks 2; statements attempted 1; HTTP 201: 1'));
+  assert(summary.endsWith('source: synthetic_stand_in'));
+  assert.equal(output.split('Observed action attempts (no replay):')[1].split('\n').filter(line=>line.includes('; ranking_statement')).length,1);
+  assert(screen.includes('Synthetic ranking (seed 7), best first:'));
+  for(const task of eligible){assert(screen.some(line=>line.includes(task.title)));assert(view.knownContent.has(task.title));}
+  for(const task of f.responses.task_list.tasks)for(const value of [task.title,task.task_id])assert(!output.includes(value));
+  for(const row of f.records.filter(r=>r.label==='ranking_statement'))assert(!output.includes(row.result.data.preference_id));
+  await assert.rejects(collectJudgments(async()=>eligible[0].title,{withheld:[...view.knownContent]}),error=>error.code==='judgment_private_content');
+});
+test('P81 a refused ranking statement retains partial counts and its closed cause before stopping',async()=>{
+  const f=flow({ranking:{seed:7,layers:2},failPreferenceAt:2,mutate:r=>r.task_list.tasks.push({task_id:secret(),title:secret(),placement:'planned',is_routine_occurrence:false})});
+  let fault;try{await f.run();}catch(error){fault=error;}
+  assert.equal(fault?.code,'action_request_failed');const line=failureLine(fault);
+  assert(line.includes('action: ranking_statement'));assert(line.includes('HTTP 400'));assert(line.includes('"preference_unknown_task":1'));
+  assert(!f.calls.some(call=>call.path===e.PLANNING_GENERATE_PATH));
+  const report=new PublicReport(e);f.records.forEach(record=>report.observe(record));const output=report.render();
+  assert(output.includes('ranked Tasks 2; statements attempted 2; HTTP 201: 1'));
+  assert.equal(output.split('Observed action attempts (no replay):')[1].split('\n').filter(row=>row.includes('; ranking_statement')).length,2);
+  assert(output.includes('POST /planning/generate: unavailable; action not observed'));
+  for(const task of f.responses.task_list.tasks)for(const value of [task.title,task.task_id]){assert(!output.includes(value));assert(!line.includes(value));}
+});
+test('P81 absent ranking preserves real unranked priority rows; zero and one eligible Task are honest',async()=>{
+  const f=flow();await f.run();const report=new PublicReport(e);f.records.forEach(record=>report.observe(record));const output=report.render();
+  assert(!f.records.some(record=>record.label==='ranking_lookup'||record.label==='ranking_statement'));
+  assert(output.includes('ranking outcome: private_input_missing'));assert(output.includes('GET /tasks: unavailable; action not observed'));
+  assert(output.includes('task_priorities: 3 (client-computed cardinality); bucket_count: 0; ranked: 0; unranked: 3'));
+  assert(!output.includes('missing_task_priorities'));assert(output.includes('ranking_input: not_supplied'));
+  for(const n of [0,1]) {
+    const f=flow({ranking:{seed:7,layers:5},mutate:r=>{r.task_list.tasks=r.task_list.tasks.filter(task=>task.placement==='planned').slice(0,n);r.plan.task_priorities=r.task_list.tasks.map(task=>({task_id:task.task_id,bucket_count:0,value:0.1}));}});
+    delete f.inputs.task;delete f.inputs.precondition;await f.run();
+    const report=new PublicReport(e);f.records.forEach(record=>report.observe(record));const output=report.render();
+    assert(!f.calls.some(call=>call.path===e.PREFERENCE_CREATE_PATH));
+    if(n===0)assert(output.includes('ranking outcome: no_eligible_tasks'));
+    else {assert(output.includes('buckets 1; ranked Tasks 0; statements attempted 0; HTTP 201: 0'));assert(output.includes('bucket_count: 0; ranked: 0; unranked: 1'));}
+  }
+});
+test('P81 malformed ranking lists stop before preference or planning writes',async()=>{
+  const row={task_id:secret(),title:secret(),placement:'planned',is_routine_occurrence:false};
+  for(const tasks of [undefined,{},[null],[row,row],[{...row,placement:'private'}],[{...row,is_routine_occurrence:undefined}],[{...row,task_id:null}]]) {
+    const f=flow({ranking:{seed:7,layers:4},mutate:r=>{r.task_list.tasks=tasks;}});
+    await assert.rejects(f.run(),error=>error.code==='action_request_failed'&&failureLine(error).includes('action: ranking_lookup')&&failureLine(error).includes('invalid JSON/field shape'));
+    assert(!f.calls.some(call=>[e.PREFERENCE_CREATE_PATH,e.PLANNING_GENERATE_PATH].includes(call.path)));
+  }
+});
+test('P81 priority projection uses the shared bucket count and distinguishes absent, empty and malformed rows',()=>{
+  const canary=secret(),line=rows=>{const report=new PublicReport(e);report.observe({label:'plan',result:{status:200,data:rows}});return report.render().split('\n').find(line=>line.startsWith('POST /planning/generate task_priorities:'));};
+  const rows=[{task_id:canary,bucket_count:4,bucket:0,value:0.314159265358},{task_id:canary,bucket_count:4,bucket:3,value:0.271828182845},{task_id:canary,bucket_count:4},{task_id:canary,bucket_count:4,bucket:null}];
+  const observed=line({task_priorities:rows});assert(observed.includes('task_priorities: 4 (client-computed cardinality); bucket_count: 4; ranked: 2; unranked: 2'));assert(!observed.includes(canary));assert(!observed.includes('0.314159265358'));assert(!observed.includes('0.271828182845'));
+  assert(line({}).includes('task_priorities: missing_task_priorities'));
+  assert(line({task_priorities:[]}).includes('task_priorities: 0 (client-computed cardinality); bucket_count: unavailable; ranked: 0; unranked: 0'));
+  assert(line({task_priorities:null}).includes('task_priorities: invalid_task_priorities'));
+  assert(line({task_priorities:rows.map((row,i)=>i===0?{...row,bucket_count:5}:row)}).includes('bucket_count: unavailable; ranked: 2; unranked: 2'));
+  assert(line({task_priorities:[{bucket_count:canary,bucket:canary}]}).includes('bucket_count: unavailable; ranked: unavailable; unranked: unavailable'));
+});
+test('P81 changing one observed ranking field changes only the public lines it feeds',async()=>{
+  const f=flow({ranking:{seed:7,layers:2}});await f.run();
+  const render=records=>{const report=new PublicReport(e);records.forEach(record=>report.observe(record));return report.render().split('Observed action attempts (no replay):')[0].split('\n');};
+  const before=render(f.records),cases=[
+    [rows=>rows.filter(r=>r.label==='ranking').forEach(r=>r.seed++),'POST /preference ranking:'],
+    [rows=>rows.filter(r=>r.label==='ranking').forEach(r=>r.layers++),'POST /preference ranking:'],
+    [rows=>rows.filter(r=>r.label==='ranking').forEach(r=>r.buckets.push([])),'POST /preference ranking:'],
+    [rows=>rows.find(r=>r.label==='ranking_lookup').result.data.tasks.push({task_id:secret(),title:secret(),placement:'static',is_routine_occurrence:false}),'GET /tasks ranking_lookup tasks:'],
+    [rows=>rows.find(r=>r.label==='plan').result.data.task_priorities.forEach(row=>row.bucket_count=3),'POST /planning/generate task_priorities:'],
+    [rows=>{const row=rows.find(r=>r.label==='plan').result.data.task_priorities[0];row.bucket_count=1;row.bucket=0;},'POST /planning/generate task_priorities:']
+  ];
+  for(const [mutate,prefix] of cases){const rows=structuredClone(f.records);mutate(rows);const after=render(rows);assert.equal(after.length,before.length);const changed=after.filter((line,i)=>line!==before[i]);assert.equal(changed.length,1);assert(changed[0].startsWith(prefix));}
 });

@@ -32,6 +32,13 @@ export class PrivateRenderer {
   }
   say(value){this.print(safeText(scrubPrivatePaths(plain(value),this.credentialPaths)));}
   observe(record) {
+    if(record.label==='ranking'&&record.complete===true) {
+      const titles=new Map(record.tasks.map(task=>[task.task_id,task.title]));
+      this.say(PRIVATE_BANNER);this.say(`Synthetic ranking (seed ${record.seed}), best first:`);
+      record.buckets.forEach((bucket,i)=>this.say(`Bucket ${i+1}: `+bucket.map(id=>{const title=titles.get(id);this.remember(title);return plain(title);}).join(' | ')));
+      if(record.tasks.length===1)this.say('One eligible Task supplies no pairwise statement and remains unranked.');
+      return;
+    }
     const data=record.result?.data;if(!data||typeof data!=='object')return;
     this.say(PRIVATE_BANNER);
     for(const field of ['error','message'])if(data[field]!=null){this.remember(typeof data[field]==='string'?data[field]:undefined);this.say(`${field}: ${plain(data[field])}`);}

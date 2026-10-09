@@ -26,6 +26,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { eveningZone, localParts, rehearsalWeek, routineBody } from "./rehearsal-week.mjs";
+import { rankingStatements } from "./synthetic-ranking.mjs";
 
 function option(name) {
   const index = process.argv.indexOf(`--${name}`);
@@ -2472,6 +2473,32 @@ scenarios.push({
     const restored = await call(o.base, "POST", endpoints.PLANNING_GENERATE_PATH, body);
     ok(!restored.diagnostics.some((d) => d.code === "planning_gpu_unavailable"), "withdrawal restores default-off without an environment probe diagnostic");
     return "complete old Plan-field golden preserved; CPU provenance and replay persist; policy-on reports unavailable GPU compute and still uses CPU";
+  }
+});
+
+scenarios.push({
+  name: "a seeded ranking layers the backlog",
+  async run(o) {
+    const ids=[],titles=new Map();
+    for(let i=1;i<=12;i++) {
+      const title=`Invented ranked ${String(i).padStart(2,"0")}`;
+      const task=await captureTask(o,{title,duration_estimate:fixed(15)});
+      ids.push(task.task_id);titles.set(task.task_id,title);
+    }
+    const ranking=rankingStatements(ids,{seed:7,layers:4});
+    for(const statement of ranking.statements)await call(o.base,"POST",endpoints.PREFERENCE_CREATE_PATH,{schema_version:endpoints.PREFERENCE_SCHEMA_VERSION,...statement},201);
+    same((await call(o.base,"GET",endpoints.PREFERENCE_LIST_PATH)).preferences.length,11,"the synthetic stand-in admits eleven pairwise statements");
+    // Read the full response here; generatePlan deliberately returns only Plan.
+    const response=await call(o.base,"POST",endpoints.PLANNING_GENERATE_PATH,{schema_version:endpoints.PLANNING_SCHEMA_VERSION,request:null});
+    ok(response.plan,"the ranked invented backlog yields a Plan");
+    same(response.task_priorities.length,12,"the server explains all twelve invented Tasks");
+    same(response.task_priorities.map(row=>row.task_id).sort(),[...ids].sort(),"every invented Task has exactly one priority row");
+    const expected=new Map(ranking.buckets.flatMap((bucket,p)=>bucket.map(id=>[id,{bucket:p,bucket_count:4,value:p===3?0.1:1.0-0.9*p/3}])));
+    for(const row of response.task_priorities)same({bucket:row.bucket,bucket_count:row.bucket_count,value:row.value},expected.get(row.task_id),`${titles.get(row.task_id)}: the server's bucket and exact value`);
+    same(response.diagnostics.filter(d=>["preference_cycle","preference_ignored_unknown_task"].includes(d.code)),[],"no cycle or ignored-Task diagnostic");
+    same(rankingStatements([...ids].reverse(),{seed:7,layers:4}).statements,ranking.statements,"reordered listing with seed 7 retains identical statements");
+    ok(JSON.stringify(rankingStatements(ids,{seed:8,layers:4}).statements)!==JSON.stringify(ranking.statements),"seed 8 produces different statements");
+    return "synthetic_stand_in: eleven admitted statements yield twelve server priority rows in four buckets, with exact values and unchanged listing-order semantics";
   }
 });
 

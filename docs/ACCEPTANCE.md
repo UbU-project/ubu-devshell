@@ -1447,3 +1447,48 @@ source-checked fixed marker classifies stand-in affect figures without printing
 prose. The occupancy minimum changes no golden, candidate count or expectation.
 The governing quotes, approved corrections, exact dump fields, tests, unchanged
 public contracts and both kinds of pin are in [P1B-80_PINS.md](P1B-80_PINS.md).
+
+### P1B-81 seeded ranking is a rehearsal stand-in
+
+“A manual instrument has one line of execution.” Optional private ranking adds
+no flag, prompt, comparison branch or manual step. When supplied, the fresh-store
+driver admits seeded pairwise Preferences between capture and planning; when
+absent, it records private_input_missing. Only the rehearsal and throwaway
+scenario runner generate this synthetic stand-in. Native POST /preference stamps
+user provenance, so no product route, Setting, binary flag or UI control can
+generate a synthetic ranking for a real store.
+
+The generator uses sorted-copy Fisher–Yates with mulberry32, balanced buckets,
+indifference chains within each bucket and strict edges between adjacent first
+members. No dependency or Rust rule is copied. Planned non-occurrences are the
+rehearsal selection; Static exclusion is policy, not server incapability. One
+Task creates no pairwise statement and remains unranked. Bucket titles appear
+only privately and are remembered for judgment privacy. The public block marks
+synthetic_stand_in, retains every attempt, and shows only seed/layer integers,
+counts and closed outcomes. A failed statement stops with its closed cause and
+retains the observations already made.
+
+The plan line counts the server's actual task_priorities rows, their shared
+bucket_count and rows with/without a bucket. Non-mandatory Static Tasks can be
+unranked rows; absence of ranking input does not mean the response field is
+missing. The three empty planning sibling collections serialize alike after
+P1B-80; only an actually absent priority field prints missing_task_priorities.
+
+Scenario 37 proves the unchanged orchestrator layers eleven statements over
+twelve invented Tasks into four buckets and exact contract values. The generator
+is not adjusted to match the server. Existing scenarios retain their numbers
+and loopback exemption; injected driver tests gain no live/process/signal access.
+No Rust, schema, route, UI, validator fingerprint or diagnostic vocabulary changes.
+
+UBU-D0303 records the operator's supplied 2026-10-09 certification/comparison
+reading and discharges the planner switch condition; it makes no new measurement
+or CUDA certification claim. UBU-D0275/UBU-D0291 remain historical records. Subject
+ratification or retirement remains the gate, including the previously named
+UBU-D0291 append-only-marker retirement gap; no clearing or ratification operation
+is introduced. Full governing quotes, corrections, evidence and pins are in
+[P1B-81_PINS.md](P1B-81_PINS.md).
+
+Operator acceptance names only [LIVE_REHEARSAL.md](LIVE_REHEARSAL.md): one
+pre-flight plus one rehearsal with ranking supplied, not performed by the agent.
+What is under test is whether the seeded stand-in produces a value-ordered week
+and the public block identifies it as a stand-in.

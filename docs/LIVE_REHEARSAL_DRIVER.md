@@ -58,6 +58,7 @@ and repository content. No observation, requirement or routine hour is inferred:
 | mutations | your genuine UniverseState PATCH mutation array |
 | task | unique ordinary active Task selector, id or privately supplied title |
 | precondition | explicit condition AST; a useful existing tree is preserved |
+| ranking | optional rehearsal-only synthetic stand-in: exactly seed (integer 0–4294967295) and layers (integer 1–64) |
 
 Omitted optional authoring inputs are recorded as skipped automatically. Invalid
 supplied selectors or failed requests stop with a named fault. The versioned Task
@@ -65,6 +66,33 @@ PATCH changes only preconditions and reads it back. Vocabulary and Precondition
 run separately after deterministic authoring. Zero candidates is a legitimate
 result; no producer is rerun to force agreement. No automatic candidate admission
 or rejection occurs. The optional app remains available for deliberate decisions.
+
+Synthetic ranking stands in for the ordering input the operator has not supplied;
+it is not a learned or human-authored preference. Only this fresh-store rehearsal
+and the throwaway scenario runner generate it. POST /preference stamps admitted
+statements user_defined with user provenance, so no route, Setting, binary flag
+or UI control generates synthetic statements for a real store. The driver owns
+an absent fresh store and never attaches to an existing one. A supplied ranking
+is applied automatically after capture; an omitted ranking is recorded as
+private_input_missing, with no prompt, flag or alternative execution.
+
+The lookup selects planned, non-occurrence Tasks. Excluding Static commitments
+is rehearsal policy, not a claim that the server cannot rank them. Sorted-copy
+Fisher–Yates and mulberry32 make the same Task-ID set and seed reproducible.
+Balanced buckets have indifference chains within them and one preferred-to edge
+between adjacent first members. Zero eligible Tasks records no_eligible_tasks;
+one gives one proposed bucket but no pairwise statement and remains unranked.
+The private screen shows bucket titles best first and remembers them for judgment
+privacy. The public block marks synthetic_stand_in, counts every attempt and
+HTTP 201, and counts distinct Tasks named by successful statements. It withholds
+Task/Preference IDs, titles and value floats.
+
+The plan line counts actual task_priorities rows, reports their shared bucket_count,
+and counts rows with/without a bucket as ranked/unranked. It does not replace the
+server's eligible set with the ranking lookup: non-mandatory Static Tasks can be
+unranked rows too. A nonempty unranked response has bucket_count 0 and real rows.
+Absent fields print missing_task_priorities; malformed data is unavailable/invalid,
+and an empty array has zero rows but no shared bucket_count to infer.
 
 Pre-flight requires advisory.model and advisory.endpoint in inputs.settings,
 using the last value when an advisory Setting is supplied more than once, just
@@ -137,11 +165,14 @@ meet the named rule before starting another fresh rehearsal:
 | subject_unique | settings[i].name or subjects[i] | root appears once across supplied Setting and subject entries |
 | one_subject_required | subjects | exactly one operator-chosen root for the live rehearsal |
 | subject_mutation_write_required | mutations | at least one supported state write under the supplied root |
+| ranking_object_required | ranking | object with only seed and layers |
+| ranking_seed_u32 | ranking.seed | integer 0–4294967295 |
+| ranking_layers_1_to_64 | ranking.layers | integer 1–64 |
 
 ## One execution and two sinks
 
 Type live after checking the displayed store/calendar. The action order is routine,
-settings, session, capture, Plan, preview, approval decision, pre-authoring
+settings, session, capture, synthetic ranking lookup/statements, Plan, preview, approval decision, pre-authoring
 UniverseState counts, explicit subject/mutation authoring, Task requirement,
 registry readback, Vocabulary, Precondition and queue. The script does not reset the calendar.
 Stamped leftovers/collisions are observations; unstamped reset completeness
@@ -182,7 +213,9 @@ No visual-pass prompt or fourth judgment remains. Known private content in a
 judgment stops with a privacy fault rather than entering the public file.
 
 The public writer atomically replaces one file with mode 0600: the BEGIN/END block
-on completion, or a single named reason/remedy on refusal. Selection boundaries
+on completion, or the partial rendered block followed by a named reason/remedy
+on a handled action failure. Early failures before a report exists retain the
+named reason/remedy alone. Selection boundaries
 are no longer the operator's task. Interrupted/startup/launcher failures use the
 same artifact. An unwritable sink cannot be fabricated: copy_back_unwritable
 names UBU_REHEARSAL_OUTPUT and the remedy on screen; select a writable destination.
@@ -239,10 +272,11 @@ and their witnesses; it cannot bypass names, roots or numeric assertions.
 Both standing check-all/test-all execute this assertion through driver tests.
 
 Empty JSON arrays project 0; absent collections project missing_<field>, and
-malformed collections invalid_<field>. The response intentionally omits empty
-blocked_tasks and invalid_tasks by skip_serializing_if, unlike unplaced_tasks.
-This remains an orchestrator finding: no zero is inferred from missing wire
-data and no serializer is repaired here. Producers print selected_tasks as the
+malformed collections invalid_<field>. unplaced_tasks, blocked_tasks and
+invalid_tasks now serialize alike, including empty arrays, following P1B-80.
+task_priorities is omitted when empty; only an absent field projects
+missing_task_priorities. Unranked eligible Tasks still have explanation rows
+with bucket_count 0 and no bucket. Producers print selected_tasks as the
 cardinality of selected[] Tasks, with the actual request.limit beside it.
 
 For P1B-74, include planning.gpu_enabled=true in private settings. Default

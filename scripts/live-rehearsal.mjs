@@ -1,10 +1,11 @@
 // Real operator instrument, never executed by checks. Tests inject all effects.
 import { requestJson, loopbackUrl, TransportError } from './loopback-json.mjs';
-import { PublicReport, registryFigures, responseCause, REPORT_ROUTES } from './live-rehearsal-report.mjs';
+import { PublicReport, registryFigures, rankingTasks, responseCause, REPORT_ROUTES } from './live-rehearsal-report.mjs';
 import { RehearsalFault, failureLine, finishFailure, writePublicArtifact, startupBuffer } from './live-rehearsal-diagnostics.mjs';
 import { collectJudgments, privateStrings } from './live-rehearsal-questions.mjs';
 import { validAuthoringInputs, routineBody, ADVISORY_LIMIT } from './live-rehearsal-contract.mjs';
 import { PrivateRenderer } from './live-rehearsal-private.mjs';
+import { rankingStatements } from './synthetic-ranking.mjs';
 import { spawn } from 'node:child_process';
 import http from 'node:http';
 import net from 'node:net';
@@ -121,7 +122,7 @@ export async function runActions({ endpoints:e, inputs={}, call, approve=async()
       result={status:null,data:null,error:error instanceof TransportError?error.code:'connection_or_response_failure'};
     }
     if (result.status !== expected && !result.error) result.error='unexpected_status';
-    const record={ label,method,route:path,result,...(['vocabulary','precondition'].includes(label)?{requestLimit:body.limit}:{}),...(label==='registry'?{subjects:inputs.subjects}:{}) }; results.push(record);observe(record);
+    const record={ label,method,route:path,result,...(['vocabulary','precondition'].includes(label)?{requestLimit:body.limit}:{}),...(label==='registry'?{subjects:inputs.subjects}:{}),...(label==='ranking_statement'?{statement:{task_a:body.task_a,task_b:body.task_b}}:{}),...(label==='plan'?{rankingSupplied:!!inputs.ranking}:{}) }; results.push(record);observe(record);
     if(result.error)throw new RehearsalFault('action_request_failed',{action:label,...responseCause(result),check:result.error});
     if(label==='session'&&result.data?.enabled!==true)throw new RehearsalFault('calendar_session_unavailable',{action:label,...responseCause(result)});
     if(['vocabulary','precondition'].includes(label)&&result.data?.status!=='ok')throw new RehearsalFault('advisory_run_failed',{action:label,...responseCause(result)});
@@ -136,6 +137,18 @@ export async function runActions({ endpoints:e, inputs={}, call, approve=async()
   }
   await action('session','POST',e.GOOGLE_CALENDAR_SESSION_PATH,{schema_version:e.DESKTOP_SESSION_SCHEMA_VERSION});
   await action('capture','POST',e.CALENDAR_CAPTURE_PATH,{schema_version:e.CALENDAR_CAPTURE_SCHEMA_VERSION,export_mode:'live'});
+  if(inputs.ranking) {
+    const list=await action('ranking_lookup','GET',`${e.TASK_LIST_PATH}?schema_version=${encodeURIComponent(e.TASK_READ_SCHEMA_VERSION)}&status=active`),tasks=rankingTasks(list);
+    if(!tasks)throw new RehearsalFault('action_request_failed',{action:'ranking_lookup',...cause('ranking_lookup'),check:'invalid JSON/field shape'});
+    if(!tasks.length)observe({label:'ranking',skip:'no_eligible_tasks'});
+    else {
+      const {buckets,statements}=rankingStatements(tasks.map(task=>task.task_id),inputs.ranking);
+      const ranking={label:'ranking',...inputs.ranking,buckets,tasks};
+      observe(ranking); // Retain proposed bucket counts before a statement can fail.
+      for(const statement of statements)await action('ranking_statement','POST',e.PREFERENCE_CREATE_PATH,{schema_version:e.PREFERENCE_SCHEMA_VERSION,...statement},201);
+      observe({...ranking,complete:true}); // Titles are printed privately only after admission.
+    }
+  } else observe({label:'ranking',skip:'private_input_missing'});
   await action('plan','POST',e.PLANNING_GENERATE_PATH,{schema_version:e.PLANNING_SCHEMA_VERSION,request:null});
   await action('risk_read','GET',REPORT_ROUTES.risk);
   await action('human_complete','GET',REPORT_ROUTES.humanComplete);
