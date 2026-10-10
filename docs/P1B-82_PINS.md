@@ -160,7 +160,8 @@ The prior diagnostics test now checks removal of .diagnostics-info after
 planning failure instead of asserting that every status on Today disappears:
 the independent observation status remains. No planning refusal assertion is
 weakened. The new tests' fixture attribution and at_risk expectation were
-corrected before the passing runs; existing Rust tests were unchanged.
+corrected before the passing runs. The follow-up below updates one existing
+Rust path-count expectation for the newly committed route.
 
 The exact regenerated OpenAPI copy is committed in the UI. tsc and Vite build
 pass. UI runtime report logic remains unchanged.
@@ -261,7 +262,7 @@ rule and preserves full supplied requests.
 
 | Check | Before | After |
 |---|---|---|
-| Orchestrator Rust, locked/offline | 650 | 657 passed; seven new observation tests |
+| Orchestrator Rust, locked/offline | 650 | 657 passed, 0 failed; full --no-fail-fast correction run |
 | UI | 220 | 227 passed; seven new tests; tsc/build passed |
 | Devshell driver | 82 | 88 passed; six new tests |
 | Devshell runner | 37/37; 694 requests | 38/38; 703 loopback requests; two live skips |
@@ -279,9 +280,33 @@ rule and preserves full supplied requests.
 | Validator fingerprints | existing file | byte-identical |
 | Standing check-all.sh | required | passed; existing fixture-demo quarantine unchanged |
 
-The full Rust suite passed before the final OpenAPI metadata-only annotation;
-its seven observation tests and Clippy were rerun after that review correction.
-No runtime assertion or report implementation changed in that correction.
+The earlier full-suite result did not establish a passing suite at published
+head 3c4495a. It preceded the regenerated committed OpenAPI document; the later
+focused observation tests and Clippy did not run the stale path-count assertion.
+That head's tests/universe_state.rs:568 still expected 56 committed paths while
+the document contained 57. The operator reported the resulting full-suite failure.
+The earlier full-suite-pass claim is withdrawn as validation of that head.
+
+The authorized P1B-82 follow-up changes that one expectation from 56 to 57,
+matching the deliberate new route, and reruns the full suite using:
+
+```sh
+export CARGO_BUILD_JOBS=1
+source ../ubu-devshell/scripts/env.sh
+cargo test --locked --offline --no-fail-fast
+```
+
+Actual result: 657 passed, 0 failed, 0 ignored, 0 filtered out. All 81
+test-result groups passed, including
+the_document_names_the_route_and_its_five_schemas. The command exited 0.
+
+This is a full-suite rerun against the final committed OpenAPI input, not the
+previous focused check. No runtime code, OpenAPI document, dependency revision,
+lockfile or other test expectation changes. The orchestrator pin and published
+inventory row below advance only after the correction branch is published.
+Other reported suite results above are retained from the original P1B-82 run;
+they were not rerun for this one-line expectation correction. The existing
+single-job, lock and memory controls remain unchanged.
 
 One Cargo job per invocation, sequential across repositories, sourced env.sh,
 nonblocking flock, MemoryHigh=16G/MemoryMax=20G and build/compute exclusion
@@ -298,7 +323,7 @@ No core, schema, store, kernel, adapter, quick-ubu, brand or model-committee cha
 
 | Published upstream | Inventory pin |
 |---|---|
-| ubu-orchestrator | 3c4495a4617ba537229b4721defa943417d6b9b7 |
+| ubu-orchestrator | 9fddef16990ac89d07a168c75bf04b77c35b9bc3 |
 | ubu-ui | dda2312fd17a5dc330fef102f9def30ab88ac5bf |
 | ubu-design | 6d8a78aa3ba927ac402d27c0d96a627bf02de550 |
 
