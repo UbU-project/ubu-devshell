@@ -455,6 +455,15 @@ A ticket changing a named surface brings its check back under the ledger rule.
 | item 8 numeric transcription only | each advisory producer's separate result/selection counts | P1B-71 named producer readings; projection verified by P1B-73 §B; no new live confirmation | P1B-72 opening quotes Vocabulary and Precondition candidates_enqueued 3 and selection none; no new live-driver measurements | existing advisory scenarios/UI tests; P1B-73 §B field-by-field projection tests and driver separate producer snapshots, words/names/decisions remain operator-owned | P1B-73, explicit operator correction 2026-10-07 |
 | item 9 active human judgment; no retirement proposed | whether the chosen schedule and store suit the operator | P1B-71 whole run; judgment remains live each time | P1B-72 opening accepts P1B-71 as a whole; no schedule-judgment sentence quoted | operator's public judgment at every rehearsal; script cannot supply it | not retired |
 
+### Retired in P1B-84; proven by the operator's fault rehearsal of 2026-10-10 on the P1B-82 driver
+
+| retired | what it proved | proved in | on record | what covers it now | retired |
+|---|---|---|---|---|---|
+| P1B-80 §A: a failed rehearsal writes its rendered block before the fault line | a late failure keeps every completed step's counts, marks unobserved actions unavailable and leaves three unavailable judgments | the fault rehearsal of 2026-10-10 | this ticket's prompt quotes the fault line and names the retained sections; the block itself is the operator's local artifact | the injected test "P80 a late failure preserves completed capture, planning and approval before the fault" | P1B-84 |
+| P1B-80 §B: a fault carries the closed cause its response gave it | the vocabulary refusal carried HTTP 200, response status `timeout` and the diagnostic-code counts, and nothing else | the fault rehearsal of 2026-10-10 | the same | the injected test "P80 all response-backed sibling refusals retain HTTP and diagnostic counts; approval exceptions invent none" | P1B-84 |
+
+The same run was the first to show the declined-approval row `operator_did_not_approve_or_preview_stale` live, with no calendar write.
+
 ### From `scripts/acceptance.mjs`
 
 Step numbers are the ones the harness printed in P1B-54.
@@ -1524,3 +1533,30 @@ priors do not block an otherwise feasible Plan. Calibrated enforcement and
 unrelated planning failures remain legitimate. The form's rendered copy belongs
 to the existing pre-release visual pass, whose single step is updated above.
 The route does not recalculate the current Plan on its own.
+
+### P1B-84 — closure by decision, deferred switch and Phase 2 in development
+
+`UBU-D0305` closes Phase 1b by decision on 2026-10-10 and opens Phase 2 in
+development; the switch follows Phase 2's completion. Quick UbU remains primary
+until that deferred switch. The live rehearsal remains the operator instrument
+on its own throwaway store, exercising mainline against non-primary test data.
+No instrument changed; LIVE_REHEARSAL.md and the driver reference are unchanged.
+Acceptance of this documentation ticket is the operator's review of the changed
+sentences and appended decision, not another rehearsal.
+
+The operator's fault rehearsal of 2026-10-10 on the P1B-82 driver retires P1B-80
+§A and §B under rule 6, as recorded in the ledger. The ticket records completed
+capture, ranking, observation, Plan, the three reports, preview, declined
+approval, UniverseState read, subject/authoring/requirement writes and registry.
+The retained block observed Vocabulary with status `timeout`, marked the
+precondition run and queue unavailable because their actions were not observed,
+and left all three judgments unavailable. The closed fault line supplied by
+P1B-84 is the whole record; the block remains the operator's local artifact:
+
+```text
+advisory_run_failed: action: vocabulary; HTTP 200; response status: timeout; diagnostics[].code: {"advisory_task_skipped":4,"advisory_timeout":1}. Remedy: Correct private advisory endpoint/model/budget settings using the diagnostic on screen; do not rerun for preferred candidates.
+```
+
+No model/runtime cause beyond that response is inferred. The governing quotes,
+sentence review, decision, ledger entries, unchanged baselines and both kinds
+of pin are recorded in [P1B-84_PINS.md](P1B-84_PINS.md).
