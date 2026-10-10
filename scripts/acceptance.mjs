@@ -404,6 +404,17 @@ const SEEDS = {
   },
   // ---- P1B-56: two scenarios at the HTTP layer, on this staged store. One Plan is generated
   // here, last, so that every other seed is in it. The operator generates another in the step.
+  week_observation: {
+    what: "an invented live affect observation, energy 7, stress 3 and mood intensity 3, read back exactly",
+    async make() {
+      return call("POST",endpoints.AFFECT_OBSERVATION_PATH,{schema_version:endpoints.AFFECT_OBSERVATION_SCHEMA_VERSION,energy:7,stress:3,mood_intensity:3},201);
+    },
+    async check(written) {
+      const observation=(await call("GET",endpoints.AFFECT_OBSERVATION_PATH)).observation;
+      if(observation?.snapshot_id!==written.snapshot_id||observation.observed_at!==written.observed_at||observation.source_kind!=="live_observation"||JSON.stringify(observation.dimensions)!==JSON.stringify({energy:7,stress:3,mood_intensity:3}))throw new StagingFailure("the staged affect reading did not read back exactly");
+      return "a live observation of energy 7, stress 3 and mood intensity 3 reads back with its Snapshot id and timestamp";
+    }
+  },
   week_risk: {
     what: "a Plan of the staged week, generated over HTTP: its risk report names no affect finding and is not high, and its coverage figure is about the next hour",
     async make() {
@@ -416,14 +427,12 @@ const SEEDS = {
       const findings = planned.risk_report?.findings ?? [];
       const named = findings.map((finding) => finding.category);
 
-      // Scenario one. The staged week has no Snapshot, so its affect observation is a stand-in.
-      // None of the findings that read the stand-in's margin may be raised, and the Plan-quality
-      // report says nothing was projected.
+      // Scenario one. week_observation made a comfortable live reading.
       const affect = named.filter((category) => ["affect_margin", "post_plan_depletion", "destructive_pressure"].includes(category));
-      if (affect.length > 0) throw new StagingFailure(`the risk report of a week with no Snapshot names an affect finding: ${JSON.stringify(affect)}`);
+      if (affect.length > 0) throw new StagingFailure(`the comfortable reading raises an affect finding: ${JSON.stringify(affect)}`);
       const quality = planned.human_complete_plan_quality;
-      if (quality?.post_plan_state_delta !== "neutral" || !quality.revision_suggestions[0]?.startsWith("Record how you are feeling:")) {
-        throw new StagingFailure(`the Plan-quality report presents the stand-in as a measurement: ${JSON.stringify(quality)}`);
+      if (!["better","neutral","depleted","at_risk"].includes(quality?.post_plan_state_delta) || quality.revision_suggestions[0]?.startsWith("Record how you are feeling:") || planned.legitimization?.stale_affect_warning?.includes("bootstrap default profile observation")) {
+        throw new StagingFailure(`the Plan-quality report failed to present the live reading: ${JSON.stringify(quality)}`);
       }
 
       // Scenario two. The coverage figure is absent, or it is about the reactive horizon: every
@@ -450,7 +459,7 @@ const SEEDS = {
       const covered = coverage
         ? `coverage ${Math.round(coverage.estimate * 100)}% over the next ${REACTIVE_HORIZON_SECONDS / 60} minutes, with ${coverage.boundaries.length} commitment(s) in them`
         : "no coverage figure";
-      return `risk ${planned.risk_report.level}; findings: ${[...new Set(named)].join(", ")}; no affect finding; post-plan state ${quality.post_plan_state_delta}; ${covered}`;
+      return `risk ${planned.risk_report.level}; findings: ${[...new Set(named)].join(", ")}; no affect finding; affect margin ${quality.affect_margin}; stretch ${quality.stretch_pressure}; post-plan state ${quality.post_plan_state_delta}; ${covered}`;
     }
   },
   week_matches: {
@@ -523,23 +532,23 @@ const T = {
 // changes something that could affect it. P1B-55 retired seven of nine. P1B-56 retires the three
 // P1B-55 left, which passed with that ticket and which P1B-56 does not touch; each has a line in the
 // ledger in docs/ACCEPTANCE.md. What is left is what P1B-56 changed on the screen: the risk report,
-// and the Plan-quality rows of a Plan made with no Snapshot.
+// and the Plan-quality rows, now made with a live observation (P1B-82).
 // P1B-57, P1B-58 and P1B-59 add no step and retire none. Each adds one seed that is an HTTP scenario,
 // `week_leftover`, `week_universe` and `week_measured`, and the step names all three so that they are
 // checked before it is printed.
 const STEPS = [
   {
-    needs: ["week_colours", "week_calendar", "week_leftover", "week_routine", "week_night", "week_backlog", "week_universe", "week_measured", "week_risk", "week_matches", "week_precondition"],
+    needs: ["week_colours", "week_calendar", "week_leftover", "week_routine", "week_night", "week_backlog", "week_universe", "week_measured", "week_observation", "week_risk", "week_matches", "week_precondition"],
     name: "The risk report says what it means",
     open: "Today, in the navigation.",
     click: "The button “Generate Plan”.",
-    read: `The panel headed “Plan risk” has a badge beside its heading. It reads “medium risk”. Under it each finding has a name in bold. One is named “unplaced work”, for “${T.fence}”. None is named “affect margin” or “post plan depletion”, and none is named “low coverage” unless a staged commitment starts within the next 60 minutes. Under the heading “Plan-quality signals”, the rows “Affect margin”, “Stretch pressure” and “Post-Plan state delta” each read “not recorded”, and one line under the rows begins “No Snapshot of how you are feeling has been taken”. Under “Model repair suggestions” the first line begins “Record how you are feeling:”. What was checked over HTTP before this was printed: {week_risk}. Additional staging: {week_matches}. Advisor input staging: {week_precondition}.`,
+    read: `The panel headed “Plan risk” has a badge beside its heading. It reads “medium risk”. Under it each finding has a name in bold. One is named “unplaced work”, for “${T.fence}”. None is named “affect margin” or “post plan depletion”, and none is named “low coverage” unless a staged commitment starts within the next 60 minutes. Under the heading “Plan-quality signals”, the rows “Affect margin”, “Stretch pressure” and “Post-Plan state delta” each read a figure or a word from the live observation, and no line begins “Record how you are feeling:”. Observation staging: {week_observation}. What was checked over HTTP before this was printed: {week_risk}. Additional staging: {week_matches}. Advisor input staging: {week_precondition}.`,
     copy: "The words on the badge beside “Plan risk”. The bold name of every finding under it. And the three rows “Affect margin”, “Stretch pressure” and “Post-Plan state delta”, each with what it reads.",
     codes: [
       "“medium risk”, with “unplaced work” and no affect finding: expected",
       "“high risk”, with a finding named “low coverage” whose sentence names a commitment and “the next 60 minutes”: a staged commitment starts within the hour and uncertain work is placed in front of it. That is the report doing its job. Copy the whole finding back",
       "“high risk” for any other reason, or a finding named “affect margin” or “post plan depletion”: NOT EXPECTED. Copy the whole panel back",
-      "a row that reads “0.000”, “depleted” or “sustainable stretch” where “not recorded” is expected: the panel is showing the stand-in as a measurement. Copy the three rows back"
+      "a row that reads “not recorded” after week_observation passed: NOT EXPECTED. The panel failed to show the staged measurement. Copy the three rows back"
     ]
   }
 ];

@@ -122,7 +122,7 @@ export async function runActions({ endpoints:e, inputs={}, call, approve=async()
       result={status:null,data:null,error:error instanceof TransportError?error.code:'connection_or_response_failure'};
     }
     if (result.status !== expected && !result.error) result.error='unexpected_status';
-    const record={ label,method,route:path,result,...(['vocabulary','precondition'].includes(label)?{requestLimit:body.limit}:{}),...(label==='registry'?{subjects:inputs.subjects}:{}),...(label==='ranking_statement'?{statement:{task_a:body.task_a,task_b:body.task_b}}:{}),...(label==='plan'?{rankingSupplied:!!inputs.ranking}:{}) }; results.push(record);observe(record);
+    const record={ label,method,route:path,result,...(['vocabulary','precondition'].includes(label)?{requestLimit:body.limit}:{}),...(label==='registry'?{subjects:inputs.subjects}:{}),...(label==='ranking_statement'?{statement:{task_a:body.task_a,task_b:body.task_b}}:{}),...(label==='plan'?{rankingSupplied:!!inputs.ranking}:{}),...(label==='observation'?{observation:{energy:body.energy,stress:body.stress,mood_intensity:body.mood_intensity}}:{}) }; results.push(record);observe(record);
     if(result.error)throw new RehearsalFault('action_request_failed',{action:label,...responseCause(result),check:result.error});
     if(label==='session'&&result.data?.enabled!==true)throw new RehearsalFault('calendar_session_unavailable',{action:label,...responseCause(result)});
     if(['vocabulary','precondition'].includes(label)&&result.data?.status!=='ok')throw new RehearsalFault('advisory_run_failed',{action:label,...responseCause(result)});
@@ -149,6 +149,10 @@ export async function runActions({ endpoints:e, inputs={}, call, approve=async()
       observe({...ranking,complete:true}); // Titles are printed privately only after admission.
     }
   } else observe({label:'ranking',skip:'private_input_missing'});
+  if(inputs.observation) {
+    const {energy,stress,mood_intensity}=inputs.observation;
+    await action('observation','POST',e.AFFECT_OBSERVATION_PATH,{schema_version:e.AFFECT_OBSERVATION_SCHEMA_VERSION,energy,stress,mood_intensity},201);
+  } else observe({label:'observation',skip:'private_input_missing'});
   await action('plan','POST',e.PLANNING_GENERATE_PATH,{schema_version:e.PLANNING_SCHEMA_VERSION,request:null});
   await action('risk_read','GET',REPORT_ROUTES.risk);
   await action('human_complete','GET',REPORT_ROUTES.humanComplete);

@@ -95,7 +95,7 @@ function priorityFigures(data) {
   return {bucket_count:counts.size===1?rows[0].bucket_count:'unavailable',ranked,unranked:rows.length-ranked};
 }
 const sources={capture:['POST','CALENDAR_CAPTURE_PATH'],plan:['POST','PLANNING_GENERATE_PATH'],preview:['GET','CALENDAR_PREVIEW_PATH'],approval:['POST','CALENDAR_APPROVE_PATH'],universe_before:['GET','UNIVERSE_STATE_PATH'],authoring:['PATCH','UNIVERSE_STATE_PATH'],requirement:['PATCH','TASK_PATH'],requirement_readback:['GET','TASK_PATH'],vocabulary:['POST','ADVISORY_RUN_PATH'],precondition:['POST','ADVISORY_RUN_PATH'],risk:['POST','PLANNING_GENERATE_PATH'],risk_read:['GET',REPORT_ROUTES.risk],human_complete:['GET',REPORT_ROUTES.humanComplete],time_by_category:['GET','TIME_BY_CATEGORY_PATH'],queue:['GET','ADVISORY_QUEUE_PATH'],routine:['POST','OBJECTIVE_CREATE_PATH'],session:['POST','GOOGLE_CALENDAR_SESSION_PATH'],subject:['PUT','SETTING_PUT_PATH'],registry:['GET','SETTINGS_LIST_PATH'],colour_setting:['PUT','SETTING_PUT_PATH'],advisory_setting:['PUT','SETTING_PUT_PATH'],planning_setting:['PUT','SETTING_PUT_PATH'],subject_setting:['PUT','SETTING_PUT_PATH']};
-Object.assign(sources,{ranking_lookup:['GET','TASK_LIST_PATH'],ranking_statement:['POST','PREFERENCE_CREATE_PATH'],ranking:['POST','PREFERENCE_CREATE_PATH']});
+Object.assign(sources,{ranking_lookup:['GET','TASK_LIST_PATH'],ranking_statement:['POST','PREFERENCE_CREATE_PATH'],ranking:['POST','PREFERENCE_CREATE_PATH'],observation:['POST','AFFECT_OBSERVATION_PATH']});
 const settingFamilies={colour_setting:'calendar.color',advisory_setting:'advisory',planning_setting:'planning',subject_setting:'universe.subject'};
 const safeSkips=new Set(['private_input_missing','no_eligible_tasks','unsupported_private_setting','invalid_private_input','existing_tree_preserved','task_unavailable','task_selector_missing_or_ambiguous','operator_did_not_approve_or_preview_stale','preview_unavailable']);
 export class PublicReport {
@@ -131,6 +131,7 @@ export class PublicReport {
     if(d&&typeof d==='object') {
       if(label==='ranking_lookup')lines.push(`${method} ${route} ranking_lookup tasks: ${length(d.tasks)}; eligible (placement=planned, not occurrence): ${length(rankingTasks(d))} (client-computed cardinalities; ids/titles withheld)`);
       if(!['capture','plan','vocabulary','precondition'].includes(label)&&Array.isArray(d.diagnostics))lines.push(`${method} ${route} diagnostics[].code: ${JSON.stringify(diagnostics(d.diagnostics))} (client-computed histogram; messages withheld)`);
+      if(label==='observation')lines.push(`${method} ${route} observation: dimensions ${count(d.dimension_count)}; source_kind: ${choice(d.source_kind,['live_observation','bootstrap_default_profile'])} (closed value; values and observed_at withheld)`);
       if(label==='capture') {
         for(const key of ['captured','updated','unchanged','skipped','moved','resized'])lines.push(`${method} ${route} ${key}: ${count(d[key])}`);
         lines.push(`${method} ${route} diagnostics[].code: ${JSON.stringify(diagnostics(d.diagnostics))} (client-computed histogram; messages withheld)`);
@@ -198,7 +199,7 @@ export class PublicReport {
     }
     const section=(n,labels)=>[`${n}.`,...labels.flatMap(label=>this.rows.get(label)??[`${sources[label][0]} ${sources[label][1].startsWith('/')?sources[label][1]:this.e[sources[label][1]]}: unavailable; action not observed`])];
     return ['BEGIN LIVE REHEARSAL COPY-BACK',
-      ...section(1,['capture']),...section(2,['ranking_lookup','ranking','plan']),
+      ...section(1,['capture']),...section(2,['ranking_lookup','ranking','observation','plan']),
       ...section(3,['risk','risk_read','human_complete','time_by_category']),...section(4,['preview']),...section(5,['approval']),...section(6,['universe_before']),...section(7,['subject','authoring','requirement','requirement_readback','registry']),...section(8,['vocabulary','precondition','queue']),...this.decisions,
       '9. Operator judgments (deliberate public sentences; never API data):',...Array.from({length:3},(_,i)=>`answer ${i+1}: ${typeof answers[i]==='string'?JSON.stringify(answers[i]):'unavailable'}`),
       'Additional action outcomes:',...['routine','session',...Object.keys(settingFamilies)].flatMap(label=>this.rows.get(label)??[]),

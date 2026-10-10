@@ -22,7 +22,8 @@ export const INPUT_RULES = Object.freeze([
   'colour_category_nonblank','colour_id_1_to_11','boolean_required',
   'timeout_ms_5000_to_3600000','review_days_1_to_365','text_nonblank','loopback_origin',
   'review_seed_le_ceiling','subject_unique','one_subject_required','subject_mutation_write_required',
-  'ranking_object_required','ranking_seed_u32','ranking_layers_1_to_64'
+  'ranking_object_required','ranking_seed_u32','ranking_layers_1_to_64',
+  'observation_object_required','observation_value_0_to_10'
 ]);
 function settingFault(name,value) {
   const fault=(field,rule)=>({field,rule});
@@ -50,6 +51,11 @@ export function validSetting(name,value) {return settingFault(name,value)===null
 // null is success; a refusal is a safe structural field plus a closed rule.
 export function validAuthoringInputs(inputs) {
   if(!inputs||typeof inputs!=='object'||Array.isArray(inputs))return {field:'inputs',rule:'object_required'};
+  if(Object.hasOwn(inputs,'observation')) {
+    const observation=inputs.observation,dimensions=['energy','stress','mood_intensity'];
+    if(!observation||typeof observation!=='object'||Array.isArray(observation)||Object.keys(observation).some(key=>!dimensions.includes(key)))return {field:'observation',rule:'observation_object_required'};
+    for(const name of dimensions)if(typeof observation[name]!=='number'||!Number.isFinite(observation[name])||observation[name]<0||observation[name]>10)return {field:`observation.${name}`,rule:'observation_value_0_to_10'};
+  }
   if(Object.hasOwn(inputs,'ranking')) {
     const ranking=inputs.ranking;
     if(!ranking||typeof ranking!=='object'||Array.isArray(ranking)||Object.keys(ranking).some(key=>!['seed','layers'].includes(key)))return {field:'ranking',rule:'ranking_object_required'};

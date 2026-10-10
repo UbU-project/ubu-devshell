@@ -337,17 +337,26 @@ measured number beside the asserted fact, so the staged screen shows both
 words. The live rehearsal's step 13 gained one sentence and its copy-back is
 unchanged: names and counts, never a value.
 
+P1B-82 adds no step here and retires none. It changes what the existing step
+reads: week_observation records energy 7, stress 3 and mood intensity 3 and
+reads them back exactly before week_risk generates the staged Plan. The three
+affect rows now read figures or words, and no line begins “Record how you are
+feeling:”. A row reading “not recorded” after that seed passed is NOT EXPECTED.
+Scenario 38 independently proves the route, live figures, low-energy warn_only
+Plan and both new semantic refusals over HTTP.
+
 One step. The sixth rule retired the three that P1B-55 printed: they passed
 with that ticket, and P1B-56 changes nothing they cover. They are in the
 ledger below. The step that is left is what P1B-56 changed on the screen.
 
 | # | step | kept or new | staged by |
 |---|---|---|---|
-| 1 | The risk report says what it means: Today, “Generate Plan” | kept: P1B-57, P1B-58 and P1B-59 retire nothing | `week_colours`, `week_calendar`, `week_leftover`, `week_routine`, `week_night`, `week_backlog`, `week_universe`, `week_measured`, `week_risk` |
+| 1 | The risk report says what it means: Today, “Generate Plan” | kept: P1B-82 updates the measured affect rows; no retirement | `week_colours`, `week_calendar`, `week_leftover`, `week_routine`, `week_night`, `week_backlog`, `week_universe`, `week_measured`, `week_observation`, `week_risk` |
 
 It reads the badge beside “Plan risk”, the bold names of the findings under
-it, and the three affect rows of “Plan-quality signals”, which on a store
-with no Snapshot read “not recorded”. Its `codes` name the one case in which
+it, and the three affect rows of “Plan-quality signals”, which after
+week_observation read figures or words from a live reading. Its `codes` name
+the one case in which
 “high risk” is a correct reading: a staged commitment starts within the next
 60 minutes with uncertain work placed in front of it. The harness stages in
 the computer's own timezone at whatever time it is run, so that case can
@@ -359,7 +368,8 @@ seed `week_risk`, which holds the two scenarios P1B-56 added:
 - **the risk report of the staged week names no affect finding and is not
   high.** A Plan is generated. No finding has the category `affect_margin`,
   `post_plan_depletion` or `destructive_pressure`; the Plan-quality report's
-  state is `neutral` and its first suggestion is the stand-in sentence; and
+  state is a member of its enum and its first suggestion is not the stand-in
+  sentence; and
   no finding is High except `low_coverage` with a commitment in scope;
 - **the coverage figure is absent or in scope.** If the selected candidate
   carries `coverage`, every `boundaries[].start_at` is inside the next hour,
@@ -367,9 +377,9 @@ seed `week_risk`, which holds the two scenarios P1B-56 added:
   to. The second clause is the defect as it showed: 65% with nothing in the
   hour to explain it.
 
-These two are the one place this harness asserts behaviour. They are here
-because the operator's own run is what exercises them, and the same
-assertions are in the runner's scenario 19.
+These two check the staged Plan whose figures the visual step reads. The
+coverage and stand-in assertions remain in scenario 19, while the live
+observation assertions are in scenario 38.
 
 ## The ledger of retired verifications
 
@@ -492,7 +502,8 @@ what the operator looks at. Every title in it is invented and says so.
 | `week_leftover` | nothing more: the staged calendar holds one event UbU wrote in an earlier run, carrying its stamp, and `week_calendar` ran the capture | the capture named it once as `capture_stale_export`, by id; no Task was made of it; the Tasks from the calendar are one fewer than its events |
 | `week_universe` | one invented fact, `facts.invented.kettle_descaled`, set through `PATCH /universe-state` on a store that had no UniverseState | before the edit the read answered the empty state with a null version; the edit answered with the one fact at version 2; a later read is exactly what the edit answered with; a malformed mutation sent behind a good one is refused as `universe_mutation_invalid`; and after the refusal the state is unchanged |
 | `week_measured` | a number set to 0.7 and then to 0.1 through `set_numeric`, cleared through `clear_numeric`; one Task, “Invented: water the imaginary bench”, with the precondition `numeric_values.invented.tank_level` `at_least` 25; that number set to 24 and then to 40, as `measured`; and a Plan generated at each stage | the number set to 0.1 is exactly 0.1 in the edit's answer and in a later read, which the difference P1B-58's screen sent was not; the cleared key and its provenance are gone; the Task is in `blocked_tasks` and in no step with no number recorded and at 24, and is in a step of the Plan made at 40; the level's provenance is `measured` and the fact's `asserted`; and no provenance entry is left for a value that is gone |
-| `week_risk` | one Plan of the staged week, generated over HTTP | no affect finding; the Plan-quality state is `neutral` and its first suggestion is the stand-in sentence; every coverage boundary is inside the next hour, and no uncovered mass is reported without one; nothing is High except `low_coverage` with a commitment in scope; `unplaced_work` is named |
+| `week_observation` | an invented check-in of energy 7, stress 3 and mood intensity 3 | GET reads back the exact values with live_observation, matching Snapshot id and server timestamp |
+| `week_risk` | one Plan of the staged week, generated over HTTP | no affect finding; the Plan-quality state is an enum value, affect rows carry live figures and its first suggestion is not the stand-in sentence; every coverage boundary is inside the next hour, and no uncovered mass is reported without one; nothing is High except `low_coverage` with a commitment in scope; `unplaced_work` is named |
 | `week_matches` | the Plan generated by `week_risk`, applied to the throwaway mock calendar so a captured Dynamic event sits at its Plan window | that captured event's window equals the staged placement, and the Task remains Dynamic; preview behaviour and wording are asserted by the runner |
 
 The week's calendar is a file the mock Calendar observes, written before the
@@ -1492,3 +1503,24 @@ Operator acceptance names only [LIVE_REHEARSAL.md](LIVE_REHEARSAL.md): one
 pre-flight plus one rehearsal with ranking supplied, not performed by the agent.
 What is under test is whether the seeded stand-in produces a value-ordered week
 and the public block identifies it as a stand-in.
+
+### P1B-82 the rehearsal records a user-declared affect reading
+
+“A manual instrument has one line of execution.” Observation is another optional
+private input applied automatically on that line, after ranking and before Plan.
+For this ticket's acceptance, supply observation with exactly energy, stress and
+mood_intensity, finite numbers 0–10. Rules observation_object_required and
+observation_value_0_to_10 name only structural fields; faults expose no value.
+The screen labels the readings once; the public block retains HTTP status,
+server dimension count and closed source kind, with readings/timestamp/id withheld.
+The Plan line's affect_figures reads not_marked_as_stand_in when the live reading
+supplies the reports. P1B-81 ranking remains synthetic_stand_in.
+
+Operator acceptance is solely [LIVE_REHEARSAL.md](LIVE_REHEARSAL.md): one existing
+pre-flight and one rehearsal with observation supplied under greedy. No new
+manual step, paste, retry or comparison branch is added. What is under test is
+whether the operator's reading is reported as a measurement and uncalibrated
+priors do not block an otherwise feasible Plan. Calibrated enforcement and
+unrelated planning failures remain legitimate. The form's rendered copy belongs
+to the existing pre-release visual pass, whose single step is updated above.
+The route does not recalculate the current Plan on its own.

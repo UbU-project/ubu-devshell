@@ -47,6 +47,8 @@
   "advisory_unconfigured",
   "advisory_unknown_producer",
   "advisory_value_unsupported",
+  "affect_dimension_missing",
+  "affect_value_out_of_range",
   "all_candidates_blocked_on_preconditions",
   "all_candidates_blocked_on_unmet_dependencies",
   "bootstrap_already_seeded",

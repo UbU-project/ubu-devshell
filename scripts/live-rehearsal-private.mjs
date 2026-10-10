@@ -39,6 +39,10 @@ export class PrivateRenderer {
       if(record.tasks.length===1)this.say('One eligible Task supplies no pairwise statement and remains unranked.');
       return;
     }
+    if(record.label==='observation'&&record.result?.status===201&&!record.result.error&&record.observation) {
+      this.say(PRIVATE_BANNER);
+      this.say(`Recorded how you are feeling — Energy: ${plain(record.observation.energy)}; Stress: ${plain(record.observation.stress)}; Mood intensity: ${plain(record.observation.mood_intensity)}`);
+    }
     const data=record.result?.data;if(!data||typeof data!=='object')return;
     this.say(PRIVATE_BANNER);
     for(const field of ['error','message'])if(data[field]!=null){this.remember(typeof data[field]==='string'?data[field]:undefined);this.say(`${field}: ${plain(data[field])}`);}

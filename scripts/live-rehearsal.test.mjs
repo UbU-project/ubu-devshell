@@ -7,7 +7,7 @@ import { requestJson, loopbackUrl } from './loopback-json.mjs';
 import { mulberry32, shuffle, rankingStatements } from './synthetic-ranking.mjs';
 const secret=()=>randomUUID();
 const owned='http://127.0.0.1:54321',ports=new Set([54321]);
-function flow({failure,tree=false,approve=false,ranking,failPreferenceAt,mutate=()=>{}}={}) {
+function flow({failure,tree=false,approve=false,ranking,observation,failPreferenceAt,mutate=()=>{}}={}) {
   const id=secret(),name=secret(),target=secret(),records=[],calls=[];
   const inputs={routine:{title:name},subjects:['invented_'+secret().replaceAll('-','')],mutations:[{operation:'set_fact',target,payload:true}],task:{id},precondition:{target,predicate:'equals',expected:true}};
   const responses={
@@ -24,6 +24,8 @@ function flow({failure,tree=false,approve=false,ranking,failPreferenceAt,mutate=
     registry:{settings:[{name:'universe.subject.'+inputs.subjects[0],value:true,version:1,subject_metadata:{minted_at:'2026-10-06T08:00:00Z',references:{universe_state_keys:2,fact_provenance_keys:3,task_precondition_targets:4}}}]}
   };
   if(ranking!==undefined)inputs.ranking=ranking;
+  if(observation!==undefined)inputs.observation=observation;
+  responses.observation={source_kind:"live_observation",dimension_count:3,observed_at:"2026-06-10T09:00:00Z",snapshot_id:secret()};
   responses.plan.task_priorities=responses.task_list.tasks.map(task=>({task_id:task.task_id,bucket_count:0,value:0.1}));
   responses.preference_fault={diagnostics:[{code:'preference_unknown_task',message:name+' '+id}]};
   mutate(responses);
@@ -32,7 +34,7 @@ function flow({failure,tree=false,approve=false,ranking,failPreferenceAt,mutate=
     calls.push({method,path,body});
     if(path===failure)throw new Error(secret());
     let data={};
-    const label=Object.entries({capture:e.CALENDAR_CAPTURE_PATH,plan:e.PLANNING_GENERATE_PATH,preview:e.CALENDAR_PREVIEW_PATH,approval:e.CALENDAR_APPROVE_PATH,queue:e.ADVISORY_QUEUE_PATH,session:e.GOOGLE_CALENDAR_SESSION_PATH}).find(([,route])=>route===path)?.[0];
+    const label=Object.entries({capture:e.CALENDAR_CAPTURE_PATH,plan:e.PLANNING_GENERATE_PATH,preview:e.CALENDAR_PREVIEW_PATH,approval:e.CALENDAR_APPROVE_PATH,queue:e.ADVISORY_QUEUE_PATH,session:e.GOOGLE_CALENDAR_SESSION_PATH,observation:e.AFFECT_OBSERVATION_PATH}).find(([,route])=>route===path)?.[0];
     if(label)data=responses[label];
     if(path===e.UNIVERSE_STATE_PATH&&method==='GET')data=responses.universe_before;
     if(path===e.SETTINGS_LIST_PATH)data=responses.registry;
@@ -43,7 +45,7 @@ function flow({failure,tree=false,approve=false,ranking,failPreferenceAt,mutate=
       if(method==='PATCH')saved=true;
       data={version:7,payload:{preconditions:tree?{all_of:[inputs.precondition]}:saved?inputs.precondition:undefined}};
     }
-    return {status:[e.OBJECTIVE_CREATE_PATH,e.PREFERENCE_CREATE_PATH].includes(path)?201:200,data};
+    return {status:[e.OBJECTIVE_CREATE_PATH,e.PREFERENCE_CREATE_PATH,e.AFFECT_OBSERVATION_PATH].includes(path)?201:200,data};
   };
   return {inputs,calls,records,responses,run:()=>runActions({endpoints:e,inputs,call,approve:async()=>approve,observe:r=>records.push(r)})};
 }
@@ -63,8 +65,8 @@ test('JSON transport preserves status; sanitizes malformed, connection and overs
   }
 });
 test('actions follow document order with separate explicit approval and versioned leaf PATCH',async()=>{
-  const f=flow({approve:true,ranking:{seed:7,layers:2}});await f.run();
-  assert.deepEqual(f.records.filter(r=>r.label!=='ranking').map(r=>r.label),['routine','session','capture','ranking_lookup','ranking_statement','plan','risk_read','human_complete','time_by_category','preview','approval','universe_before','subject','authoring','task_lookup','task_read','requirement','requirement_readback','registry','vocabulary','precondition','queue']);
+  const f=flow({approve:true,ranking:{seed:7,layers:2},observation:{energy:7,stress:3,mood_intensity:3}});await f.run();
+  assert.deepEqual(f.records.filter(r=>r.label!=='ranking').map(r=>r.label),['routine','session','capture','ranking_lookup','ranking_statement','observation','plan','risk_read','human_complete','time_by_category','preview','approval','universe_before','subject','authoring','task_lookup','task_read','requirement','requirement_readback','registry','vocabulary','precondition','queue']);
   const patch=f.calls.find(c=>c.method==='PATCH'&&c.path.startsWith('/task/'));
   assert.deepEqual(patch.body,{schema_version:e.TASK_CAPTURE_SCHEMA_VERSION,expected_version:7,preconditions:f.inputs.precondition});
   assert.equal(Object.keys(patch.body).length,3);
@@ -364,7 +366,7 @@ test('public artifact filesystem smoke overwrites only its file, uses 0600 and l
   }finally{await fs.rm(cwd,{recursive:true,force:true});}
 });
 
-const {validSetting,validSubject,validAuthoringInputs,routineBody,ADVISORY_LIMIT}=await import('./live-rehearsal-contract.mjs');
+const {validSetting,validSubject,validAuthoringInputs,routineBody,ADVISORY_LIMIT,INPUT_RULES}=await import('./live-rehearsal-contract.mjs');
 const {checkSourceAgreement,assertSettingsAgreement,emittedCodes,assertCodesAgreement}=await import('./check-live-rehearsal-contract.mjs');
 const {readFile}=await import('node:fs/promises');
 test('A and C current source agrees with the settings gate, validation fingerprints and closed code file',async()=>{
@@ -717,7 +719,7 @@ test('P80 report routes remain existing paths and the stand-in marker agrees exa
   const {REPORT_ROUTES,BOOTSTRAP_AFFECT_MARKER}=await import('./live-rehearsal-report.mjs');
   const spec=JSON.parse(await readFile(new URL('../../ubu-orchestrator/openapi/openapi.generated.json',import.meta.url),'utf8'));
   for(const route of [...Object.values(REPORT_ROUTES),e.TIME_BY_CATEGORY_PATH])assert(spec.paths[route]?.get);
-  assert.equal(Object.keys(spec.paths).length,56);
+  assert.equal(Object.keys(spec.paths).length,57);
   const source=await readFile(new URL('../../ubu-orchestrator/src/reports/planning_analysis.rs',import.meta.url),'utf8');
   const block=/const RECORD_AFFECT_SUGGESTION: &str = concat!\(([\s\S]*?)\);/.exec(source)[1];
   assert.equal([...block.matchAll(/"(?:\\.|[^"\\])*"/g)].map(m=>JSON.parse(m[0])).join(''),BOOTSTRAP_AFFECT_MARKER);
@@ -852,4 +854,59 @@ test('P81 changing one observed ranking field changes only the public lines it f
     [rows=>{const row=rows.find(r=>r.label==='plan').result.data.task_priorities[0];row.bucket_count=1;row.bucket=0;},'POST /planning/generate task_priorities:']
   ];
   for(const [mutate,prefix] of cases){const rows=structuredClone(f.records);mutate(rows);const after=render(rows);assert.equal(after.length,before.length);const changed=after.filter((line,i)=>line!==before[i]);assert.equal(changed.length,1);assert(changed[0].startsWith(prefix));}
+});
+
+test('P82 observation has exactly two safe rules and stops before effects with a structural field',async()=>{
+  const valid={energy:7,stress:3,mood_intensity:3},canary=secret();
+  const cases=[...[null,[],true,canary,{...valid,[canary]:canary}].map(observation=>[observation,'observation','observation_object_required'])];
+  for(const name of Object.keys(valid))for(const value of [undefined,-1,11,'7',NaN,Infinity])cases.push([{...valid,[name]:value},`observation.${name}`,'observation_value_0_to_10']);
+  for(const [observation,field,rule] of cases){
+    assert.deepEqual(validAuthoringInputs({observation}),{field,rule});
+    let called=false;await assert.rejects(runActions({endpoints:e,inputs:{observation},call:async()=>{called=true;}}),error=>{
+      const line=failureLine(error);assert(line.includes('field: '+field));assert(line.includes('rule: '+rule));assert(!line.includes(canary));assert(!line.includes(JSON.stringify(observation)));return error.code==='invalid_private_inputs';
+    });assert.equal(called,false);
+  }
+  for(const value of [0,10,7.25])assert.equal(validAuthoringInputs({observation:{energy:value,stress:value,mood_intensity:value}}),null);
+  assert.deepEqual(INPUT_RULES.filter(rule=>rule.startsWith('observation_')),['observation_object_required','observation_value_0_to_10']);
+});
+test('P82 pre-flight refuses an invalid observation without calling any live effect',async()=>{
+  const env=readyEnv(),inputs=JSON.parse(env.UBU_REHEARSAL_INPUTS);inputs.observation={energy:7,stress:11,mood_intensity:3};env.UBU_REHEARSAL_INPUTS=JSON.stringify(inputs);
+  const effects=[];await assert.rejects(checkInputs({env,endpoints:e,fs:fakeFiles(),queryModels:async()=>effects.push('call'),probeWorker:async()=>effects.push('probe')}),error=>error.code==='invalid_private_inputs'&&failureLine(error).includes('field: observation.stress'));
+  assert.deepEqual(effects,[]);
+});
+test('P82 recording uses the exact body between ranking and planning and prints the three values privately once',async()=>{
+  const observation={energy:7.123456789,stress:3.234567891,mood_intensity:3.345678912},f=flow({ranking:{seed:7,layers:2},observation});await f.run();
+  const index=f.calls.findIndex(call=>call.path===e.AFFECT_OBSERVATION_PATH);
+  assert.equal(f.calls[index-1].path,e.PREFERENCE_CREATE_PATH);assert.equal(f.calls[index+1].path,e.PLANNING_GENERATE_PATH);
+  assert.deepEqual(f.calls[index],{method:'POST',path:e.AFFECT_OBSERVATION_PATH,body:{schema_version:e.AFFECT_OBSERVATION_SCHEMA_VERSION,...observation}});
+  const screen=[],view=new PrivateRenderer({print:line=>screen.push(line)}),report=new PublicReport(e);f.records.forEach(record=>{view.observe(record);report.observe(record);});
+  const output=report.render(),lines=output.split('\n');
+  assert(lines.includes('POST /affect/observation HTTP: 201; outcome: response_observed'));
+  assert(lines.includes('POST /affect/observation observation: dimensions 3; source_kind: live_observation (closed value; values and observed_at withheld)'));
+  assert(lines.indexOf(lines.find(line=>line.startsWith('POST /preference ranking:')))<lines.indexOf('POST /affect/observation HTTP: 201; outcome: response_observed'));
+  for(const value of Object.values(observation)){const text=String(value);assert.equal(screen.filter(line=>line.includes(text)).length,1);assert(!output.includes(text));assert(!view.knownContent.has(text));}
+  assert(!output.includes(f.responses.observation.observed_at));assert(!output.includes(f.responses.observation.snapshot_id));
+});
+test('P82 observation public projection depends only on status, server count and the closed server source',()=>{
+  const record={label:'observation',observation:{energy:7.123456789,stress:3.234567891,mood_intensity:3.345678912},result:{status:201,data:{dimension_count:3,source_kind:'live_observation',observed_at:secret(),snapshot_id:secret()}}};
+  const render=row=>{const report=new PublicReport(e);report.observe(row);return report.render().split('Observed action attempts (no replay):')[0].split('\n');},before=render(record);
+  for(const change of [row=>row.result.data.dimension_count=2,row=>row.result.data.source_kind='bootstrap_default_profile']){const row=structuredClone(record);change(row);const after=render(row),changed=after.filter((line,i)=>line!==before[i]);assert.equal(changed.length,1);assert(changed[0].startsWith('POST /affect/observation observation:'));}
+  for(const change of [row=>row.observation.energy=2,row=>row.result.data.observed_at=secret(),row=>row.result.data.snapshot_id=secret()]){const row=structuredClone(record);change(row);assert.deepEqual(render(row),before);}
+  const canary=secret(),row=structuredClone(record);row.result.data.source_kind=canary;row.result.data.dimension_count=canary;
+  const output=render(row).join('\n');assert(!output.includes(canary));assert(output.includes('dimensions unavailable; source_kind: withheld_or_unavailable'));
+  const statusRow=structuredClone(record);statusRow.result.status=200;const changed=render(statusRow).filter((line,i)=>line!==before[i]);assert.equal(changed.length,1);assert(changed[0].startsWith('POST /affect/observation HTTP:'));
+});
+test('P82 an absent observation stays unavailable and preserves the Plan stand-in marker',async()=>{
+  const {BOOTSTRAP_AFFECT_MARKER}=await import('./live-rehearsal-report.mjs');
+  const f=flow({mutate:r=>r.plan.human_complete_plan_quality={revision_suggestions:[BOOTSTRAP_AFFECT_MARKER]}});await f.run();
+  assert(!f.calls.some(call=>call.path===e.AFFECT_OBSERVATION_PATH));
+  const report=new PublicReport(e);f.records.forEach(record=>report.observe(record));const output=report.render();
+  assert(output.includes('POST /affect/observation: unavailable; action not observed'));assert(output.includes('affect_figures: stand_in'));
+  const live=flow({observation:{energy:7,stress:3,mood_intensity:3},mutate:r=>r.plan.human_complete_plan_quality={revision_suggestions:[]}});await live.run();
+  const liveReport=new PublicReport(e);live.records.forEach(record=>liveReport.observe(record));assert(liveReport.render().includes('affect_figures: not_marked_as_stand_in'));
+});
+test('P82 a refused observation stops before planning and exposes only a closed cause',async()=>{
+  const f=flow({observation:{energy:7.123456789,stress:3,mood_intensity:3},failure:e.AFFECT_OBSERVATION_PATH});
+  await assert.rejects(f.run(),error=>error.code==='action_request_failed'&&failureLine(error).includes('action: observation')&&!failureLine(error).includes('7.123456789'));
+  assert(!f.calls.some(call=>call.path===e.PLANNING_GENERATE_PATH));
 });

@@ -35,7 +35,7 @@ rehearsal. Set your private environment:
 | UBU_GOOGLE_CALENDAR_ID | explicit rehearsal calendar id |
 | UBU_GOOGLE_CREDENTIALS_PATH | readable absolute OAuth application-file path |
 | UBU_GOOGLE_TOKEN_CACHE_PATH | absolute readable/writable token file, or writable parent |
-| UBU_REHEARSAL_INPUTS | genuine private routine/settings/observations/Task requirement, exactly one operator-chosen provisional root in subjects, and a mutation that writes under it; include planning.gpu_enabled=true and optional ranking with your integer seed and layers 1–64, in the [driver reference](LIVE_REHEARSAL_DRIVER.md) shape |
+| UBU_REHEARSAL_INPUTS | genuine private routine/settings/observations/Task requirement, exactly one operator-chosen provisional root in subjects, and a mutation that writes under it; include planning.gpu_enabled=true, observation with your energy, stress and mood_intensity (each 0–10), and optional ranking with your integer seed and layers 1–64, in the [driver reference](LIVE_REHEARSAL_DRIVER.md) shape |
 | UBU_PLANNING_WORKER_PYTHON | absolute interpreter path in your active virtual environment; its command/path and PyTorch version stay on the private screen |
 | UBU_PLANNER_STRATEGY | required non-empty strategy; select greedy for this worker rehearsal |
 | UBU_PLANNING_WORKER_PROBE_TIMEOUT_MS | optional integer 1–30000 ms environment-probe budget; default 30000 ms |

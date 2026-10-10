@@ -58,6 +58,7 @@ and repository content. No observation, requirement or routine hour is inferred:
 | mutations | your genuine UniverseState PATCH mutation array |
 | task | unique ordinary active Task selector, id or privately supplied title |
 | precondition | explicit condition AST; a useful existing tree is preserved |
+| observation | optional private object with exactly energy, stress and mood_intensity; finite numbers 0–10, supplied for P1B-82 operator acceptance |
 | ranking | optional rehearsal-only synthetic stand-in: exactly seed (integer 0–4294967295) and layers (integer 1–64) |
 
 Omitted optional authoring inputs are recorded as skipped automatically. Invalid
@@ -66,6 +67,28 @@ PATCH changes only preconditions and reads it back. Vocabulary and Precondition
 run separately after deterministic authoring. Zero candidates is a legitimate
 result; no producer is rerun to force agreement. No automatic candidate admission
 or rejection occurs. The optional app remains available for deliberate decisions.
+
+A supplied observation is recorded once after ranking and before Plan generation,
+through POST /affect/observation with its schema version and exactly the three
+private values. The server stamps its Snapshot and timestamp. Absence records
+private_input_missing; no prompt or alternate branch is added. The private
+screen labels the three values once, without remembering numbers as titles.
+The public block's section 2 retains only the observed HTTP status, the server's
+dimension_count and source_kind checked against live_observation or
+bootstrap_default_profile; arbitrary source strings are withheld_or_unavailable.
+Values, observed_at and Snapshot id are withheld. Its two success lines are:
+
+```text
+POST /affect/observation HTTP: 201; outcome: response_observed
+POST /affect/observation observation: dimensions 3; source_kind: live_observation (closed value; values and observed_at withheld)
+```
+
+The subsequent Plan line reads affect_figures: not_marked_as_stand_in when the
+server's report no longer carries the stand-in marker. This is provenance, not
+a public disclosure of affect values. Uncalibrated priors do not block an
+otherwise feasible Plan; calibrated enforcement and unrelated failures remain
+valid. The observation is current until replaced when no freshness limit is
+configured; a store that holds one, or a supplied request, still goes stale.
 
 Synthetic ranking stands in for the ordering input the operator has not supplied;
 it is not a learned or human-authored preference. Only this fresh-store rehearsal
@@ -168,11 +191,13 @@ meet the named rule before starting another fresh rehearsal:
 | ranking_object_required | ranking | object with only seed and layers |
 | ranking_seed_u32 | ranking.seed | integer 0–4294967295 |
 | ranking_layers_1_to_64 | ranking.layers | integer 1–64 |
+| observation_object_required | observation | object with only energy, stress and mood_intensity |
+| observation_value_0_to_10 | observation.energy, observation.stress, observation.mood_intensity | each required, finite number 0–10 |
 
 ## One execution and two sinks
 
 Type live after checking the displayed store/calendar. The action order is routine,
-settings, session, capture, synthetic ranking lookup/statements, Plan, preview, approval decision, pre-authoring
+settings, session, capture, synthetic ranking lookup/statements, affect observation, Plan, risk/human-complete/time-by-category reads, preview, approval decision, pre-authoring
 UniverseState counts, explicit subject/mutation authoring, Task requirement,
 registry readback, Vocabulary, Precondition and queue. The script does not reset the calendar.
 Stamped leftovers/collisions are observations; unstamped reset completeness

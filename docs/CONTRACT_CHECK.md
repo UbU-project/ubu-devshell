@@ -1,7 +1,7 @@
 # The scenario runner
 
 `scripts/check-ui-contract.sh` builds the real `ubu-orchestrator` and walks
-the daily loop against it over HTTP, in thirty-seven scenarios. It needs no
+the daily loop against it over HTTP, in thirty-eight scenarios. It needs no
 webview, no Google account and no model. A full walk takes about ten seconds
 once the orchestrator is built.
 
@@ -46,7 +46,7 @@ at that time:
 
 Those two assertions are still scenario 1, and still run first.
 
-## The thirty-seven scenarios
+## The thirty-eight scenarios
 
 Every scenario starts its own orchestrator on its own ephemeral loopback
 port with its own empty store. Nothing is carried from one to the next. All
@@ -91,6 +91,7 @@ calendar requests ask for `export_mode: "mock"`.
 | 35 | vocabulary subject schema | Real request constrains governed-minus-affect plus provisional names; unknown subjects and missing predicates are refused independently, leaving ok status and the survivor. |
 | 36 | invocation provenance and unchanged Plan | Complete pre-ticket Plan fields, exact fixture goldens, CPU provenance/replay, policy-on fallback and default-off restoration remain unchanged. |
 | 37 | a seeded ranking layers the backlog | Twelve invented Tasks receive eleven synthetic stand-in statements from seed 7 and four balanced buckets. The server returns every Task's exact bucket, shared bucket_count 4 and value (1.0, 0.7, 0.4, exactly 0.1), without a cycle or ignored-Task diagnostic. Reordered IDs preserve the statements; seed 8 changes them. |
+| 38 | an affect observation replaces the stand-in | Fresh GET null; one invented fixed Task; record/read energy 7, stress 3, intensity 3 with live provenance; live Plan has no affect finding or stand-in sentence and an enum post-plan state; energy 2 keeps a warn_only Plan with energy violated; 11 and missing stress receive the two HTTP 400 codes. |
 
 The seeded scenarios first apply a day with no seed, then restart the
 orchestrator on the same store with a fixture built from the events that
@@ -417,10 +418,10 @@ scenario 7 of 16: colour means done (seeded mock calendar)
 PASS  7 colour means done: a colour on an applied Dynamic event completes its Task at capture, and only that Task
 ```
 
-A complete walk ends with thirty-seven `PASS` lines, two `SKIP` lines and:
+A complete walk ends with thirty-eight `PASS` lines, two `SKIP` lines and:
 
 ```text
-RESULT: 37 of 37 scenarios passed, 0 failed, 2 skipped, 694 requests, all to 127.0.0.1
+RESULT: 38 of 38 scenarios passed, 0 failed, 2 skipped, 703 requests, all to 127.0.0.1
 ```
 
 The walk stops at the first failure. The `FAIL` line names the scenario and
@@ -446,7 +447,7 @@ Two scripts, one boundary.
 | | `check-ui-contract.sh` | `acceptance.sh` |
 |---|---|---|
 | Covers | The HTTP layer: what the orchestrator does with a request. | The rendered layer: what a human sees in the app. |
-| Asserts | Everything it checks, in thirty-seven scenarios, each on its own store. | Nothing about behaviour. It stages a store and prints steps. |
+| Asserts | Everything it checks, in thirty-eight scenarios, each on its own store. | Nothing about behaviour. It stages a store and prints steps. |
 | Store | One throwaway store per scenario, and two for the rehearsal, on ephemeral ports. | One throwaway store on the app's default port, held until Ctrl-C. |
 | Preconditions | Each scenario stages exactly what it asserts. | Each step declares the seeds it needs; each seed checks itself over HTTP. |
 | A human | Reads PASS and FAIL lines. | Opens the app and follows the steps. |

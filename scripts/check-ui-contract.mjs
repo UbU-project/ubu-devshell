@@ -2502,6 +2502,41 @@ scenarios.push({
   }
 });
 
+// P1B-82: one new path, with an invented Task so a fresh store can plan.
+scenarios.push({
+  name: "an affect observation replaces the stand-in",
+  async run(o) {
+    const read=()=>call(o.base,"GET",endpoints.AFFECT_OBSERVATION_PATH);
+    const record=(values,expect=201)=>call(o.base,"POST",endpoints.AFFECT_OBSERVATION_PATH,{schema_version:endpoints.AFFECT_OBSERVATION_SCHEMA_VERSION,...values},expect);
+    const generate=()=>call(o.base,"POST",endpoints.PLANNING_GENERATE_PATH,{schema_version:endpoints.PLANNING_SCHEMA_VERSION,request:null});
+    same((await read()).observation,null,"the fresh store has no observation");
+    await captureTask(o,{title:"Invented affect observation control",duration_estimate:fixed(15)});
+    const written=await record({energy:7,stress:3,mood_intensity:3});
+    const observation=(await read()).observation;
+    same(observation.snapshot_id,written.snapshot_id,"read-back selects the recorded Snapshot");
+    same(observation.observed_at,written.observed_at,"read-back preserves the server timestamp");
+    same(observation.source_kind,"live_observation","the reading has live provenance");
+    same(observation.dimensions,{energy:7,stress:3,mood_intensity:3},"the exact invented reading is stored");
+    same([written.source_kind,written.dimension_count],["live_observation",3],"POST returns server provenance and count");
+    const comfortable=await generate();
+    ok(comfortable.plan,"the comfortable reading yields a Plan");
+    ok(!comfortable.legitimization.stale_affect_warning?.includes("bootstrap default profile observation"),"the Plan uses the reading rather than the stand-in");
+    const quality=comfortable.human_complete_plan_quality;
+    ok(!quality.revision_suggestions[0]?.startsWith("Record how you are feeling:"),"the first suggestion is not the stand-in sentence");
+    ok(["better","neutral","depleted","at_risk"].includes(quality.post_plan_state_delta),"post-plan state is its enum");
+    same(comfortable.risk_report.findings.filter(row=>["affect_margin","post_plan_depletion","destructive_pressure"].includes(row.category)),[],"comfortable values raise no affect finding");
+    await record({energy:2,stress:3,mood_intensity:3});
+    const low=await generate();
+    ok(low.plan,"a reading below an uncalibrated prior still yields a Plan");
+    same(low.legitimization.mode,"warn_only","uncalibrated priors warn");
+    same(low.legitimization.affect_feasible,false,"low energy is reported as infeasible");
+    ok(low.legitimization.violated_dimensions.includes("energy"),"the violated dimension is named");
+    same((await record({energy:11,stress:3,mood_intensity:3},400)).diagnostics[0].code,"affect_value_out_of_range","11 is refused");
+    same((await record({energy:7,mood_intensity:3},400)).diagnostics[0].code,"affect_dimension_missing","missing stress is refused");
+    return `live reading replaces the stand-in; margin ${quality.affect_margin}, stretch ${quality.stretch_pressure}, post-plan state ${quality.post_plan_state_delta}; low energy keeps a warned Plan; both value and missing-dimension refusals hold`;
+  }
+});
+
 // ----------------------------------------------------- the live flags (§E)
 
 // Off by default. Unset, each is reported as skipped, never as passed, and
