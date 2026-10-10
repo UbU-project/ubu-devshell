@@ -455,6 +455,15 @@ A ticket changing a named surface brings its check back under the ledger rule.
 | item 8 numeric transcription only | each advisory producer's separate result/selection counts | P1B-71 named producer readings; projection verified by P1B-73 §B; no new live confirmation | P1B-72 opening quotes Vocabulary and Precondition candidates_enqueued 3 and selection none; no new live-driver measurements | existing advisory scenarios/UI tests; P1B-73 §B field-by-field projection tests and driver separate producer snapshots, words/names/decisions remain operator-owned | P1B-73, explicit operator correction 2026-10-07 |
 | item 9 active human judgment; no retirement proposed | whether the chosen schedule and store suit the operator | P1B-71 whole run; judgment remains live each time | P1B-72 opening accepts P1B-71 as a whole; no schedule-judgment sentence quoted | operator's public judgment at every rehearsal; script cannot supply it | not retired |
 
+### Retired in P1B-83; proven by the operator's fault rehearsal of 2026-10-10 on the P1B-82 driver
+
+| retired | what it proved | proved in | on record | what covers it now | retired |
+|---|---|---|---|---|---|
+| P1B-80 §A: a failed rehearsal writes its rendered block before the fault line | a late failure keeps every completed step's counts, marks unobserved actions unavailable and leaves three unavailable judgments | the fault rehearsal of 2026-10-10 | this ticket's prompt quotes the fault line and names the retained sections; the block itself is the operator's local artifact | the injected test "P80 a late failure preserves completed capture, planning and approval before the fault" | P1B-83 |
+| P1B-80 §B: a fault carries the closed cause its response gave it | the vocabulary refusal carried HTTP 200, response status `timeout` and the diagnostic-code counts, and nothing else | the fault rehearsal of 2026-10-10 | the same | the injected test "P80 all response-backed sibling refusals retain HTTP and diagnostic counts; approval exceptions invent none" | P1B-83 |
+
+The same run was the first to show the declined-approval row `operator_did_not_approve_or_preview_stale` live, with no calendar write.
+
 ### From `scripts/acceptance.mjs`
 
 Step numbers are the ones the harness printed in P1B-54.
@@ -1524,3 +1533,29 @@ priors do not block an otherwise feasible Plan. Calibrated enforcement and
 unrelated planning failures remain legitimate. The form's rendered copy belongs
 to the existing pre-release visual pass, whose single step is updated above.
 The route does not recalculate the current Plan on its own.
+
+
+### P1B-83 the switch is recorded and the fault-run verifications retire
+
+The operator's fault rehearsal of 2026-10-10 at 08:20 on the P1B-82 driver
+retained capture, ranking, observation, Plan, the three reports, preview,
+declined approval, UniverseState read, subject/authoring/requirement writes
+and registry before Vocabulary timed out. Precondition and queue remained
+“unavailable; action not observed”; all three judgments remained unavailable.
+The ticket's prompt is the record; the operator's local block is not copied
+into the repositories. Its closed fault line is:
+
+```text
+advisory_run_failed: action: vocabulary; HTTP 200; response status: timeout; diagnostics[].code: {"advisory_task_skipped":4,"advisory_timeout":1}. Remedy: Correct private advisory endpoint/model/budget settings using the diagnostic on screen; do not rerun for preferred candidates.
+```
+
+Under rule 6, the two P1B-80 §A/§B verifications retire in the ledger above.
+The existing injected tests cover the retained block and closed response cause;
+no instrument, driver reference or LIVE_REHEARSAL.md instruction changes.
+
+The switch had already happened on 2026-10-10 (`UBU-D0305`). Phase 1b is
+complete by its exit criterion, and the store is no longer disposable.
+The MVP-release camera-and-voice commitment continues under `UBU-D0292`,
+with its sequence still open in `UBU-Q0183`. There is no new rehearsal for
+this documentation ticket. Acceptance is the operator reading the listed
+before/after sentences and the appended decision; Claude merges afterward.
